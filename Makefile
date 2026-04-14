@@ -1,7 +1,8 @@
-COMPOSE := docker compose
+COMPOSE_DEV := docker compose -f compose.dev.yml
+COMPOSE_PROD := docker compose -f compose.prod.yml
 SERVICE := app
 
-.PHONY: help install dev lint build start docker-build docker-up docker-down docker-logs docker-shell docker-rebuild docker-reset clean
+.PHONY: help install dev lint build start docker-build docker-up docker-down docker-logs docker-shell docker-rebuild docker-reset docker-prod-build docker-prod-up docker-prod-down docker-prod-logs clean
 
 help:
 	@echo "Comandos disponíveis:"
@@ -10,13 +11,17 @@ help:
 	@echo "  make lint            Executa o lint do projeto"
 	@echo "  make build           Gera o build local de produção"
 	@echo "  make start           Inicia a aplicação local usando o build de produção"
-	@echo "  make docker-build    Constrói a imagem/serviço Docker"
-	@echo "  make docker-up       Sobe o ambiente Docker em background"
-	@echo "  make docker-down     Derruba os containers mantendo os volumes"
-	@echo "  make docker-logs     Exibe os logs do serviço $(SERVICE)"
-	@echo "  make docker-shell    Abre um shell dentro do container $(SERVICE)"
-	@echo "  make docker-rebuild  Reconstrói a imagem e sobe o ambiente"
-	@echo "  make docker-reset    Derruba containers e remove volumes"
+	@echo "  make docker-build    Constrói a imagem do ambiente de desenvolvimento"
+	@echo "  make docker-up       Sobe o ambiente Docker de desenvolvimento"
+	@echo "  make docker-down     Derruba o ambiente Docker de desenvolvimento"
+	@echo "  make docker-logs     Exibe os logs do ambiente de desenvolvimento"
+	@echo "  make docker-shell    Abre um shell no container de desenvolvimento"
+	@echo "  make docker-rebuild  Reconstrói e sobe o ambiente de desenvolvimento"
+	@echo "  make docker-reset    Derruba o ambiente de desenvolvimento e remove volumes"
+	@echo "  make docker-prod-build Constrói a imagem do ambiente de produção"
+	@echo "  make docker-prod-up  Sobe o ambiente Docker de produção"
+	@echo "  make docker-prod-down Derruba o ambiente Docker de produção"
+	@echo "  make docker-prod-logs Exibe os logs do ambiente de produção"
 	@echo "  make clean           Remove artefatos locais de build"
 
 install:
@@ -35,25 +40,37 @@ start:
 	pnpm start
 
 docker-build:
-	$(COMPOSE) build
+	$(COMPOSE_DEV) build
 
 docker-up:
-	$(COMPOSE) up -d
+	$(COMPOSE_DEV) up -d
 
 docker-down:
-	$(COMPOSE) down
+	$(COMPOSE_DEV) down
 
 docker-logs:
-	$(COMPOSE) logs -f $(SERVICE)
+	$(COMPOSE_DEV) logs -f $(SERVICE)
 
 docker-shell:
-	$(COMPOSE) exec $(SERVICE) sh
+	$(COMPOSE_DEV) exec $(SERVICE) sh
 
 docker-rebuild:
-	$(COMPOSE) up --build -d
+	$(COMPOSE_DEV) up --build -d
 
 docker-reset:
-	$(COMPOSE) down -v
+	$(COMPOSE_DEV) down -v
+
+docker-prod-build:
+	$(COMPOSE_PROD) build
+
+docker-prod-up:
+	$(COMPOSE_PROD) up -d
+
+docker-prod-down:
+	$(COMPOSE_PROD) down
+
+docker-prod-logs:
+	$(COMPOSE_PROD) logs -f $(SERVICE)
 
 clean:
 	rm -rf .next

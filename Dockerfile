@@ -20,8 +20,6 @@ RUN pnpm build
 
 FROM base AS runner
 
-ENV NODE_ENV=production
-
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
 
 COPY --from=builder /app/.next/standalone ./
