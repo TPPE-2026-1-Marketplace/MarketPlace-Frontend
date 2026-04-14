@@ -26,7 +26,8 @@ Arquivos principais:
 
 - [package.json](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/package.json)
 - [Dockerfile](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/Dockerfile)
-- [compose.yml](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/compose.yml)
+- [compose.dev.yml](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/compose.dev.yml)
+- [compose.prod.yml](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/compose.prod.yml)
 - [Makefile](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/Makefile)
 - [.env.example](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/.env.example)
 
@@ -63,6 +64,17 @@ Variáveis públicas expostas ao navegador no Next.js devem começar com:
 ```bash
 NEXT_PUBLIC_
 ```
+
+### Sobre `NODE_ENV`
+
+O `NODE_ENV` não fica fixado no `Dockerfile`.
+
+Ele é definido de forma explícita por ambiente:
+
+- `compose.dev.yml` usa `NODE_ENV=development`
+- `compose.prod.yml` usa `NODE_ENV=production`
+
+Essa decisão foi tomada para que o modo de execução fique controlado pelo runtime de cada ambiente, e não pela imagem base compartilhada entre desenvolvimento e produção.
 
 ## Como rodar localmente sem Docker
 
@@ -129,7 +141,9 @@ Esse fluxo usa containers para o ambiente da aplicação.
 - o código do projeto é montado dentro do container via volume
 - as dependências ficam em volume separado
 - o cache do `pnpm` fica em volume separado
-- o serviço sobe em modo desenvolvimento com `pnpm dev`
+- o arquivo `compose.dev.yml` sobe o serviço em modo desenvolvimento com `pnpm dev`
+- o arquivo `compose.prod.yml` sobe a imagem final do estágio `runner`
+- o `NODE_ENV` é definido no Compose correspondente ao ambiente
 - o hot reload funciona sem reinstalar tudo a cada alteração de código
 
 ## Fluxo Docker na primeira vez
@@ -151,7 +165,7 @@ make docker-rebuild
 Equivalente direto:
 
 ```bash
-docker compose up --build -d
+docker compose -f compose.dev.yml up --build -d
 ```
 
 ### 2. Ver logs do serviço
@@ -280,20 +294,42 @@ O ambiente de desenvolvimento e o ambiente de produção não usam exatamente o 
 
 No desenvolvimento:
 
-- usa `docker compose`
+- usa `compose.dev.yml`
 - monta o código local como volume
 - roda `pnpm dev`
+- define `NODE_ENV=development`
 - tem hot reload
 
 ### Produção
 
 Na produção:
 
+- usa `compose.prod.yml`
 - a imagem é construída com o `Dockerfile`
 - o projeto passa pelo `pnpm build`
 - o Next gera o artefato otimizado
 - a imagem final roda com `node server.js`
+- define `NODE_ENV=production`
 - o container final é menor e não depende do código-fonte montado em volume
+
+### Como subir produção com Compose
+
+```bash
+make docker-prod-build
+make docker-prod-up
+```
+
+Para acompanhar os logs:
+
+```bash
+make docker-prod-logs
+```
+
+Para derrubar:
+
+```bash
+make docker-prod-down
+```
 
 ## Como gerar a imagem de produção
 
@@ -369,6 +405,30 @@ Reconstruir Docker:
 
 ```bash
 make docker-rebuild
+```
+
+Subir Docker de produção:
+
+```bash
+make docker-prod-up
+```
+
+Construir Docker de produção:
+
+```bash
+make docker-prod-build
+```
+
+Ver logs da produção:
+
+```bash
+make docker-prod-logs
+```
+
+Derrubar produção:
+
+```bash
+make docker-prod-down
 ```
 
 Ver logs:

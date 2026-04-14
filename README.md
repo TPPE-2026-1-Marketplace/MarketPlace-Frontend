@@ -21,8 +21,20 @@ O projeto ficará disponível em `http://localhost:3000`.
 ## Executando com Docker
 
 ```bash
-docker compose up --build
+make docker-rebuild
 ```
+
+Para produção com Compose:
+
+```bash
+make docker-prod-build
+make docker-prod-up
+```
+
+O ambiente define `NODE_ENV` por arquivo Compose:
+
+- `compose.dev.yml`: `NODE_ENV=development`
+- `compose.prod.yml`: `NODE_ENV=production`
 
 ## Build de produção
 
