@@ -5,6 +5,8 @@ node_modules
 coverage
 dist
 .env
+.env.development
+.env.production
 .env.local
 .env.development.local
 .env.test.local

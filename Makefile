@@ -2,10 +2,11 @@ COMPOSE_DEV := docker compose -f compose.dev.yml
 COMPOSE_PROD := docker compose -f compose.prod.yml
 SERVICE := app
 
-.PHONY: help install dev lint build start docker-build docker-up docker-down docker-logs docker-shell docker-rebuild docker-reset docker-prod-build docker-prod-up docker-prod-down docker-prod-logs clean
+.PHONY: help env-setup install dev lint build start docker-build docker-up docker-down docker-logs docker-shell docker-rebuild docker-reset docker-prod-build docker-prod-up docker-prod-down docker-prod-logs clean
 
 help:
 	@echo "Comandos disponíveis:"
+	@echo "  make env-setup       Cria .env.development e .env.production a partir dos exemplos"
 	@echo "  make install         Instala dependências localmente com pnpm"
 	@echo "  make dev             Sobe o Next.js localmente em modo desenvolvimento"
 	@echo "  make lint            Executa o lint do projeto"
@@ -23,6 +24,10 @@ help:
 	@echo "  make docker-prod-down Derruba o ambiente Docker de produção"
 	@echo "  make docker-prod-logs Exibe os logs do ambiente de produção"
 	@echo "  make clean           Remove artefatos locais de build"
+
+env-setup:
+	cp -n .env.development.example .env.development
+	cp -n .env.production.example .env.production
 
 install:
 	pnpm install
