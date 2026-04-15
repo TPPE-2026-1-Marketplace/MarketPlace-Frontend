@@ -29,7 +29,8 @@ Arquivos principais:
 - [compose.dev.yml](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/compose.dev.yml)
 - [compose.prod.yml](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/compose.prod.yml)
 - [Makefile](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/Makefile)
-- [.env.example](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/.env.example)
+- [.env.development.example](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/.env.development.example)
+- [.env.production.example](/home/brunobreis/Documents/unb/semestres/atual/tppe/front/.env.production.example)
 
 ## Requisitos
 
@@ -51,13 +52,27 @@ npm install -g pnpm
 
 ## Variáveis de ambiente
 
-O projeto já possui um arquivo de exemplo:
+O projeto usa templates versionados e arquivos reais locais:
 
 ```bash
-.env.example
+.env.development.example
+.env.production.example
 ```
 
-Se o projeto passar a depender de variáveis privadas ou URLs de backend, o ideal é criar um arquivo `.env.local` ou `.env` fora do versionamento, conforme a necessidade.
+Os arquivos reais usados pela aplicação são:
+
+```bash
+.env.development
+.env.production
+```
+
+Eles não devem ser versionados. Para criar ambos rapidamente:
+
+```bash
+make env-setup
+```
+
+Se o projeto passar a depender de valores sensíveis, mantenha segredos apenas nesses arquivos locais ou em variáveis injetadas pelo ambiente/CI/CD.
 
 Variáveis públicas expostas ao navegador no Next.js devem começar com:
 
@@ -81,6 +96,12 @@ Essa decisão foi tomada para que o modo de execução fique controlado pelo run
 Esse fluxo usa o Node da sua própria máquina.
 
 ### 1. Instalar dependências
+
+Antes, crie os arquivos `.env` locais:
+
+```bash
+make env-setup
+```
 
 ```bash
 make install
@@ -151,6 +172,12 @@ Esse fluxo usa containers para o ambiente da aplicação.
 Esse é o fluxo recomendado para a primeira execução.
 
 ### 1. Construir e subir o ambiente
+
+Antes, garanta que `.env.development` exista:
+
+```bash
+make env-setup
+```
 
 ```bash
 make docker-up
@@ -306,6 +333,7 @@ Na produção:
 
 - usa `compose.prod.yml`
 - a imagem é construída com o `Dockerfile`
+- o build depende de `.env.production` existir localmente
 - o projeto passa pelo `pnpm build`
 - o Next gera o artefato otimizado
 - a imagem final roda com `node server.js`
@@ -374,6 +402,7 @@ make help
 Instalar dependências localmente:
 
 ```bash
+make env-setup
 make install
 ```
 
