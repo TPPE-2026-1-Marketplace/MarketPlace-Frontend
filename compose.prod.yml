@@ -1,0 +1,12 @@
+services:
+  app:
+    build:
+      context: .
+      target: runner
+    ports:
+      - "3003:3000"
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
