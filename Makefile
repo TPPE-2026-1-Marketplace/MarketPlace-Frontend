@@ -24,6 +24,7 @@ help:
 	@echo "  make docker-prod-down Derruba o ambiente Docker de produção"
 	@echo "  make docker-prod-logs Exibe os logs do ambiente de produção"
 	@echo "  make clean           Remove artefatos locais de build"
+	@echo "  make check           Verifica se a imagem do dockerfile está correta"
 
 env-setup:
 	cp -n .env.development.example .env.development
@@ -79,3 +80,6 @@ docker-prod-logs:
 
 clean:
 	rm -rf .next
+
+check:
+	docker build . --check
