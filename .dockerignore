@@ -10,4 +10,11 @@ README.md
 .env.*
 !.env.example
 Dockerfile*
-compose*.yml
+compose*
+.DS_store
+*.log
+npm-debug.log*
+.vscode/
+.idea/
+.husky/_
+tsconfig.tsbuildinfo
