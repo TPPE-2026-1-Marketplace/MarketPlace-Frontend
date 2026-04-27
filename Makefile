@@ -1,33 +1,49 @@
-COMPOSE_DEV := docker compose -f compose.dev.yml
-COMPOSE_PROD := docker compose -f compose.prod.yml
+COMPOSE_DEV := docker compose --env-file .env.development -f compose.dev.yml
+COMPOSE_PROD := docker compose --env-file .env.production -f compose.prod.yml
 SERVICE := app
 
-.PHONY: help env-setup install dev lint build start docker-build docker-up docker-down docker-logs docker-shell docker-rebuild docker-reset docker-prod-build docker-prod-up docker-prod-down docker-prod-logs clean
+export DOCKER_BUILDKIT := 1
+export COMPOSE_DOCKER_CLI_BUILD := 1
+
+.PHONY: help env-setup install dev lint build start \
+    dev-up dev-down dev-logs dev-shell dev-build dev-rebuild dev-reset \
+    prod-up prod-down prod-logs prod-build prod-rebuild \
+    clean check
 
 help:
-	@echo "Comandos disponíveis:"
-	@echo "  make env-setup       Cria .env.development e .env.production a partir dos exemplos"
-	@echo "  make install         Instala dependências localmente com pnpm"
-	@echo "  make dev             Sobe o Next.js localmente em modo desenvolvimento"
-	@echo "  make lint            Executa o lint do projeto"
-	@echo "  make build           Gera o build local de produção"
-	@echo "  make start           Inicia a aplicação local usando o build de produção"
-	@echo "  make docker-build    Constrói a imagem do ambiente de desenvolvimento"
-	@echo "  make docker-up       Sobe o ambiente Docker de desenvolvimento"
-	@echo "  make docker-down     Derruba o ambiente Docker de desenvolvimento"
-	@echo "  make docker-logs     Exibe os logs do ambiente de desenvolvimento"
-	@echo "  make docker-shell    Abre um shell no container de desenvolvimento"
-	@echo "  make docker-rebuild  Reconstrói e sobe o ambiente de desenvolvimento"
-	@echo "  make docker-reset    Derruba o ambiente de desenvolvimento e remove volumes"
-	@echo "  make docker-prod-build Constrói a imagem do ambiente de produção"
-	@echo "  make docker-prod-up  Sobe o ambiente Docker de produção"
-	@echo "  make docker-prod-down Derruba o ambiente Docker de produção"
-	@echo "  make docker-prod-logs Exibe os logs do ambiente de produção"
-	@echo "  make clean           Remove artefatos locais de build"
+	@echo "Setup e local:"
+	@echo "  make env-setup        Cria .env.development e .env.production a partir dos .example"
+	@echo "  make install          Instala dependencias localmente com pnpm"
+	@echo "  make dev              Sobe o Next.js localmente em modo desenvolvimento"
+	@echo "  make lint             Executa o lint do projeto"
+	@echo "  make build            Gera o build local de producao"
+	@echo "  make start            Inicia a aplicacao local usando o build"
+	@echo ""
+	@echo "Desenvolvimento (Docker):"
+	@echo "  make dev-up           Sobe o ambiente Docker de desenvolvimento"
+	@echo "  make dev-down         Derruba o ambiente Docker de desenvolvimento"
+	@echo "  make dev-logs         Exibe logs do ambiente Docker de desenvolvimento"
+	@echo "  make dev-shell        Abre um shell no container da aplicacao"
+	@echo "  make dev-build        Apenas constroi a imagem de desenvolvimento"
+	@echo "  make dev-rebuild      Constroi e sobe o ambiente Docker de desenvolvimento"
+	@echo "  make dev-reset        Derruba o ambiente e REMOVE OS VOLUMES (apaga banco!)"
+	@echo ""
+	@echo "Producao (Docker):"
+	@echo "  make prod-up          Sobe o ambiente Docker de producao"
+	@echo "  make prod-down        Derruba o ambiente Docker de producao"
+	@echo "  make prod-logs        Exibe logs do ambiente Docker de producao"
+	@echo "  make prod-build       Apenas constroi a imagem de producao"
+	@echo "  make prod-rebuild     Constroi e sobe o ambiente Docker de producao"
+	@echo ""
+	@echo "Utilidades:"
+	@echo "  make clean            Remove artefatos locais de build"
+	@echo "  make check            Verifica se o Dockerfile esta correto"
 
 env-setup:
-	cp -n .env.development.example .env.development
-	cp -n .env.production.example .env.production
+	cp -n .env.development.example .env.development || true
+	cp -n .env.production.example .env.production || true
+	@echo "Arquivos .env.development e .env.production criados (se ainda nao existiam)."
+	@echo "Edite-os com os valores reais antes de subir o ambiente."
 
 install:
 	pnpm install
@@ -44,38 +60,44 @@ build:
 start:
 	pnpm start
 
-docker-build:
-	$(COMPOSE_DEV) build
-
-docker-up:
+dev-up:
 	$(COMPOSE_DEV) up -d
 
-docker-down:
+dev-down:
 	$(COMPOSE_DEV) down
 
-docker-logs:
-	$(COMPOSE_DEV) logs -f $(SERVICE)
+dev-logs:
+	$(COMPOSE_DEV) logs -f
 
-docker-shell:
+dev-shell:
 	$(COMPOSE_DEV) exec $(SERVICE) sh
 
-docker-rebuild:
+dev-build:
+	$(COMPOSE_DEV) build $(SERVICE)
+
+dev-rebuild:
 	$(COMPOSE_DEV) up --build -d
 
-docker-reset:
+dev-reset:
 	$(COMPOSE_DEV) down -v
 
-docker-prod-build:
-	$(COMPOSE_PROD) build
-
-docker-prod-up:
+prod-up:
 	$(COMPOSE_PROD) up -d
 
-docker-prod-down:
+prod-down:
 	$(COMPOSE_PROD) down
 
-docker-prod-logs:
-	$(COMPOSE_PROD) logs -f $(SERVICE)
+prod-logs:
+	$(COMPOSE_PROD) logs -f
+
+prod-build:
+	$(COMPOSE_PROD) build $(SERVICE)
+
+prod-rebuild:
+	$(COMPOSE_PROD) up --build -d
 
 clean:
 	rm -rf .next
+
+check:
+	docker build . --check

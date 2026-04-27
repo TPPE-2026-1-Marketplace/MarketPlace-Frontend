@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Marketplace Frontend",
-  description: "Base front-end com Next.js, Tailwind CSS e Docker.",
+  title: "DK Fashion",
+  description: "Sua loja de vestidos no Distrito Federal.",
 };
 
 type RootLayoutProps = Readonly<{
