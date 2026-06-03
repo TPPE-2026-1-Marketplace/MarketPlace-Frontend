@@ -6,26 +6,28 @@ SERVICE := app
 export DOCKER_BUILDKIT := 1
 export COMPOSE_DOCKER_CLI_BUILD := 1
 
-.PHONY: help env-setup install dev lint build start \
-	dev-up dev-down dev-logs dev-logs-once dev-shell dev-build dev-rebuild dev-restart dev-reset \
+.PHONY: help env-setup install dev lint build start preview \
+	dev-up dev-down dev-logs dev-logs-once dev-logs-app dev-shell dev-build dev-rebuild dev-restart dev-reset \
 	dev-lint dev-lint-fix dev-format dev-typecheck dev-check \
 	prod-up prod-down prod-logs prod-build prod-rebuild \
-	clean check
+	clean check dev-ci prod-image
 
 help:
 	@echo "Setup e local:"
 	@echo "  make env-setup        Cria .env.development e .env.production a partir dos .example"
 	@echo "  make install          Instala dependencias localmente com pnpm"
-	@echo "  make dev              Sobe o Next.js localmente em modo desenvolvimento"
+	@echo "  make dev              Sobe o Vite localmente (sem Docker) em modo desenvolvimento"
 	@echo "  make lint             Executa o lint do projeto"
 	@echo "  make build            Gera o build local de producao"
-	@echo "  make start            Inicia a aplicacao local usando o build"
+	@echo "  make preview          Serve o build local de producao via Vite preview"
+	@echo "  make start            Alias de preview"
 	@echo ""
 	@echo "Desenvolvimento (Docker):"
 	@echo "  make dev-up           Sobe o ambiente Docker de desenvolvimento"
 	@echo "  make dev-down         Derruba o ambiente Docker de desenvolvimento"
 	@echo "  make dev-logs         Exibe logs do ambiente Docker de desenvolvimento"
 	@echo "  make dev-logs-once    Exibe logs (uma vez) do ambiente Docker de desenvolvimento"
+	@echo "  make dev-logs-app     Exibe logs apenas do servico da aplicacao"
 	@echo "  make dev-shell        Abre um shell no container da aplicacao"
 	@echo "  make dev-build        Apenas constroi a imagem de desenvolvimento"
 	@echo "  make dev-rebuild      Constroi e sobe o ambiente Docker de desenvolvimento"
@@ -49,6 +51,10 @@ help:
 	@echo "Utilidades:"
 	@echo "  make clean            Remove artefatos locais de build"
 	@echo "  make check            Verifica se o Dockerfile esta correto"
+	@echo ""
+	@echo "CI/CD:"
+	@echo "  make dev-ci           Roda lint + typecheck + format:check + build no container (espelha o CI)"
+	@echo "  make prod-image       Builda a imagem Docker de producao standalone (espelha o CD)"
 
 env-setup:
 	cp -n .env.development.example .env.development || true
@@ -68,8 +74,11 @@ lint:
 build:
 	pnpm build
 
+preview:
+	pnpm preview
+
 start:
-	pnpm start
+	pnpm preview
 
 dev-up:
 	$(COMPOSE_DEV) up -d
@@ -82,6 +91,9 @@ dev-logs:
 
 dev-logs-once:
 	$(COMPOSE_DEV) logs --tail $${TAIL:-120}
+
+dev-logs-app:
+	$(COMPOSE_DEV) logs -f $(SERVICE)
 
 dev-shell:
 	$(COMPOSE_DEV) exec $(SERVICE) sh
@@ -113,7 +125,7 @@ dev-restart:
 
 dev-reset:
 	$(COMPOSE_DEV) down -v
-	rm -rf .next tsconfig.tsbuildinfo
+	rm -rf dist tsconfig.tsbuildinfo
 
 prod-up:
 	$(COMPOSE_PROD) up -d
@@ -131,7 +143,13 @@ prod-rebuild:
 	$(COMPOSE_PROD) up --build -d
 
 clean:
-	rm -rf .next tsconfig.tsbuildinfo
+	rm -rf dist tsconfig.tsbuildinfo
 
 check:
 	docker build . --check
+
+dev-ci:
+	$(COMPOSE_DEV) exec $(SERVICE) sh -c "pnpm lint && pnpm typecheck && pnpm format:check && pnpm build"
+
+prod-image:
+	docker build --target runner -t marketplace-frontend:local .

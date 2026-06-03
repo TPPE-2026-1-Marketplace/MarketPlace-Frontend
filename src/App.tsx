@@ -1,9 +1,11 @@
-export default function Home() {
+export default function App() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
       <div className="flex flex-col items-center gap-2 text-center">
         <div className="mb-2 border border-white/20 px-5 py-3">
-          <span className="text-2xl font-bold tracking-[0.4em] text-white">DK FASHION</span>
+          <span className="text-2xl font-bold tracking-[0.4em] text-white">
+            DK FASHION
+          </span>
         </div>
         <h1 className="text-4xl font-light tracking-widest text-white sm:text-5xl">
           Hello, World
@@ -13,5 +15,5 @@ export default function Home() {
         </p>
       </div>
     </main>
-  );
+  )
 }
