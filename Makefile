@@ -6,7 +6,7 @@ SERVICE := app
 export DOCKER_BUILDKIT := 1
 export COMPOSE_DOCKER_CLI_BUILD := 1
 
-.PHONY: help env-setup install dev lint build start preview \
+.PHONY: help env-setup install dev lint test build start preview \
 	dev-up dev-down dev-logs dev-logs-once dev-logs-app dev-shell dev-build dev-rebuild dev-restart dev-reset \
 	dev-lint dev-lint-fix dev-format dev-typecheck dev-check \
 	prod-up prod-down prod-logs prod-build prod-rebuild \
@@ -18,6 +18,7 @@ help:
 	@echo "  make install          Instala dependencias localmente com pnpm"
 	@echo "  make dev              Sobe o Vite localmente (sem Docker) em modo desenvolvimento"
 	@echo "  make lint             Executa o lint do projeto"
+	@echo "  make test             Executa os testes do projeto"
 	@echo "  make build            Gera o build local de producao"
 	@echo "  make preview          Serve o build local de producao via Vite preview"
 	@echo "  make start            Alias de preview"
@@ -70,6 +71,9 @@ dev:
 
 lint:
 	pnpm lint
+
+test:
+	pnpm test
 
 build:
 	pnpm build
