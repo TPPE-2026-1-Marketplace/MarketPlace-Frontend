@@ -16,6 +16,7 @@ interface ProductCardProps {
   categoria?: string;
   nota?: number;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export default function ProductCard({
@@ -27,6 +28,7 @@ export default function ProductCard({
   categoria,
   nota,
   className,
+  style,
 }: ProductCardProps) {
   const desconto = precoOriginal
     ? Math.round(((precoOriginal - preco) / precoOriginal) * 100)
@@ -36,6 +38,7 @@ export default function ProductCard({
     <Link
       href={`/produtos/${id}`}
       className={cn("group block", className)}
+      style={style}
     >
       <div className="relative overflow-hidden rounded-[var(--radius-lg)] bg-[var(--background-card)] border border-[var(--border)] transition-all duration-[var(--transition-base)] hover:border-[var(--border-accent)] hover:shadow-[var(--shadow-glow)]">
         {/* Image */}

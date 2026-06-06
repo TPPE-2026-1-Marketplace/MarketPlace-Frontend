@@ -24,8 +24,7 @@ RUN --mount=type=cache,target=/pnpm/store \
 
 FROM deps AS dev
 
-CMD ["pnpm", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
-# CMD ["sh", "-c", "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then pnpm install; fi && pnpm dev --hostname 0.0.0.0 --port 3000"]
+CMD ["sh", "-c", "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then pnpm install; fi && pnpm dev --hostname 0.0.0.0 --port 3000"]
 
 FROM base AS build
 
