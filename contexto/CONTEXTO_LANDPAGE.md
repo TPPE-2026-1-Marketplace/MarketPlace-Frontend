@@ -216,17 +216,17 @@ front/src/
 
 ---
 
-### ETAPA 4 — Página Home (Landpage)
+### ETAPA 4 — Página Home (Landpage) ✅
 
-- [ ] **4.1** Criar `src/components/sections/HeroSection.tsx` — hero com imagem em fullscreen, título impactante, CTA "Ver Coleção"
-- [ ] **4.2** Criar `src/components/sections/FeaturedProducts.tsx` — carrossel/grid de produtos em destaque (dados do backend)
-- [ ] **4.3** Criar `src/components/sections/CategorySection.tsx` — cards de categoria (debutante, formatura, casamento, festa)
-- [ ] **4.4** Criar `src/components/sections/ReviewsSection.tsx` — avaliações de clientes com estrelas
-- [ ] **4.5** Criar `src/components/sections/PromoSection.tsx` — banner promocional
-- [ ] **4.6** Montar `src/app/page.tsx` com todas as seções acima
-- [ ] **4.7** Gerar imagens para o hero e seções com generate_image
+- [x] **4.1** Criar `src/components/sections/HeroSection.tsx` — hero com imagem em fullscreen, título impactante, CTA "Ver Coleção"
+- [x] **4.2** Criar `src/components/sections/FeaturedProducts.tsx` — carrossel/grid de produtos em destaque (dados do backend)
+- [x] **4.3** Criar `src/components/sections/CategorySection.tsx` — cards de categoria (debutante, formatura, casamento, festa)
+- [x] **4.4** Criar `src/components/sections/ReviewsSection.tsx` — avaliações de clientes com estrelas
+- [x] **4.5** Criar `src/components/sections/PromoSection.tsx` — banner promocional
+- [x] **4.6** Montar `src/app/page.tsx` com todas as seções acima
+- [x] **4.7** Gerar imagens para o hero e seções com generate_image
 
-**Commit:** `feat(home): landpage com hero, destaques, categorias e reviews`
+**Commit:** `feat(home): landpage com hero, destaques, categorias e reviews` ✅ `b943be3`
 
 ---
 
