@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1.7
 
-# O uso do ARG faz com o que a imagem pode mudar dinamicamente conforme o uso
-# isso é bom para fazer uma validação da melhor imagem
+# O uso do ARG faz com que a imagem possa mudar dinamicamente conforme o uso.
 # Exemplo: docker build --build-arg NODE_VERSION=20-alpine .
 
 ARG NODE_VERSION=22-alpine
 
+# ─── Estágio base: Node + pnpm ───────────────────────────────────────────────
 FROM node:${NODE_VERSION} AS base
 
 ENV PNPM_HOME="/pnpm"
@@ -15,18 +15,28 @@ RUN corepack enable
 
 WORKDIR /app
 
+# ─── Estágio deps: instala dependências com cache ─────────────────────────────
 FROM base AS deps
 
 COPY package.json pnpm-lock.yaml ./
 
-RUN --mount=type=cache,target=/pnpm/store \
-    pnpm install --frozen-lockfile --store-dir=/pnpm/store
+RUN --mount=type=cache,target=/app/.pnpm-store \
+    pnpm install --frozen-lockfile --store-dir=/app/.pnpm-store
 
+# ─── Estágio dev: servidor de desenvolvimento Vite com HMR ───────────────────
 FROM deps AS dev
 
-CMD ["pnpm", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
-# CMD ["sh", "-c", "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then pnpm install; fi && pnpm dev --hostname 0.0.0.0 --port 3000"]
+# Ajusta ownership para o usuario do host
+# (compose define user: "${UID:-1000}:${GID:-1000}")
+RUN chown -R node:node /app
 
+USER node
+
+EXPOSE 3000
+
+CMD ["pnpm", "dev"]
+
+# ─── Estágio build: gera os arquivos estáticos de produção ───────────────────
 FROM base AS build
 
 ENV NODE_ENV=production
@@ -36,23 +46,18 @@ COPY . .
 
 RUN pnpm build
 
-FROM base AS runner
+# ─── Estágio runner: Nginx serve os arquivos estáticos ───────────────────────
+FROM nginx:stable-alpine AS runner
 
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-ENV NODE_ENV=production
+# Copia os artefatos de build do estágio anterior
+COPY --from=build /app/dist /usr/share/nginx/html
 
-RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
+# Copia a configuração customizada do Nginx (SPA fallback + healthcheck)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-COPY --from=build --chown=nextjs:nextjs /app/public ./public
-COPY --from=build --chown=nextjs:nextjs /app/.next/standalone ./
-COPY --from=build --chown=nextjs:nextjs /app/.next/static ./.next/static
+EXPOSE 80
 
-USER nextjs
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost/health || exit 1
 
-EXPOSE 3000
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
-
-CMD ["node", "server.js"]
+CMD ["nginx", "-g", "daemon off;"]
