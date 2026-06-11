@@ -1,148 +1,240 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ShoppingBag, User, Menu, X, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ShoppingCart, User, Menu, X, Search, Heart, LogOut, LayoutDashboard, Store, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart";
 
+const MAIN_CATEGORIES = [
+  { label: "Festa", path: "/produtos?categoria=festa" },
+  { label: "Formatura", path: "/produtos?categoria=formatura" },
+  { label: "Casamento", path: "/produtos?categoria=casamento" },
+  { label: "Debutante", path: "/produtos?categoria=debutante" },
+];
+
+const TYPE_CATEGORIES = [
+  { label: "Midi", path: "/produtos?tipo=midi" },
+  { label: "Longo", path: "/produtos?tipo=longo" },
+  { label: "Longuete", path: "/produtos?tipo=longuete" },
+];
+
 export default function Header() {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { itemCount } = useCart();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Mocked user state for layout consistency
+  const user = null; // Change when auth is implemented
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const navLinks = [
-    { href: "/produtos", label: "Coleção" },
-    { href: "/produtos?categoria=debutante", label: "Debutante" },
-    { href: "/produtos?categoria=formatura", label: "Formatura" },
-    { href: "/produtos?categoria=casamento", label: "Casamento" },
-    { href: "/produtos?categoria=festa", label: "Festa" },
-  ];
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/produtos?busca=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+      setMenuOpen(false);
+    }
+  };
+
+  const handleFavoritesClick = () => {
+    if (user) {
+      router.push("/favoritos");
+    } else {
+      router.push("/conta");
+    }
+  };
 
   return (
-    <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-[var(--transition-base)]",
-        isScrolled
-          ? "glass py-3 shadow-lg"
-          : "bg-transparent py-5",
-      )}
-    >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link
-            href="/"
-            className="group flex items-center gap-2"
+    <header className="bg-white sticky top-0 z-50 border-b border-gray-100">
+      {/* 1. TOP BAR */}
+      <div className="bg-[#1a1a1a] text-white text-center py-2 text-xs tracking-widest">
+        Enviamos para todo o DF&nbsp;&nbsp;|&nbsp;&nbsp;Compra segura
+      </div>
+
+      {/* 2. MAIN HEADER */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-4 h-16">
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="lg:hidden p-2 text-gray-600 shrink-0"
           >
-            <div className="border border-white/20 px-4 py-1.5 transition-all duration-[var(--transition-base)] group-hover:border-[var(--color-brand)]/50 group-hover:shadow-[var(--shadow-glow)]">
-              <span className="text-lg font-bold tracking-[0.3em] text-white">
-                DK FASHION
-              </span>
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
+          {/* Logo */}
+          <Link href="/" className="shrink-0 flex items-center">
+            <div className="bg-[#1a1a1a] px-3 py-1 flex flex-col items-center justify-center">
+              <span className="text-white font-serif text-lg leading-none tracking-widest">DK</span>
+              <span className="text-white text-[8px] tracking-[0.2em] uppercase leading-none mt-0.5">Fashion</span>
             </div>
           </Link>
 
-          {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="relative text-sm font-medium tracking-[0.1em] uppercase text-white/70 transition-colors duration-[var(--transition-fast)] hover:text-white after:absolute after:bottom-[-4px] after:left-0 after:h-[1px] after:w-0 after:bg-[var(--color-brand)] after:transition-all after:duration-[var(--transition-base)] hover:after:w-full"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Actions */}
-          <div className="flex items-center gap-3">
+          {/* Central search bar (desktop) */}
+          <form
+            onSubmit={handleSearch}
+            className="hidden lg:flex flex-1 max-w-xl mx-auto relative"
+          >
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar vestidos..."
+              className="w-full border border-gray-200 bg-gray-50 px-5 py-2.5 pr-12 focus:outline-none focus:border-[#1a1a1a] text-sm transition-colors text-[var(--foreground)]"
+            />
             <button
-              className="hidden sm:flex items-center justify-center w-10 h-10 rounded-full text-white/70 hover:text-white hover:bg-white/5 transition-all duration-[var(--transition-fast)]"
-              aria-label="Buscar"
+              type="submit"
+              className="absolute right-0 top-0 h-full px-4 text-gray-500 hover:text-[#1a1a1a] transition-colors"
             >
-              <Search size={20} />
+              <Search className="w-4 h-4" />
+            </button>
+          </form>
+
+          {/* Icons */}
+          <div className="flex items-center gap-0.5 ml-auto lg:ml-0">
+            <button
+              onClick={handleFavoritesClick}
+              className="p-2.5 text-gray-600 hover:text-[#1a1a1a] active:scale-95 transition-all"
+              aria-label="Favoritos"
+            >
+              <Heart className="w-5 h-5" />
             </button>
 
-            <Link
-              href="/conta"
-              className="hidden sm:flex items-center justify-center w-10 h-10 rounded-full text-white/70 hover:text-white hover:bg-white/5 transition-all duration-[var(--transition-fast)]"
-              aria-label="Minha conta"
-            >
-              <User size={20} />
-            </Link>
+            {/* User menu */}
+            <div className="relative" ref={userMenuRef}>
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="p-2.5 text-gray-600 hover:text-[#1a1a1a] transition-colors flex items-center gap-1.5"
+              >
+                <User className="w-5 h-5" />
+              </button>
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 shadow-lg py-1 w-52 z-50">
+                  <Link
+                    href="/conta"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Entrar / Cadastrar
+                  </Link>
+                </div>
+              )}
+            </div>
 
+            {/* Cart */}
             <Link
               href="/carrinho"
-              className="relative flex items-center justify-center w-10 h-10 rounded-full text-white/70 hover:text-white hover:bg-white/5 transition-all duration-[var(--transition-fast)]"
-              aria-label="Carrinho"
+              className="relative p-2.5 text-gray-600 hover:text-[#1a1a1a] transition-colors"
             >
-              <ShoppingBag size={20} />
+              <ShoppingCart className="w-5 h-5" />
               {itemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-brand)] text-[10px] font-bold text-white">
-                  {itemCount > 9 ? "9+" : itemCount}
+                <span className="absolute -top-0.5 -right-0.5 bg-[#1a1a1a] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center leading-none">
+                  {itemCount}
                 </span>
               )}
             </Link>
-
-            {/* Mobile toggle */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="flex lg:hidden items-center justify-center w-10 h-10 rounded-full text-white/70 hover:text-white hover:bg-white/5 transition-all duration-[var(--transition-fast)]"
-              aria-label="Menu"
-            >
-              {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Menu */}
-      <div
-        className={cn(
-          "lg:hidden overflow-hidden transition-all duration-[var(--transition-base)]",
-          isMobileMenuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0",
-        )}
-      >
-        <nav className="glass mx-4 mt-3 rounded-[var(--radius-lg)] p-4 flex flex-col gap-1">
-          {navLinks.map((link) => (
+        {/* 3. CATEGORY MENU (desktop) */}
+        <nav className="hidden lg:flex items-center justify-center gap-0 border-t border-gray-100 overflow-x-auto">
+          <Link
+            href="/produtos"
+            className="px-4 py-3 text-xs tracking-widest uppercase text-gray-500 hover:text-[#1a1a1a] hover:bg-gray-50 transition-colors whitespace-nowrap"
+          >
+            Todos os Vestidos
+          </Link>
+
+          <span className="text-gray-200 text-sm px-1">|</span>
+
+          {MAIN_CATEGORIES.map((cat) => (
             <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="px-4 py-3 text-sm font-medium tracking-[0.1em] uppercase text-white/70 hover:text-white hover:bg-white/5 rounded-[var(--radius-md)] transition-all duration-[var(--transition-fast)]"
+              key={cat.label}
+              href={cat.path}
+              className="px-4 py-3 text-xs tracking-widest uppercase text-gray-500 hover:text-[#1a1a1a] hover:bg-gray-50 transition-colors whitespace-nowrap"
             >
-              {link.label}
+              {cat.label}
             </Link>
           ))}
-          <div className="border-t border-[var(--border)] mt-2 pt-2 flex gap-2">
+
+          <span className="text-gray-200 text-sm px-1">|</span>
+
+          {TYPE_CATEGORIES.map((cat) => (
             <Link
-              href="/conta"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm text-white/70 hover:text-white hover:bg-white/5 rounded-[var(--radius-md)] transition-all"
+              key={cat.label}
+              href={cat.path}
+              className="px-4 py-3 text-xs tracking-widest uppercase text-gray-400 hover:text-[#1a1a1a] hover:bg-gray-50 transition-colors whitespace-nowrap"
             >
-              <User size={16} />
-              Conta
+              {cat.label}
             </Link>
-            <Link
-              href="/carrinho"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm text-white/70 hover:text-white hover:bg-white/5 rounded-[var(--radius-md)] transition-all"
-            >
-              <ShoppingBag size={16} />
-              Carrinho
-            </Link>
-          </div>
+          ))}
         </nav>
       </div>
+
+      {/* Mobile menu */}
+      {menuOpen && (
+        <div className="lg:hidden bg-white border-t border-gray-100 pb-4">
+          <div className="px-4 pt-4 pb-3">
+            <form onSubmit={handleSearch} className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar vestidos..."
+                className="w-full border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 focus:outline-none focus:border-[#1a1a1a] text-sm text-[var(--foreground)]"
+              />
+              <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                <Search className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+          <div className="px-4 space-y-0.5">
+            <Link
+              href="/produtos"
+              onClick={() => setMenuOpen(false)}
+              className="block py-2.5 text-sm text-gray-700 hover:text-[#1a1a1a] border-b border-gray-50 tracking-wide"
+            >
+              Todos os Vestidos
+            </Link>
+            <p className="text-xs text-gray-400 uppercase tracking-widest pt-3 pb-1">Coleções</p>
+            {MAIN_CATEGORIES.map((cat) => (
+              <Link
+                key={cat.label}
+                href={cat.path}
+                onClick={() => setMenuOpen(false)}
+                className="block py-2 pl-2 text-sm text-gray-600 hover:text-[#1a1a1a]"
+              >
+                {cat.label}
+              </Link>
+            ))}
+            <p className="text-xs text-gray-400 uppercase tracking-widest pt-3 pb-1">Comprimento</p>
+            {TYPE_CATEGORIES.map((cat) => (
+              <Link
+                key={cat.label}
+                href={cat.path}
+                onClick={() => setMenuOpen(false)}
+                className="block py-2 pl-2 text-sm text-gray-500 hover:text-[#1a1a1a]"
+              >
+                {cat.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

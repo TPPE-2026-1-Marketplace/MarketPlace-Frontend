@@ -50,7 +50,7 @@ export default function Pagination({
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-[var(--transition-fast)]"
+        className="flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none transition-all duration-[var(--transition-fast)]"
         aria-label="Página anterior"
       >
         <ChevronLeft size={16} />
@@ -72,8 +72,8 @@ export default function Pagination({
             className={cn(
               "flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] text-sm font-medium transition-all duration-[var(--transition-fast)]",
               currentPage === page
-                ? "bg-[var(--color-brand)] text-white"
-                : "border border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-white",
+                ? "bg-[var(--color-brand)] text-[var(--foreground)]"
+                : "border border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-[var(--foreground)]",
             )}
             aria-current={currentPage === page ? "page" : undefined}
           >
@@ -86,7 +86,7 @@ export default function Pagination({
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all duration-[var(--transition-fast)]"
+        className="flex items-center justify-center w-9 h-9 rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-[var(--foreground)] disabled:opacity-30 disabled:pointer-events-none transition-all duration-[var(--transition-fast)]"
         aria-label="Próxima página"
       >
         <ChevronRight size={16} />

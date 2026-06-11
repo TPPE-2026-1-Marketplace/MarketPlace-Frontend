@@ -1,120 +1,58 @@
 "use client";
 
 import React from "react";
-import { Star, Quote } from "lucide-react";
-
-const reviews = [
-  {
-    name: "Maria Clara",
-    rating: 5,
-    text: "O vestido superou todas as minhas expectativas! A qualidade do tecido é incrível e o atendimento foi perfeito. Me senti uma princesa na minha formatura.",
-    occasion: "Formatura",
-    date: "Maio 2026",
-  },
-  {
-    name: "Ana Beatriz",
-    rating: 5,
-    text: "Comprei meu vestido de debutante aqui e não poderia estar mais feliz. A equipe me ajudou a encontrar o modelo perfeito. Recomendo demais!",
-    occasion: "Debutante",
-    date: "Abril 2026",
-  },
-  {
-    name: "Juliana Santos",
-    rating: 5,
-    text: "Vestido maravilhoso para o casamento da minha irmã. Entrega super rápida para Brasília e caimento perfeito. Voltarei com certeza!",
-    occasion: "Casamento",
-    date: "Março 2026",
-  },
-  {
-    name: "Fernanda Lima",
-    rating: 4,
-    text: "Adorei a variedade de modelos e cores. O vestido ficou lindo e recebi muitos elogios na festa. Preço justo pela qualidade oferecida.",
-    occasion: "Festa",
-    date: "Maio 2026",
-  },
-];
-
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: 5 }, (_, i) => (
-        <Star
-          key={i}
-          size={14}
-          className={
-            i < rating
-              ? "fill-amber-400 text-amber-400"
-              : "fill-none text-[var(--foreground-subtle)]"
-          }
-        />
-      ))}
-    </div>
-  );
-}
+import { Star } from "lucide-react";
 
 export default function ReviewsSection() {
   return (
-    <section className="py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center mb-14">
-          <span className="text-xs font-medium tracking-[0.2em] uppercase text-[var(--color-brand)]">
-            Depoimentos
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-light text-white mt-2">
-            O que nossas{" "}
-            <span className="font-semibold text-gradient">clientes</span>{" "}
-            dizem
+    <section className="py-14 bg-white border-t border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-10">
+          <h2 className="text-gray-900 font-serif text-3xl" style={{ letterSpacing: "-0.02em" }}>
+            O que nossas clientes dizem
           </h2>
-          <div className="flex items-center justify-center gap-2 mt-4">
-            <StarRating rating={5} />
-            <span className="text-sm text-[var(--foreground-muted)]">
-              4.9 de 5 · +200 avaliações
-            </span>
-          </div>
+          <p className="text-gray-500 text-sm mt-1 font-sans">
+            Satisfação garantida em cada compra
+          </p>
         </div>
-
-        {/* Reviews Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {reviews.map((review, index) => (
-            <div
-              key={index}
-              className="group relative p-6 rounded-[var(--radius-lg)] bg-[var(--background-card)] border border-[var(--border)] hover:border-[var(--border-accent)] transition-all duration-[var(--transition-base)] animate-slide-up"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              {/* Quote icon */}
-              <Quote
-                size={24}
-                className="text-[var(--color-brand)]/20 mb-4"
-              />
-
-              {/* Stars */}
-              <StarRating rating={review.rating} />
-
-              {/* Text */}
-              <p className="mt-4 text-sm text-[var(--foreground-secondary)] leading-relaxed line-clamp-4">
-                &ldquo;{review.text}&rdquo;
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {[
+            {
+              name: "Maria S.",
+              text: "Comprei o vestido de debutante e fiquei apaixonada! Qualidade incrível e chegou antes do prazo. Super recomendo a DK Festas!",
+              stars: 5,
+              tag: "Debutante",
+            },
+            {
+              name: "Juliana C.",
+              text: "Atendimento maravilhoso e vestido de formatura simplesmente perfeito. Recebi elogios a noite toda. Obrigada DK Festas!",
+              stars: 5,
+              tag: "Formatura",
+            },
+            {
+              name: "Ana B.",
+              text: "O vestido de casamento superou todas as expectativas. Me senti uma rainha! O caimento é impecável e o tecido é de altíssima qualidade.",
+              stars: 5,
+              tag: "Casamento",
+            },
+          ].map((t, i) => (
+            <div key={i} className="bg-[#f8f8f8] p-6 border border-gray-100">
+              <div className="flex items-center gap-0.5 mb-3">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star
+                    key={s}
+                    className="w-3.5 h-3.5 fill-[#1a1a1a] text-[#1a1a1a]"
+                  />
+                ))}
+              </div>
+              <p className="text-gray-600 text-sm leading-relaxed mb-5 italic">
+                "{t.text}"
               </p>
-
-              {/* Author */}
-              <div className="mt-5 pt-4 border-t border-[var(--border)]">
-                <div className="flex items-center gap-3">
-                  {/* Avatar placeholder */}
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--color-brand)] to-[var(--color-brand-dark)] flex items-center justify-center text-white text-xs font-bold">
-                    {review.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">
-                      {review.name}
-                    </p>
-                    <p className="text-xs text-[var(--foreground-subtle)]">
-                      {review.occasion} · {review.date}
-                    </p>
-                  </div>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-900 text-sm font-medium">{t.name}</span>
+                <span className="bg-gray-200 text-gray-700 text-xs px-2.5 py-1">
+                  {t.tag}
+                </span>
               </div>
             </div>
           ))}

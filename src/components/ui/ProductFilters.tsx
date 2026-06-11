@@ -68,8 +68,8 @@ export default function ProductFilters({
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-[var(--radius-full)] border transition-all duration-[var(--transition-fast)] capitalize",
                 filters.categoria === cat
-                  ? "bg-[var(--color-brand)] border-[var(--color-brand)] text-white"
-                  : "bg-transparent border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-white",
+                  ? "bg-[var(--color-brand)] border-[var(--color-brand)] text-[var(--foreground)]"
+                  : "bg-transparent border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-[var(--foreground)]",
               )}
             >
               {cat}
@@ -149,7 +149,7 @@ export default function ProductFilters({
       {/* Desktop sidebar */}
       <aside className="hidden lg:block w-64 shrink-0">
         <div className="sticky top-[calc(var(--header-height)+2rem)] p-5 rounded-[var(--radius-lg)] bg-[var(--background-card)] border border-[var(--border)]">
-          <h2 className="text-sm font-semibold text-white mb-5 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-[var(--foreground)] mb-5 flex items-center gap-2">
             <SlidersHorizontal size={16} />
             Filtros
           </h2>

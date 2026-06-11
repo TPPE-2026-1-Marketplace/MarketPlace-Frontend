@@ -11,7 +11,7 @@ interface BadgeProps {
 
 const variantStyles: Record<BadgeVariant, string> = {
   default:
-    "bg-white/10 text-[var(--foreground-secondary)]",
+    "bg-black/10 text-[var(--foreground-secondary)]",
   brand:
     "bg-[var(--color-brand)]/15 text-[var(--color-brand-light)]",
   success:

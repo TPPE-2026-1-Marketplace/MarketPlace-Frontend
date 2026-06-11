@@ -1,4 +1,10 @@
 @import "tailwindcss";
+@source "../";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-playfair), ui-serif, Georgia, serif;
+}
 
 /* ============================
    DK Fashion — Design Tokens
@@ -11,26 +17,26 @@
   --color-brand-dark: #a03062;
 
   /* Background */
-  --background: #0a0a0a;
-  --background-secondary: #111111;
-  --background-card: #161616;
-  --background-elevated: #1a1a1a;
+  --background: #f9fafb;
+  --background-secondary: #f3f4f6;
+  --background-card: #ffffff;
+  --background-elevated: #ffffff;
 
   /* Foreground */
-  --foreground: #ffffff;
-  --foreground-secondary: #e0e0e0;
-  --foreground-muted: #888888;
-  --foreground-subtle: #555555;
+  --foreground: #111827;
+  --foreground-secondary: #374151;
+  --foreground-muted: #6b7280;
+  --foreground-subtle: #9ca3af;
 
   /* Border */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.15);
+  --border: #e5e7eb;
+  --border-hover: #d1d5db;
   --border-accent: rgba(200, 66, 124, 0.4);
 
   /* Overlay */
-  --overlay: rgba(0, 0, 0, 0.6);
-  --glass: rgba(22, 22, 22, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.06);
+  --overlay: rgba(0, 0, 0, 0.4);
+  --glass: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.06);
 
   /* Status */
   --color-success: #22c55e;
@@ -64,12 +70,6 @@
 /* ============================
    Base Styles
    ============================ */
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
 
 html {
   scroll-behavior: smooth;

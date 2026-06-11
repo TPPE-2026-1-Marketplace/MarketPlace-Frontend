@@ -1,92 +1,72 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
-import { Sparkles, Truck, Shield } from "lucide-react";
-import Button from "@/components/ui/Button";
+import { ArrowRight, MapPin, Shield, RefreshCw } from "lucide-react";
 
 export default function PromoSection() {
   return (
-    <section className="py-20 sm:py-28 bg-[var(--background-secondary)] overflow-hidden">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Main promo banner */}
-        <div className="relative rounded-[var(--radius-xl)] overflow-hidden">
-          {/* Background gradient */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(135deg, #1a0a12 0%, #2d0f1e 30%, #0a0a0a 70%, #0f0a15 100%)",
-            }}
-          />
-          {/* Decorative circles */}
-          <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-[var(--color-brand)]/10 blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 w-60 h-60 rounded-full bg-[var(--color-brand)]/5 blur-3xl" />
-
-          {/* Content */}
-          <div className="relative z-10 px-8 sm:px-14 py-14 sm:py-20 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-6 rounded-[var(--radius-full)] border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/10">
-              <Sparkles size={14} className="text-[var(--color-brand-light)]" />
-              <span className="text-xs font-medium tracking-[0.15em] uppercase text-[var(--color-brand-light)]">
-                Promoção exclusiva
-              </span>
-            </div>
-            <h2 className="text-3xl sm:text-5xl font-light text-white max-w-2xl mx-auto leading-tight">
-              Até{" "}
-              <span className="font-bold text-gradient">30% OFF</span>{" "}
-              na coleção de inverno
-            </h2>
-            <p className="text-base text-white/50 mt-4 max-w-lg mx-auto">
-              Condições especiais para compras acima de R$ 1.500. Frete grátis
-              para o Distrito Federal.
+    <>
+      {/* Editorial banner */}
+      <section className="my-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative overflow-hidden bg-[#1a1a1a] p-10 md:p-16">
+          <div className="relative z-10 max-w-lg">
+            <p className="text-gray-500 text-xs tracking-[0.3em] uppercase mb-3 font-sans">
+              Nova Temporada
             </p>
-            <div className="mt-8">
-              <Link href="/produtos">
-                <Button size="lg">
-                  Aproveitar agora
-                  <Sparkles size={16} />
-                </Button>
-              </Link>
-            </div>
+            <h2
+              className="text-white mb-3 font-serif text-3xl sm:text-4xl"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              Coleção Formatura 2026
+            </h2>
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed font-sans">
+              Vestidos desenhados para marcar o início de uma nova fase. Elegância,
+              confiança e sofisticação em cada detalhe.
+            </p>
+            <Link
+              href="/produtos?categoria=formatura"
+              className="inline-flex items-center gap-2 bg-white text-[#1a1a1a] px-8 py-3 hover:bg-gray-100 transition-colors text-sm tracking-wide font-medium"
+            >
+              Explorar Coleção <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
+      </section>
 
-        {/* Trust badges */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-12">
+      {/* Trust features */}
+      <section className="py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-5">
           {[
             {
-              icon: Truck,
-              title: "Entrega para todo Brasil",
-              desc: "Frete grátis no DF • Envio rastreado",
+              icon: <MapPin className="w-5 h-5" />,
+              title: "Entrega no DF",
+              desc: "Enviamos para todo o Distrito Federal",
             },
             {
-              icon: Shield,
-              title: "Compra segura",
-              desc: "PIX e cartão até 12x • Dados protegidos",
+              icon: <Shield className="w-5 h-5" />,
+              title: "Compra Segura",
+              desc: "Dados protegidos e transações seguras",
             },
             {
-              icon: Sparkles,
-              title: "Qualidade garantida",
-              desc: "Tecidos premium • Acabamento impecável",
+              icon: <RefreshCw className="w-5 h-5" />,
+              title: "Troca em 7 dias",
+              desc: "Conforme o Código de Defesa do Consumidor",
             },
-          ].map((badge) => (
+          ].map((f) => (
             <div
-              key={badge.title}
-              className="flex items-start gap-4 p-6 rounded-[var(--radius-lg)] bg-[var(--background-card)] border border-[var(--border)] hover:border-[var(--border-hover)] transition-colors duration-[var(--transition-fast)]"
+              key={f.title}
+              className="flex flex-col items-center text-center p-6 bg-white border border-gray-100"
             >
-              <div className="shrink-0 w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-brand)]/10 flex items-center justify-center">
-                <badge.icon size={20} className="text-[var(--color-brand)]" />
+              <div className="w-11 h-11 bg-gray-100 flex items-center justify-center text-gray-600 mb-4 rounded-full">
+                {f.icon}
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-white">
-                  {badge.title}
-                </h3>
-                <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
-                  {badge.desc}
-                </p>
-              </div>
+              <h4 className="text-gray-900 mb-1 font-serif text-lg">{f.title}</h4>
+              <p className="text-gray-500 text-xs font-sans">{f.desc}</p>
             </div>
           ))}
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

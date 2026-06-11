@@ -13,13 +13,13 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    "bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-light)] active:bg-[var(--color-brand-dark)] shadow-md hover:shadow-lg",
+    "bg-[var(--color-brand)] text-[var(--foreground)] hover:bg-[var(--color-brand-light)] active:bg-[var(--color-brand-dark)] shadow-md hover:shadow-lg",
   secondary:
     "bg-[var(--background-elevated)] text-[var(--foreground)] border border-[var(--border)] hover:border-[var(--border-hover)] hover:bg-[var(--background-card)]",
   ghost:
-    "bg-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-white/5",
+    "bg-transparent text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-black/5",
   outline:
-    "bg-transparent text-[var(--color-brand)] border border-[var(--color-brand)] hover:bg-[var(--color-brand)] hover:text-white",
+    "bg-transparent text-[var(--color-brand)] border border-[var(--color-brand)] hover:bg-[var(--color-brand)] hover:text-[var(--foreground)]",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

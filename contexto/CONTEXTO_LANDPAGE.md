@@ -230,28 +230,28 @@ front/src/
 
 ---
 
-### ETAPA 5 — Catálogo de Produtos
+### ETAPA 5 — Catálogo de Produtos ✅
 
-- [ ] **5.1** Criar `src/components/ui/ProductCard.tsx` — card com imagem, nome, preço, hover animation
-- [ ] **5.2** Criar `src/components/ui/ProductFilters.tsx` — filtros laterais (categoria, tipo, preço)
-- [ ] **5.3** Criar `src/components/ui/Pagination.tsx` — navegação de páginas
-- [ ] **5.4** Criar `src/app/(public)/produtos/page.tsx` — página de catálogo com grid + filtros
-- [ ] **5.5** Conectar ao backend: `GET /api/products` com query params de filtro e paginação
+- [x] **5.1** Criar `src/components/ui/ProductCard.tsx` — card com imagem, nome, preço, hover animation
+- [x] **5.2** Criar `src/components/ui/ProductFilters.tsx` — filtros laterais (categoria, tipo, preço)
+- [x] **5.3** Criar `src/components/ui/Pagination.tsx` — navegação de páginas
+- [x] **5.4** Criar `src/app/(public)/produtos/page.tsx` — página de catálogo com grid + filtros
+- [x] **5.5** Conectar ao backend: `GET /api/products` com query params de filtro e paginação
 
-**Commit:** `feat(catalog): catálogo de produtos com filtros e paginação`
+**Commit:** `feat(catalog): catálogo de produtos com filtros e paginação` ✅
 
 ---
 
-### ETAPA 6 — Detalhe do Produto
+### ETAPA 6 — Detalhe do Produto ✅
 
-- [ ] **6.1** Criar `src/components/ui/ImageGallery.tsx` — galeria de imagens com thumbnails
-- [ ] **6.2** Criar `src/components/ui/SizeSelector.tsx` — seleção de tamanho
-- [ ] **6.3** Criar `src/components/ui/ColorSelector.tsx` — seleção de cor
-- [ ] **6.4** Criar `src/components/ui/ShippingCalculator.tsx` — input de CEP + chamada ao backend
-- [ ] **6.5** Criar `src/app/(public)/produtos/[id]/page.tsx` — página de detalhe do produto
-- [ ] **6.6** Conectar ao backend: `GET /api/products/:id`, `GET /api/shipping/quote`
+- [x] **6.1** Criar `src/components/ui/ImageGallery.tsx` — galeria de imagens com thumbnails
+- [x] **6.2** Criar `src/components/ui/SizeSelector.tsx` — seleção de tamanho
+- [x] **6.3** Criar `src/components/ui/ColorSelector.tsx` — seleção de cor
+- [x] **6.4** Criar `src/components/ui/ShippingCalculator.tsx` — input de CEP + chamada ao backend
+- [x] **6.5** Criar `src/app/(public)/produtos/[id]/page.tsx` — página de detalhe do produto
+- [x] **6.6** Conectar ao backend: `GET /api/products/:id`, `GET /api/shipping/quote`
 
-**Commit:** `feat(product-detail): página de detalhe com galeria, variantes e frete`
+**Commit:** `feat(product-detail): página de detalhe com galeria, variantes e frete` ✅
 
 ---
 
