@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ShoppingCart, User, Menu, X, Search, Heart, LogOut, LayoutDashboard, Store, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart";
+import { useAuth } from "@/hooks/useAuth";
 
 const MAIN_CATEGORIES = [
   { label: "Festa", path: "/produtos?categoria=festa" },
@@ -28,8 +29,8 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Mocked user state for layout consistency
-  const user = null; // Change when auth is implemented
+  // Auth state
+  const { user, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -125,12 +126,23 @@ export default function Header() {
               {userMenuOpen && (
                 <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 shadow-lg py-1 w-52 z-50">
                   <Link
-                    href="/conta"
+                    href={isAuthenticated ? "/conta" : "/login"}
                     onClick={() => setUserMenuOpen(false)}
                     className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
-                    Entrar / Cadastrar
+                    {isAuthenticated ? "Minha Conta" : "Entrar / Cadastrar"}
                   </Link>
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => {
+                        logout();
+                        setUserMenuOpen(false);
+                      }}
+                      className="block w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      Sair
+                    </button>
+                  )}
                 </div>
               )}
             </div>

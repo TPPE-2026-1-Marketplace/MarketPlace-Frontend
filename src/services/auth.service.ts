@@ -6,16 +6,25 @@ const USER_KEY = "dk_user";
 
 export const AuthService = {
   async login(credentials: LoginRequest): Promise<{ user: User; token: string }> {
-    const response = await api.post<LoginResponse>("/auth/login", credentials);
+    // Mock validation using .env variables
+    const validLogin = process.env.NEXT_PUBLIC_LOGIN_CLIENTE || "cliente123";
+    const validPassword = process.env.NEXT_PUBLIC_SENHA_CLIENTE || "cliente123";
 
-    // Store token
-    localStorage.setItem(TOKEN_KEY, response.access_token);
+    if (credentials.email === validLogin && credentials.password === validPassword) {
+      const mockToken = "mock_token_" + Date.now();
+      localStorage.setItem(TOKEN_KEY, mockToken);
+      
+      const user: User = {
+        id: "1",
+        email: credentials.email,
+        nome: "Cliente Teste",
+        role: "customer"
+      };
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      return { user, token: mockToken };
+    }
 
-    // Fetch user profile
-    const user = await this.getProfile();
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-
-    return { user, token: response.access_token };
+    throw new Error("E-mail ou senha incorretos.");
   },
 
   async register(data: RegisterRequest): Promise<User> {

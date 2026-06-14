@@ -124,7 +124,7 @@ function ProdutosContent() {
               href={cat.value === "all" ? "/produtos" : `/produtos?categoria=${cat.value}`}
               className={`px-4 py-2 text-sm transition-colors border ${
                 category === cat.value
-                  ? "bg-[#1a1a1a] text-white border-[#1a1a1a]"
+                  ? "bg-[#1a1a1a] !text-white border-[#1a1a1a]"
                   : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
               }`}
             >
@@ -198,7 +198,7 @@ function ProdutosContent() {
                       onClick={() => toggleSize(size)}
                       className={`w-10 h-9 border text-xs transition-colors ${
                         selectedSizes.includes(size)
-                          ? "bg-[#1a1a1a] text-white border-[#1a1a1a]"
+                          ? "bg-[#1a1a1a] !text-white border-[#1a1a1a]"
                           : "border-gray-200 text-gray-600 hover:border-gray-500"
                       }`}
                     >
@@ -239,7 +239,7 @@ function ProdutosContent() {
                 <SlidersHorizontal className="w-4 h-4" />
                 Filtros{" "}
                 {hasActiveFilters && (
-                  <span className="bg-[#1a1a1a] text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="bg-[#1a1a1a] !text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
                     !
                   </span>
                 )}
@@ -280,7 +280,7 @@ function ProdutosContent() {
                 </p>
                 <button
                   onClick={clearFilters}
-                  className="bg-[#1a1a1a] text-white px-6 py-2 hover:bg-[#333333] transition-colors text-sm"
+                  className="bg-[#1a1a1a] !text-white px-6 py-2 hover:bg-[#333333] transition-colors text-sm"
                 >
                   Limpar Filtros
                 </button>
