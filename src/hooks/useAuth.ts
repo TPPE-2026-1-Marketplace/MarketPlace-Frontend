@@ -58,6 +58,7 @@ export function useAuth() {
 
   const logout = useCallback(() => {
     setUser(null);
+    window.location.href = "/";
   }, []);
 
   return {

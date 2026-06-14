@@ -28,11 +28,10 @@ export default function LoginPage() {
   useEffect(() => {
     if (isAuthenticated) {
       if (retorno === "checkout") {
-        navigate("/checkout");
+        window.location.href = "/checkout";
       } else {
         const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee";
-        // Redirect internal users to / (or dashboard), customers to /conta
-        navigate(isInternalUser ? "/" : "/conta");
+        window.location.href = isInternalUser ? "/" : "/conta";
       }
     }
   }, [isAuthenticated, user, navigate, retorno]);
@@ -81,17 +80,19 @@ export default function LoginPage() {
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => { setIsRegister(false); setMessage(null); }}
-              className={`flex-1 py-3 text-sm transition-colors rounded-xl ${
-                !isRegister ? "bg-black !text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              className={`flex-1 py-3 text-sm transition-colors rounded-xl font-medium ${
+                !isRegister ? "" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
+              style={!isRegister ? { backgroundColor: '#1a1a1a', color: '#ffffff' } : {}}
             >
               Entrar
             </button>
             <button
               onClick={() => { setIsRegister(true); setMessage(null); }}
-              className={`flex-1 py-3 text-sm transition-colors rounded-xl ${
-                isRegister ? "bg-black !text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              className={`flex-1 py-3 text-sm transition-colors rounded-xl font-medium ${
+                isRegister ? "" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
+              style={isRegister ? { backgroundColor: '#1a1a1a', color: '#ffffff' } : {}}
             >
               Criar Conta
             </button>
@@ -134,11 +135,11 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="block text-sm text-gray-600 mb-1.5">E-mail</label>
+              <label className="block text-sm text-gray-600 mb-1.5">Login / E-mail</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
-                  type="email"
+                  type="text"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="seu@email.com"
@@ -197,7 +198,8 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-black !text-white py-3 hover:bg-[#333333] transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-sm tracking-wide"
+              className="w-full rounded-xl py-3 hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium tracking-wide mt-2"
+              style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

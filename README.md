@@ -1,6 +1,6 @@
 # Marketplace Frontend
 
-Base de front-end para a disciplina de Técnicas de Programação em Plataformas Emergentes (TPPE), usando `Next.js`, `Tailwind CSS`, `pnpm` e `Docker`.
+Base de front-end para a disciplina de Técnicas de Programação em Plataformas Emergentes (TPPE), usando `React (Vite SPA)`, `Tailwind CSS`, `pnpm` e `Docker`.
 
 ## Requisitos
 
@@ -60,4 +60,4 @@ Crie os arquivos reais a partir dos templates:
 make env-setup
 ```
 
-Variáveis públicas do Next.js devem usar o prefixo `NEXT_PUBLIC_`.
+Variáveis públicas do Vite devem usar o prefixo `VITE_`.

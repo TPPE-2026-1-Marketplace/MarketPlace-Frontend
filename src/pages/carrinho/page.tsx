@@ -37,7 +37,8 @@ export default function CarrinhoPage() {
           </p>
           <Link
             to="/produtos"
-            className="inline-flex items-center gap-2 bg-[#1a1a1a] text-white px-6 py-3 hover:bg-[#333333] transition-colors text-sm font-sans"
+            className="inline-flex items-center gap-2 px-6 py-3 hover:opacity-90 transition-opacity text-sm font-sans"
+            style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
           >
             <ArrowLeft className="w-4 h-4" /> Continuar Comprando
           </Link>
@@ -175,7 +176,8 @@ export default function CarrinhoPage() {
                 />
                 <button
                   type="submit"
-                  className="bg-[#1a1a1a] text-white px-4 py-2 text-sm hover:bg-[#333333] transition-colors"
+                  className="px-4 py-2 text-sm hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
                 >
                   Calcular
                 </button>
@@ -228,7 +230,8 @@ export default function CarrinhoPage() {
 
               <button
                 onClick={() => navigate("/checkout")}
-                className="w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors flex items-center justify-center gap-2 text-sm tracking-wide"
+                className="w-full py-3 hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm tracking-wide"
+                style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
               >
                 Finalizar Compra <ArrowRight className="w-4 h-4" />
               </button>

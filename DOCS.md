@@ -6,7 +6,7 @@ Este documento descreve como rodar o projeto localmente, como usar o ambiente Do
 
 O projeto foi configurado com:
 
-- `Next.js`
+- `React (Vite SPA)`
 - `TypeScript`
 - `Tailwind CSS`
 - `pnpm`
@@ -77,7 +77,7 @@ Se o projeto passar a depender de valores sensíveis, mantenha segredos apenas n
 Variáveis públicas expostas ao navegador no Next.js devem começar com:
 
 ```bash
-NEXT_PUBLIC_
+VITE_
 ```
 
 ### Sobre `NODE_ENV`
@@ -250,7 +250,7 @@ Você altera arquivos como:
 - `src/app/layout.tsx`
 - `src/app/globals.css`
 
-Como a pasta do projeto está montada no container, o Next.js detecta a mudança e recompila automaticamente.
+Como a pasta do projeto está montada no container, o Vite detecta a mudança e recompila automaticamente.
 
 ### 3. Ver as mudanças no navegador
 
@@ -334,9 +334,9 @@ Na produção:
 - usa `compose.prod.yml`
 - a imagem é construída com o `Dockerfile`
 - o build depende de `.env.production` existir localmente
-- o projeto passa pelo `pnpm build`
-- o Next gera o artefato otimizado
-- a imagem final roda com `node server.js`
+- o projeto passa pelo `pnpm run build`
+- o Vite gera os estáticos otimizados na pasta dist
+- a imagem final roda com `nginx`
 - define `NODE_ENV=production`
 - o container final é menor e não depende do código-fonte montado em volume
 
