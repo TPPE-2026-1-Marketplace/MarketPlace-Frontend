@@ -1,14 +1,14 @@
-"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type AnyModel = any;
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
-import { ProductService } from "@/services";
-import type { Product } from "@/models";
+import { api } from "@/lib/api";
 
 export default function FeaturedProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<AnyModel[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,8 +16,8 @@ export default function FeaturedProducts() {
       try {
         setLoading(true);
         // Using getProducts instead of getFeaturedProducts for now as it may not exist
-        const response = await ProductService.getProducts({ page: 1, limit: 4 });
-        setProducts(response.data || []);
+        const response = await api.get("/products", { page: 1, limit: 4 });
+        setProducts((response as any).data || []);
       } catch (error) {
         console.error("Erro ao carregar destaques:", error);
       } finally {
@@ -39,7 +39,7 @@ export default function FeaturedProducts() {
           </p>
         </div>
         <Link
-          href="/produtos"
+          to="/produtos"
           className="text-sm text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-1"
         >
           Ver todos <ArrowRight className="w-4 h-4" />

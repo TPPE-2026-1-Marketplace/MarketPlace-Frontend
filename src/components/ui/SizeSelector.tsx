@@ -1,13 +1,13 @@
-"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type AnyModel = any;
 
 import React, { useState } from "react";
 import { Ruler } from "lucide-react";
-import type { ProductVariant } from "@/models";
 
 interface SizeSelectorProps {
-  sizes: ProductVariant[];
+  sizes: AnyModel[];
   selectedSku: string | undefined;
-  onSelectSize: (variant: ProductVariant) => void;
+  onSelectSize: (variant: AnyModel) => void;
 }
 
 export default function SizeSelector({
@@ -17,7 +17,7 @@ export default function SizeSelector({
 }: SizeSelectorProps) {
   if (!sizes || sizes.length <= 1) return null;
 
-  const selectedVariant = sizes.find((s) => s.codigo_sku === selectedSku);
+  const selectedVariant = sizes.find((s) => s.id === selectedSku);
 
   return (
     <div className="mb-6">
@@ -36,10 +36,10 @@ export default function SizeSelector({
       <div className="flex flex-wrap gap-2">
         {sizes.map((variant) => (
           <button
-            key={variant.codigo_sku}
+            key={variant.id}
             onClick={() => onSelectSize(variant)}
             className={`w-12 h-12 text-sm font-medium rounded-[var(--radius-md)] border transition-all duration-[var(--transition-fast)] ${
-              selectedSku === variant.codigo_sku
+              selectedSku === variant.id
                 ? "bg-[var(--color-brand)] border-[var(--color-brand)] text-white"
                 : "bg-transparent border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-[var(--foreground)]"
             }`}

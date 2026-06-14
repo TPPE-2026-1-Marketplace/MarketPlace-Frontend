@@ -1,15 +1,13 @@
-"use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { User, Package, Heart, LogOut, ChevronRight, Edit2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function ContaPage() {
   const { user, logout, isAuthenticated } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"dados" | "pedidos" | "favoritos">("dados");
 
   if (!isAuthenticated) {
@@ -20,7 +18,7 @@ export default function ContaPage() {
           <h2 className="text-gray-700 mb-2 font-serif text-2xl">Você precisa estar logada</h2>
           <p className="text-gray-500 text-sm mb-4">Faça login para acessar sua conta.</p>
           <Link
-            href="/login"
+            to="/login"
             className="bg-[#1a1a1a] text-white px-6 py-2 hover:bg-[#333333] transition-colors text-sm inline-block"
           >
             Fazer Login
@@ -32,7 +30,7 @@ export default function ContaPage() {
 
   const handleLogout = () => {
     logout();
-    router.push("/");
+    navigate("/");
   };
 
   const myOrders: any[] = []; // Placeholder for actual orders
@@ -142,7 +140,7 @@ export default function ContaPage() {
                   Salve seus vestidos favoritos para não perder!
                 </p>
                 <Link
-                  href="/produtos"
+                  to="/produtos"
                   className="text-gray-700 text-sm hover:underline"
                 >
                   Explorar vestidos

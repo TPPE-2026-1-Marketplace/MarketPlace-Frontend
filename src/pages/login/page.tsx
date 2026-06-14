@@ -1,14 +1,12 @@
-"use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
-import Link from "next/link";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Eye, EyeOff, User, Lock, Mail, Phone, AlertCircle, CheckCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const mode = searchParams.get("modo");
   const retorno = searchParams.get("retorno");
   
@@ -18,7 +16,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   
   const { login, register, isAuthenticated, user } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const [form, setForm] = useState({
     name: "",
@@ -30,14 +28,14 @@ export default function LoginPage() {
   useEffect(() => {
     if (isAuthenticated) {
       if (retorno === "checkout") {
-        router.push("/checkout");
+        navigate("/checkout");
       } else {
         const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee";
         // Redirect internal users to / (or dashboard), customers to /conta
-        router.push(isInternalUser ? "/" : "/conta");
+        navigate(isInternalUser ? "/" : "/conta");
       }
     }
-  }, [isAuthenticated, user, router, retorno]);
+  }, [isAuthenticated, user, navigate, retorno]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,7 +188,7 @@ export default function LoginPage() {
 
             {!isRegister && (
               <div className="text-right">
-                <Link href="#" className="text-xs text-[#C8427C] hover:underline">
+                <Link to="#" className="text-xs text-[#C8427C] hover:underline">
                   Esqueci minha senha
                 </Link>
               </div>
@@ -220,9 +218,9 @@ export default function LoginPage() {
 
         <p className="text-center text-xs text-gray-400 mt-4">
           Ao entrar, você concorda com nossos{" "}
-          <Link href="/politicas#termos" className="text-gray-600 hover:underline">Termos de Uso</Link>{" "}
+          <Link to="/politicas#termos" className="text-gray-600 hover:underline">Termos de Uso</Link>{" "}
           e{" "}
-          <Link href="/politicas#lgpd" className="text-gray-600 hover:underline">Política de Privacidade</Link>.
+          <Link to="/politicas#lgpd" className="text-gray-600 hover:underline">Política de Privacidade</Link>.
         </p>
       </div>
     </div>

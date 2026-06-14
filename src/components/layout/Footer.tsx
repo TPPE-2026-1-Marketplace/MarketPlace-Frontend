@@ -1,7 +1,6 @@
-"use client";
 
 import React from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { MapPin, Mail, Clock } from "lucide-react";
 
 function InstagramIcon({ className }: { className?: string }) {
@@ -98,7 +97,7 @@ export default function Footer() {
               ].map((item) => (
                 <li key={item.label}>
                   <Link
-                    href={item.path}
+                    to={item.path}
                     className="text-gray-500 hover:text-gray-200 transition-colors"
                   >
                     {item.label}
@@ -115,7 +114,7 @@ export default function Footer() {
               ].map((item) => (
                 <li key={item.label}>
                   <Link
-                    href={item.path}
+                    to={item.path}
                     className="text-gray-500 hover:text-gray-200 transition-colors"
                   >
                     {item.label}
@@ -138,7 +137,7 @@ export default function Footer() {
               ].map((item) => (
                 <li key={item.label}>
                   <Link
-                    href={item.path}
+                    to={item.path}
                     className="text-gray-500 hover:text-gray-200 transition-colors"
                   >
                     {item.label}
@@ -188,7 +187,7 @@ export default function Footer() {
         <div className="border-t border-gray-800 mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-600">
           <p>© 2026 DK Festas. Todos os direitos reservados.</p>
           <div className="flex items-center gap-4">
-            <Link href="/politicas" className="hover:text-gray-400 transition-colors">
+            <Link to="/politicas" className="hover:text-gray-400 transition-colors">
               Política de Privacidade
             </Link>
             <span>·</span>

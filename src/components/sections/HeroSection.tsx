@@ -1,7 +1,6 @@
-"use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const SLIDES = [
@@ -73,7 +72,7 @@ export default function HeroSection() {
             <div className="flex flex-col sm:flex-row gap-4">
               {slides[current].primaryCta && (
                 <Link
-                  href={slides[current].primaryCategory}
+                  to={slides[current].primaryCategory}
                   className="bg-white text-[#1a1a1a] px-8 py-3.5 hover:bg-gray-100 transition-colors text-sm tracking-widest uppercase font-medium text-center"
                 >
                   {slides[current].primaryCta}
@@ -81,7 +80,7 @@ export default function HeroSection() {
               )}
               {slides[current].secondaryCta && (
                 <Link
-                  href={slides[current].secondaryCategory}
+                  to={slides[current].secondaryCategory}
                   className="border border-white/40 bg-black/20 backdrop-blur-sm text-white px-8 py-3.5 hover:border-white hover:bg-white/10 transition-colors text-sm tracking-widest uppercase font-medium text-center"
                 >
                   {slides[current].secondaryCta}

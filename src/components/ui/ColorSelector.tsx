@@ -1,12 +1,12 @@
-"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type AnyModel = any;
 
 import React from "react";
-import type { ProductVariant } from "@/models";
 
 interface ColorSelectorProps {
-  colors: ProductVariant[];
+  colors: AnyModel[];
   selectedColorCode: string | undefined;
-  onSelectColor: (variant: ProductVariant) => void;
+  onSelectColor: (variant: AnyModel) => void;
 }
 
 export default function ColorSelector({

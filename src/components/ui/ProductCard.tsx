@@ -1,7 +1,6 @@
-"use client";
 
 import React from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { ShoppingCart, Heart } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -36,7 +35,7 @@ export default function ProductCard({
 
   return (
     <Link
-      href={`/produtos/${id}`}
+      to={`/produtos/${id}`}
       className={`group block ${className || ""}`}
       style={style}
     >

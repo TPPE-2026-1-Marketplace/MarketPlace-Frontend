@@ -1,4 +1,3 @@
-"use client";
 
 import React from "react";
 import { Star } from "lucide-react";
@@ -41,7 +40,7 @@ export default function ReviewsSection() {
                 {[1, 2, 3, 4, 5].map((s) => (
                   <Star
                     key={s}
-                    className="w-3.5 h-3.5 fill-[#1a1a1a] text-[#1a1a1a]"
+                    className="w-3.5 h-3.5 -[#1a1a1a] text-[#1a1a1a]"
                   />
                 ))}
               </div>

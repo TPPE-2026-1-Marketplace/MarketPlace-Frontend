@@ -1,12 +1,11 @@
-"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type AnyModel = any;
 
 import React, { useState } from "react";
-import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { CatalogImage } from "@/models";
 
 interface ImageGalleryProps {
-  images: CatalogImage[];
+  images: AnyModel[];
   productName: string;
 }
 
@@ -16,13 +15,11 @@ export default function ImageGallery({ images, productName }: ImageGalleryProps)
   if (!images || images.length === 0) {
     return (
       <div className="relative flex-1 aspect-[3/4] rounded-[var(--radius-xl)] overflow-hidden bg-[var(--background-card)] border border-[var(--border)]">
-        <Image
+        <img
           src="/hero-dress.png"
           alt={productName}
-          fill
           className="object-cover"
-          priority
-          sizes="(max-width: 1024px) 100vw, 50vw"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
         />
       </div>
     );
@@ -45,10 +42,9 @@ export default function ImageGallery({ images, productName }: ImageGalleryProps)
                   : "border-[var(--border)] hover:border-[var(--border-hover)]"
               }`}
             >
-              <Image
+              <img
                 src={img.image?.url ?? "/hero-dress.png"}
                 alt={`${productName} thumbnail ${i + 1}`}
-                fill
                 className="object-cover"
                 sizes="80px"
               />
@@ -59,13 +55,11 @@ export default function ImageGallery({ images, productName }: ImageGalleryProps)
 
       {/* Main image */}
       <div className="relative flex-1 aspect-[3/4] rounded-[var(--radius-xl)] overflow-hidden bg-[var(--background-card)] border border-[var(--border)] order-1 sm:order-2">
-        <Image
+        <img
           src={currentImageUrl}
           alt={productName}
-          fill
           className="object-cover"
-          priority
-          sizes="(max-width: 1024px) 100vw, 50vw"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
         />
         {/* Navigation arrows for multiple images */}
         {images.length > 1 && (

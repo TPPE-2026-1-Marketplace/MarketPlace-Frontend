@@ -1,9 +1,9 @@
-"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type AnyModel = any;
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
+import { useParams, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   ShoppingCart,
   Heart,
@@ -21,8 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
-import ProductService from "@/services/ProductService";
-import type { Produto, VarianteProduto } from "@/models";
+import { api } from "@/lib/api";
 import ProductCard from "@/components/ui/ProductCard";
 
 const SIZE_TABLE: [string, string, string, string, string][] = [
@@ -41,11 +40,11 @@ const SIZE_TABLE: [string, string, string, string, string][] = [
 
 export default function ProductDetailPage() {
   const { id } = useParams();
-  const router = useRouter();
+  const navigate = useNavigate();
   const { addItem } = useCart();
   
-  const [product, setProduct] = useState<Produto | null>(null);
-  const [related, setRelated] = useState<Produto[]>([]);
+  const [product, setProduct] = useState<AnyModel | null>(null);
+  const [related, setRelated] = useState<AnyModel[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedSize, setSelectedSize] = useState("");
@@ -61,13 +60,13 @@ export default function ProductDetailPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const data = await ProductService.getProductById(Number(id));
+        const data = await api.get<AnyModel>(`/products/${Number(id)}`);
         setProduct(data);
         
         // Load related products
         if (data.categories && data.categories.length > 0) {
-          const res = await ProductService.getProducts({ categoria: data.categories[0].nome, limit: 4 });
-          setRelated(res.data.filter(p => p.id_produto !== data.id_produto));
+          const res = await api.get<AnyModel>("/products", { categoria: data.categories[0].nome, limit: 4 });
+          setRelated(res.data.filter((p: any) => p.id_produto !== data.id_produto));
         }
       } catch (err) {
         console.error(err);
@@ -90,8 +89,8 @@ export default function ProductDetailPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white font-sans">
         <div className="text-center">
-          <h2 className="text-gray-700 mb-4 font-serif text-2xl">Produto não encontrado</h2>
-          <Link href="/produtos" className="text-[#1a1a1a] hover:underline text-sm">
+          <h2 className="text-gray-700 mb-4 font-serif text-2xl">AnyModel não encontrado</h2>
+          <Link to="/produtos" className="text-[#1a1a1a] hover:underline text-sm">
             Voltar para a loja
           </Link>
         </div>
@@ -100,10 +99,10 @@ export default function ProductDetailPage() {
   }
 
   // Extract unique colors and sizes from variants
-  const colors = Array.from(new Set(product.variants?.map(v => v.cor).filter(Boolean))) as string[];
-  const sizes = Array.from(new Set(product.variants?.map(v => v.tamanho).filter(Boolean))) as string[];
+  const colors = Array.from(new Set(product.variants?.map((v: any) => v.cor).filter(Boolean))) as string[];
+  const sizes = Array.from(new Set(product.variants?.map((v: any) => v.tamanho).filter(Boolean))) as string[];
   
-  const allImages = product.variants?.flatMap(v => v.images?.map(img => img.image.url) || []) || [];
+  const allImages = product.variants?.flatMap((v: any) => v.images?.map((img: any) => img.image.url) || []) || [];
   const gallery = allImages.length > 0 ? Array.from(new Set(allImages)) : ["/hero-dress.png"];
 
   // Default to first variant's price or base price
@@ -116,7 +115,7 @@ export default function ProductDetailPage() {
   const isLowStock = totalStock > 0 && totalStock <= 3;
   
   const categoryName = product.categories?.[0]?.nome || "Vestido";
-  const firstVariantSku = baseVariant?.codigo_sku || `SKU-${product.id_produto}`;
+  const firstVariantSku = baseVariant?.id || `SKU-${product.id_produto}`;
 
   const handleAddToCart = () => {
     if (!selectedSize || !selectedColor) {
@@ -125,13 +124,13 @@ export default function ProductDetailPage() {
     }
     
     // Find the variant
-    const variant = product.variants?.find(v => v.cor === selectedColor && v.tamanho === selectedSize);
+    const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
     if (!variant) {
       alert("Variante não encontrada.");
       return;
     }
 
-    addItem(product, variant, quantity);
+    addItem(variant?.id as any, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -141,11 +140,11 @@ export default function ProductDetailPage() {
       alert("Por favor, selecione o tamanho e a cor antes de continuar.");
       return;
     }
-    const variant = product.variants?.find(v => v.cor === selectedColor && v.tamanho === selectedSize);
+    const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
     if (!variant) return;
 
-    addItem(product, variant, quantity);
-    router.push("/carrinho");
+    addItem(variant?.id as any, quantity);
+    navigate("/carrinho");
   };
 
   const handleShippingCheck = (e: React.FormEvent) => {
@@ -163,12 +162,12 @@ export default function ProductDetailPage() {
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center gap-2 text-xs text-gray-400">
-            <Link href="/" className="hover:text-gray-700 transition-colors">Início</Link>
+            <Link to="/" className="hover:text-gray-700 transition-colors">Início</Link>
             <span>/</span>
-            <Link href="/produtos" className="hover:text-gray-700 transition-colors">Vestidos</Link>
+            <Link to="/produtos" className="hover:text-gray-700 transition-colors">Vestidos</Link>
             <span>/</span>
             <Link
-              href={`/produtos?categoria=${categoryName}`}
+              to={`/produtos?categoria=${categoryName}`}
               className="hover:text-gray-700 transition-colors capitalize"
             >
               {categoryName}
@@ -181,7 +180,7 @@ export default function ProductDetailPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <button
-          onClick={() => router.back()}
+          onClick={() => navigate(-1)}
           className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 mt-4 mb-6 transition-colors"
         >
           <ChevronLeft className="w-4 h-4" /> Voltar
@@ -200,10 +199,9 @@ export default function ProductDetailPage() {
                       : "border-gray-200 hover:border-gray-400"
                   }`}
                 >
-                  <Image
-                    src={img}
+                  <img
+                    src={img as string}
                     alt={`${product.titulo} ${idx + 1}`}
-                    fill
                     className="object-cover object-top"
                   />
                 </button>
@@ -212,12 +210,10 @@ export default function ProductDetailPage() {
 
             <div className="flex-1 relative">
               <div className="relative aspect-[3/4] overflow-hidden bg-gray-50">
-                <Image
-                  src={gallery[activeImage]}
+                <img
+                  src={gallery[activeImage] as string}
                   alt={product.titulo}
-                  fill
                   className="object-cover object-top"
-                  priority
                 />
                 {discount && (
                   <div className="absolute top-4 left-4 bg-[#1a1a1a] text-white px-3 py-1 text-xs tracking-wide">
@@ -264,10 +260,9 @@ export default function ProductDetailPage() {
                     }`}
                     style={{ height: "4.5rem" }}
                   >
-                    <Image
-                      src={img}
+                    <img
+                      src={img as string}
                       alt={`${product.titulo} ${idx + 1}`}
-                      fill
                       className="object-cover object-top"
                     />
                   </button>
@@ -296,7 +291,7 @@ export default function ProductDetailPage() {
                 {[1, 2, 3, 4, 5].map((s) => (
                   <Star
                     key={s}
-                    className="w-3.5 h-3.5 fill-[#1a1a1a] text-[#1a1a1a]"
+                    className="w-3.5 h-3.5 -[#1a1a1a] text-[#1a1a1a]"
                   />
                 ))}
               </div>
@@ -539,7 +534,7 @@ export default function ProductDetailPage() {
                 <div className="bg-gray-50 p-4">
                   <div className="flex items-center gap-0.5 mb-2">
                     {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className="w-3.5 h-3.5 fill-[#1a1a1a] text-[#1a1a1a]" />
+                      <Star key={s} className="w-3.5 h-3.5 -[#1a1a1a] text-[#1a1a1a]" />
                     ))}
                   </div>
                   <p className="text-sm text-gray-600 leading-relaxed mb-2">

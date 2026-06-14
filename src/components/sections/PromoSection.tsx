@@ -1,7 +1,6 @@
-"use client";
 
 import React from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { ArrowRight, MapPin, Shield, RefreshCw } from "lucide-react";
 
 export default function PromoSection() {
@@ -25,7 +24,7 @@ export default function PromoSection() {
               confiança e sofisticação em cada detalhe.
             </p>
             <Link
-              href="/produtos?categoria=formatura"
+              to="/produtos?categoria=formatura"
               className="inline-flex items-center gap-2 bg-white text-[#1a1a1a] px-8 py-3 hover:bg-gray-100 transition-colors text-sm tracking-wide font-medium"
             >
               Explorar Coleção <ArrowRight className="w-4 h-4" />

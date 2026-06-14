@@ -1,8 +1,7 @@
-"use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ShoppingCart, User, Menu, X, Search, Heart, LogOut, LayoutDashboard, Store, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart";
@@ -23,7 +22,7 @@ const TYPE_CATEGORIES = [
 
 export default function Header() {
   const { itemCount } = useCart();
-  const router = useRouter();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,7 +44,7 @@ export default function Header() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/produtos?busca=${encodeURIComponent(searchQuery.trim())}`);
+      navigate(`/produtos?busca=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery("");
       setMenuOpen(false);
     }
@@ -53,9 +52,9 @@ export default function Header() {
 
   const handleFavoritesClick = () => {
     if (user) {
-      router.push("/favoritos");
+      navigate("/favoritos");
     } else {
-      router.push("/conta");
+      navigate("/conta");
     }
   };
 
@@ -78,7 +77,7 @@ export default function Header() {
           </button>
 
           {/* Logo */}
-          <Link href="/" className="shrink-0 flex items-center">
+          <Link to="/" className="shrink-0 flex items-center">
             <div className="bg-[#1a1a1a] px-3 py-1 flex flex-col items-center justify-center">
               <span className="text-white font-serif text-lg leading-none tracking-widest">DK</span>
               <span className="text-white text-[8px] tracking-[0.2em] uppercase leading-none mt-0.5">Fashion</span>
@@ -126,7 +125,7 @@ export default function Header() {
               {userMenuOpen && (
                 <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 shadow-lg py-1 w-52 z-50">
                   <Link
-                    href={isAuthenticated ? "/conta" : "/login"}
+                    to={isAuthenticated ? "/conta" : "/login"}
                     onClick={() => setUserMenuOpen(false)}
                     className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
@@ -149,7 +148,7 @@ export default function Header() {
 
             {/* Cart */}
             <Link
-              href="/carrinho"
+              to="/carrinho"
               className="relative p-2.5 text-gray-600 hover:text-[#1a1a1a] transition-colors"
             >
               <ShoppingCart className="w-5 h-5" />
@@ -165,7 +164,7 @@ export default function Header() {
         {/* 3. CATEGORY MENU (desktop) */}
         <nav className="hidden lg:flex items-center justify-center gap-0 border-t border-gray-100 overflow-x-auto">
           <Link
-            href="/produtos"
+            to="/produtos"
             className="px-4 py-3 text-xs tracking-widest uppercase text-gray-500 hover:text-[#1a1a1a] hover:bg-gray-50 transition-colors whitespace-nowrap"
           >
             Todos os Vestidos
@@ -176,7 +175,7 @@ export default function Header() {
           {MAIN_CATEGORIES.map((cat) => (
             <Link
               key={cat.label}
-              href={cat.path}
+              to={cat.path}
               className="px-4 py-3 text-xs tracking-widest uppercase text-gray-500 hover:text-[#1a1a1a] hover:bg-gray-50 transition-colors whitespace-nowrap"
             >
               {cat.label}
@@ -188,7 +187,7 @@ export default function Header() {
           {TYPE_CATEGORIES.map((cat) => (
             <Link
               key={cat.label}
-              href={cat.path}
+              to={cat.path}
               className="px-4 py-3 text-xs tracking-widest uppercase text-gray-400 hover:text-[#1a1a1a] hover:bg-gray-50 transition-colors whitespace-nowrap"
             >
               {cat.label}
@@ -216,7 +215,7 @@ export default function Header() {
           </div>
           <div className="px-4 space-y-0.5">
             <Link
-              href="/produtos"
+              to="/produtos"
               onClick={() => setMenuOpen(false)}
               className="block py-2.5 text-sm text-gray-700 hover:text-[#1a1a1a] border-b border-gray-50 tracking-wide"
             >
@@ -226,7 +225,7 @@ export default function Header() {
             {MAIN_CATEGORIES.map((cat) => (
               <Link
                 key={cat.label}
-                href={cat.path}
+                to={cat.path}
                 onClick={() => setMenuOpen(false)}
                 className="block py-2 pl-2 text-sm text-gray-600 hover:text-[#1a1a1a]"
               >
@@ -237,7 +236,7 @@ export default function Header() {
             {TYPE_CATEGORIES.map((cat) => (
               <Link
                 key={cat.label}
-                href={cat.path}
+                to={cat.path}
                 onClick={() => setMenuOpen(false)}
                 className="block py-2 pl-2 text-sm text-gray-500 hover:text-[#1a1a1a]"
               >

@@ -1,7 +1,6 @@
-"use client";
 
 import React, { useEffect } from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { Truck, RefreshCw, Shield, MessageCircle, Clock, FileText, ChevronRight } from "lucide-react";
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -37,7 +36,7 @@ export default function PoliticasPage() {
       <div className="bg-[#1a1a1a] text-white py-12">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-            <Link href="/" className="hover:text-gray-300 transition-colors">
+            <Link to="/" className="hover:text-gray-300 transition-colors">
               Início
             </Link>
             <ChevronRight className="w-3 h-3" />

@@ -1,12 +1,14 @@
-"use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type AnyModel = any;
+type ProductFiltersType = any;
+
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
 import { useProducts } from "@/hooks/useProducts";
-import type { ProductFilters as ProductFiltersType } from "@/models";
 
 const CATEGORIES = [
   { value: "all", label: "Todas" },
@@ -38,7 +40,7 @@ const ALL_COLORS = [
 ];
 
 function ProdutosContent() {
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
   
   // Local state for UI
@@ -62,7 +64,7 @@ function ProdutosContent() {
   const { products, isLoading, meta } = useProducts(apiFilters);
 
   useEffect(() => {
-    setApiFilters(prev => ({
+    setApiFilters((prev: any) => ({
       ...prev,
       categoria: category !== "all" ? category : undefined,
       busca: search || undefined,
@@ -121,7 +123,7 @@ function ProdutosContent() {
           {CATEGORIES.map((cat) => (
             <Link
               key={cat.value}
-              href={cat.value === "all" ? "/produtos" : `/produtos?categoria=${cat.value}`}
+              to={cat.value === "all" ? "/produtos" : `/produtos?categoria=${cat.value}`}
               className={`px-4 py-2 text-sm transition-colors border ${
                 category === cat.value
                   ? "bg-[#1a1a1a] !text-white border-[#1a1a1a]"

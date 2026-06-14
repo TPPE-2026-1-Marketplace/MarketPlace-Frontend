@@ -1,16 +1,14 @@
-"use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ShoppingCart, Trash2, Plus, Minus, ArrowLeft, ArrowRight, Info } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/lib/utils";
-import Image from "next/image";
 
 export default function CarrinhoPage() {
   const { cart, updateQuantity, removeItem, clear } = useCart();
-  const router = useRouter();
+  const navigate = useNavigate();
   const [cep, setCep] = useState("");
   const [shippingMsg, setShippingMsg] = useState<string | null>(null);
 
@@ -38,7 +36,7 @@ export default function CarrinhoPage() {
             Explore nossa coleção e encontre o vestido perfeito para você!
           </p>
           <Link
-            href="/produtos"
+            to="/produtos"
             className="inline-flex items-center gap-2 bg-[#1a1a1a] text-white px-6 py-3 hover:bg-[#333333] transition-colors text-sm font-sans"
           >
             <ArrowLeft className="w-4 h-4" /> Continuar Comprando
@@ -65,7 +63,7 @@ export default function CarrinhoPage() {
           <div className="flex-1 space-y-4">
             <div className="flex items-center justify-between mb-2">
               <Link
-                href="/produtos"
+                to="/produtos"
                 className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" /> Continuar comprando
@@ -80,14 +78,13 @@ export default function CarrinhoPage() {
 
             {cart.items.map((item) => (
               <div
-                key={item.variant.codigo_sku}
+                key={item.variant.id}
                 className="bg-white p-4 border border-gray-100 flex gap-4"
               >
-                <Link href={`/produtos/${item.product.id_produto}`} className="shrink-0 relative w-20 h-24 sm:w-24 sm:h-32">
-                  <Image
-                    src={item.imageUrl || "/hero-dress.png"}
-                    alt={item.product.titulo}
-                    fill
+                <Link to={`/produtos/${item.variant.produto.id}`} className="shrink-0 relative w-20 h-24 sm:w-24 sm:h-32">
+                  <img
+                    src={item.variant.images?.[0]?.image.url || "/hero-dress.png"}
+                    alt={item.variant.produto.titulo}
                     className="object-cover object-top"
                   />
                 </Link>
@@ -95,10 +92,10 @@ export default function CarrinhoPage() {
                   <div className="flex justify-between gap-2">
                     <div>
                       <Link
-                        href={`/produtos/${item.product.id_produto}`}
+                        to={`/produtos/${item.variant.produto.id}`}
                         className="text-gray-900 hover:text-gray-600 transition-colors line-clamp-1 text-sm font-medium"
                       >
-                        {item.product.titulo}
+                        {item.variant.produto.titulo}
                       </Link>
                       <div className="flex gap-3 mt-1 text-xs text-gray-500">
                         {item.variant.tamanho && (
@@ -113,11 +110,11 @@ export default function CarrinhoPage() {
                         )}
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {item.variant.codigo_sku}
+                        {item.variant.id}
                       </p>
                     </div>
                     <button
-                      onClick={() => removeItem(item.variant.codigo_sku)}
+                      onClick={() => removeItem(item.variant.id)}
                       className="text-gray-300 hover:text-red-500 transition-colors p-1 shrink-0 h-fit"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -128,7 +125,7 @@ export default function CarrinhoPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() =>
-                          updateQuantity(item.variant.codigo_sku, item.quantity - 1)
+                          updateQuantity(item.variant.id, item.quantity - 1)
                         }
                         className="w-7 h-7 border border-gray-200 flex items-center justify-center hover:border-gray-500 transition-colors text-gray-600"
                       >
@@ -139,7 +136,7 @@ export default function CarrinhoPage() {
                       </span>
                       <button
                         onClick={() =>
-                          updateQuantity(item.variant.codigo_sku, item.quantity + 1)
+                          updateQuantity(item.variant.id, item.quantity + 1)
                         }
                         className="w-7 h-7 border border-gray-200 flex items-center justify-center hover:border-gray-500 transition-colors text-gray-600"
                       >
@@ -148,11 +145,11 @@ export default function CarrinhoPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-gray-900 text-sm font-medium">
-                        {formatCurrency(item.variant.preco_variante * item.quantity)}
+                        {formatCurrency((item.variant.preco_variante || item.variant.produto.preco_base) * item.quantity)}
                       </p>
                       {item.quantity > 1 && (
                         <p className="text-xs text-gray-400">
-                          {formatCurrency(item.variant.preco_variante)} cada
+                          {formatCurrency(item.variant.preco_variante || item.variant.produto.preco_base)} cada
                         </p>
                       )}
                     </div>
@@ -230,7 +227,7 @@ export default function CarrinhoPage() {
               </div>
 
               <button
-                onClick={() => router.push("/checkout")}
+                onClick={() => navigate("/checkout")}
                 className="w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors flex items-center justify-center gap-2 text-sm tracking-wide"
               >
                 Finalizar Compra <ArrowRight className="w-4 h-4" />

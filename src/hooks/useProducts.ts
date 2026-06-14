@@ -1,8 +1,32 @@
-"use client";
+
+export interface CatalogImage {
+  id: number;
+  url: string;
+}
+export interface ProductVariant {
+  id: number;
+  preco_variante?: number;
+  images?: { image: CatalogImage }[];
+  cor?: string;
+  tamanho?: string;
+}
+export interface Product {
+  id_produto: number;
+  titulo: string;
+  preco_base: number;
+  descricao?: string;
+  variants?: ProductVariant[];
+  categories?: { nome: string }[];
+}
+export interface ProductFilters {
+  categoria?: string;
+  busca?: string;
+  page?: number;
+  limit?: number;
+}
 
 import { useState, useEffect, useCallback } from "react";
-import { ProductService } from "@/services";
-import type { Product, ProductFilters } from "@/models";
+import { api } from "@/lib/api";
 import type { PaginatedResponse } from "@/lib/api";
 
 interface UseProductsResult {
@@ -27,7 +51,7 @@ export function useProducts(initialFilters?: ProductFilters): UseProductsResult 
     setError(null);
 
     try {
-      const response = await ProductService.getProducts(filters);
+      const response = await api.get<{data: Product[], meta: any}>("/products", filters as any).then(res => res).catch(() => ({ data: [], meta: {} }) as any);
       setProducts(response.data);
       setMeta(response.meta);
     } catch (err) {

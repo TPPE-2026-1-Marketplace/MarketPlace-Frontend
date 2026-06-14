@@ -1,8 +1,6 @@
-"use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { useNavigate } from "react-router-dom";
 import {
   Check,
   CreditCard,
@@ -105,7 +103,7 @@ const inputErrorClass =
 export default function CheckoutPage() {
   const { cart, clear } = useCart();
   const { user } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>("dados");
   const [payment, setPayment] = useState<"cartao" | "pix">("cartao");
@@ -197,7 +195,7 @@ export default function CheckoutPage() {
             <strong>{form.email}</strong> com os detalhes do pedido.
           </p>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => navigate("/")}
             className="w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide"
           >
             Voltar à Loja
@@ -217,7 +215,7 @@ export default function CheckoutPage() {
           }}
           onLogin={() => {
             setShowGuestModal(false);
-            router.push("/conta?retorno=checkout");
+            navigate("/conta?retorno=checkout");
           }}
         />
       )}
@@ -531,26 +529,25 @@ export default function CheckoutPage() {
                 <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pr-2">
                   {cart.items.map((item) => (
                     <div
-                      key={item.variant.codigo_sku}
+                      key={item.variant.id}
                       className="flex gap-2"
                     >
                       <div className="w-12 h-14 relative shrink-0">
-                        <Image
-                          src={item.imageUrl || "/hero-dress.png"}
-                          alt={item.product.titulo}
-                          fill
+                        <img
+                          src={item.variant.images?.[0]?.image.url || "/hero-dress.png"}
+                          alt={item.variant.produto.titulo}
                           className="object-cover object-top"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-700 line-clamp-1">
-                          {item.product.titulo}
+                          {item.variant.produto.titulo}
                         </p>
                         <p className="text-xs text-gray-500">
                           {item.variant.tamanho} · {item.variant.cor} · x{item.quantity}
                         </p>
                         <p className="text-xs text-gray-800 font-medium">
-                          {formatCurrency(item.variant.preco_variante * item.quantity)}
+                          {formatCurrency((item.variant.preco_variante || item.variant.produto.preco_base) * item.quantity)}
                         </p>
                       </div>
                     </div>

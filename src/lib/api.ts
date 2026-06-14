@@ -8,7 +8,7 @@
  */
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
+  import.meta.env.VITE_API_URL ?? "http://localhost:3001/api";
 
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;

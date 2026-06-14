@@ -1,7 +1,6 @@
-"use client";
 
 import React from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { ArrowRight, MapPin } from "lucide-react";
 
 const categories = [
@@ -55,7 +54,7 @@ export default function CategorySection() {
               </p>
             </div>
             <Link
-              href="/produtos"
+              to="/produtos"
               className="text-sm text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-1"
             >
               Ver todos <ArrowRight className="w-3.5 h-3.5" />
@@ -65,7 +64,7 @@ export default function CategorySection() {
             {categories.map((cat) => (
               <Link
                 key={cat.id}
-                href={`/produtos?categoria=${cat.id}`}
+                to={`/produtos?categoria=${cat.id}`}
                 className="group relative overflow-hidden aspect-[3/4] block bg-gray-100"
               >
                 <img
