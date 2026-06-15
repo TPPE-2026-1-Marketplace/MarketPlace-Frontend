@@ -97,7 +97,7 @@ prod-rebuild:
 	$(COMPOSE_PROD) up --build -d
 
 clean:
-	rm -rf .next
+	rm -rf dist node_modules
 
 check:
 	docker build . --check
