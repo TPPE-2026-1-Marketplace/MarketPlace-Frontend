@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { api, ApiError } from "@/lib/api";
 
 export type UserRole = "customer" | "manager" | "superadmin" | "employee";
 
@@ -31,11 +32,36 @@ export interface User {
   bonusAmount?: number;
 }
 
+/** Shape returned by POST /api/auth/login */
+interface LoginApiResponse {
+  access_token: string;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    cpf?: string | null;
+    telefone?: string | null;
+    createdAt: string;
+  };
+}
+
+/** Shape returned by POST /api/users */
+interface RegisterApiResponse {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  cpf?: string | null;
+  telefone?: string | null;
+  createdAt: string;
+}
+
 interface AuthContextType {
   user: User | null;
   users: ManagedUser[];
-  login: (email: string, password: string) => { success: boolean; message: string };
-  register: (name: string, email: string, password: string, phone: string) => { success: boolean; message: string };
+  login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  register: (name: string, email: string, password: string, phone: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   isManager: boolean;
   isSuperAdmin: boolean;
@@ -55,6 +81,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Internal users kept locally for manager/POS modules.
+ * These roles don't have self-registration via the public API yet,
+ * so we maintain them as seed data for the admin dashboard.
+ */
 const INITIAL_USERS: ManagedUser[] = [
   {
     id: "u-001",
@@ -121,16 +152,6 @@ const INITIAL_USERS: ManagedUser[] = [
     active: true,
     createdAt: "2024-04-01",
   },
-  {
-    id: "u-006",
-    name: "Maria Cliente",
-    email: "cliente@email.com",
-    password: "cliente123",
-    role: "customer",
-    phone: "(11) 98888-1234",
-    active: true,
-    createdAt: "2024-05-01",
-  },
 ];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -155,48 +176,154 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const login = (email: string, password: string) => {
-    const found = users.find(
-      (u) => u.email === email && u.password === password && u.active
-    );
-    if (found) {
-      setUser({
-        id: found.id,
-        name: found.name,
-        email: found.email,
-        role: found.role,
-        phone: found.phone,
-        sellerCode: found.sellerCode,
-        commissionRate: found.commissionRate,
-        salesTarget: found.salesTarget,
-        bonusEnabled: found.bonusEnabled,
-        bonusAmount: found.bonusAmount,
-      });
+  /**
+   * Attempts login via the backend API first.
+   * Falls back to the local users list for internal roles (manager, superadmin, employee)
+   * that may not exist in the database yet.
+   */
+  const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
+    // 1. Try the real backend API
+    try {
+      const response = await api.post<LoginApiResponse>("/auth/login", { email, password });
+
+      // Store the JWT token for authenticated API calls
+      localStorage.setItem("dk_token", response.access_token);
+
+      const apiUser: User = {
+        id: String(response.user.id),
+        name: response.user.name,
+        email: response.user.email,
+        role: (response.user.role as UserRole) || "customer",
+        phone: response.user.telefone || undefined,
+      };
+
+      setUser(apiUser);
       return { success: true, message: "Login realizado com sucesso!" };
+    } catch (err) {
+      // If the API is unreachable or returns 401, fall back to local users
+      const isApiError = err instanceof ApiError;
+      const isUnauthorized = isApiError && err.status === 401;
+      const isNetworkError = !isApiError;
+
+      if (isNetworkError) {
+        console.warn("Backend indisponível, usando autenticação local como fallback.");
+      }
+
+      // 2. Fallback: check local users (for manager/employee/superadmin roles)
+      if (isUnauthorized || isNetworkError) {
+        const found = users.find(
+          (u) => u.email === email && u.password === password && u.active
+        );
+        if (found) {
+          // Generate a mock token for internal users
+          localStorage.setItem("dk_token", `local_${found.id}_${Date.now()}`);
+          setUser({
+            id: found.id,
+            name: found.name,
+            email: found.email,
+            role: found.role,
+            phone: found.phone,
+            sellerCode: found.sellerCode,
+            commissionRate: found.commissionRate,
+            salesTarget: found.salesTarget,
+            bonusEnabled: found.bonusEnabled,
+            bonusAmount: found.bonusAmount,
+          });
+          return { success: true, message: "Login realizado com sucesso!" };
+        }
+      }
+
+      return {
+        success: false,
+        message: isApiError ? err.message : "E-mail ou senha incorretos.",
+      };
     }
-    return { success: false, message: "E-mail ou senha incorretos." };
   };
 
-  const register = (name: string, email: string, password: string, phone: string) => {
-    if (users.some((u) => u.email === email)) {
-      return { success: false, message: "E-mail já cadastrado." };
+  /**
+   * Registers a new customer account via the backend API.
+   * Falls back to local registration if the API is unavailable.
+   */
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    phone: string
+  ): Promise<{ success: boolean; message: string }> => {
+    // 1. Try the real backend API
+    try {
+      const newUser = await api.post<RegisterApiResponse>("/users", {
+        name,
+        email,
+        password,
+        telefone: phone || undefined,
+      });
+
+      // Auto-login after registration: call the login endpoint to get a JWT
+      try {
+        const loginRes = await api.post<LoginApiResponse>("/auth/login", { email, password });
+        localStorage.setItem("dk_token", loginRes.access_token);
+      } catch {
+        // If auto-login fails, the user can log in manually
+        localStorage.setItem("dk_token", `registered_${newUser.id}_${Date.now()}`);
+      }
+
+      const apiUser: User = {
+        id: String(newUser.id),
+        name: newUser.name,
+        email: newUser.email,
+        role: (newUser.role as UserRole) || "customer",
+        phone: newUser.telefone || undefined,
+      };
+
+      setUser(apiUser);
+      return { success: true, message: "Cadastro realizado com sucesso!" };
+    } catch (err) {
+      const isApiError = err instanceof ApiError;
+
+      // Conflict (email already exists)
+      if (isApiError && err.status === 409) {
+        return { success: false, message: "E-mail ou CPF já cadastrado." };
+      }
+
+      // Validation error
+      if (isApiError && err.status === 400) {
+        return { success: false, message: err.message || "Dados inválidos. Verifique os campos." };
+      }
+
+      // Network error — fallback to local registration
+      if (!isApiError) {
+        console.warn("Backend indisponível, usando cadastro local como fallback.");
+
+        if (users.some((u) => u.email === email)) {
+          return { success: false, message: "E-mail já cadastrado." };
+        }
+
+        const localUser: ManagedUser = {
+          id: `u-${Date.now()}`,
+          name,
+          email,
+          password,
+          role: "customer",
+          phone,
+          active: true,
+          createdAt: new Date().toISOString().split("T")[0],
+        };
+        setUsers((prev) => [...prev, localUser]);
+        localStorage.setItem("dk_token", `local_${localUser.id}_${Date.now()}`);
+        setUser({ id: localUser.id, name, email, role: "customer", phone });
+        return { success: true, message: "Cadastro realizado com sucesso!" };
+      }
+
+      return { success: false, message: isApiError ? err.message : "Erro ao criar conta." };
     }
-    const newUser: ManagedUser = {
-      id: `u-${Date.now()}`,
-      name,
-      email,
-      password,
-      role: "customer",
-      phone,
-      active: true,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    setUsers((prev) => [...prev, newUser]);
-    setUser({ id: newUser.id, name, email, role: "customer", phone });
-    return { success: true, message: "Cadastro realizado com sucesso!" };
   };
 
-  const logout = () => setUser(null);
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("dk_token");
+    localStorage.removeItem("dk_user");
+  };
 
   const addUser = (userData: Omit<ManagedUser, "id" | "createdAt">) => {
     if (users.some((u) => u.email === userData.email)) {
