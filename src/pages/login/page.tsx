@@ -41,19 +41,16 @@ export default function LoginPage() {
     setLoading(true);
     setMessage(null);
     
-    // Artificial delay for UX
-    await new Promise((r) => setTimeout(r, 600));
-    
     try {
       if (isRegister) {
-        const res = register(form.name, form.email, form.password, form.phone);
+        const res = await register(form.name, form.email, form.password, form.phone);
         if (res.success) {
           setMessage({ type: "success", text: res.message });
         } else {
           throw new Error(res.message);
         }
       } else {
-        const res = login(form.email, form.password);
+        const res = await login(form.email, form.password);
         if (!res.success) {
           throw new Error(res.message);
         }

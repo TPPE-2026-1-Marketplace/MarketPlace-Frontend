@@ -15,6 +15,8 @@ export interface Product {
   titulo: string;
   preco_base: number;
   descricao?: string;
+  categoria?: string | null;
+  imagem_url?: string | null;
   variants?: ProductVariant[];
   categories?: { nome: string }[];
 }
@@ -59,7 +61,32 @@ export function useProducts(initialFilters?: ProductFilters): UseProductsResult 
 
     try {
       const response = await api.get<PaginatedResponse<Product>>("/products", filters as any);
-      setProducts(response.data ?? []);
+
+      // Normalise backend products: the API may return a flat Product entity
+      // (without variants/categories), so we enrich the shape here to keep
+      // downstream components working.
+      const normalised = (response.data ?? []).map((p) => {
+        // If the backend already returns variants, keep them.
+        if (p.variants && p.variants.length > 0) return p;
+
+        // Otherwise, synthesise a minimal variant & categories array from the
+        // flat entity fields so that ProductCard / details can render correctly.
+        return {
+          ...p,
+          categories: p.categories ?? (p.categoria ? [{ nome: p.categoria }] : []),
+          variants: p.variants ?? [
+            {
+              id: p.id_produto,
+              preco_variante: p.preco_base,
+              images: p.imagem_url
+                ? [{ image: { id: p.id_produto, url: p.imagem_url } }]
+                : [],
+            },
+          ],
+        };
+      });
+
+      setProducts(normalised);
       setMeta(response.meta ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar produtos");
