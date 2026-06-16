@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, User, Lock, Mail, Phone, AlertCircle, CheckCircle } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -27,12 +27,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      if (retorno === "checkout") {
-        window.location.href = "/checkout";
-      } else {
-        const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee";
-        window.location.href = isInternalUser ? "/" : "/conta";
-      }
+        if (retorno === "checkout") {
+          navigate("/checkout");
+        } else {
+          const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee";
+          navigate(isInternalUser ? "/" : "/conta");
+        }
     }
   }, [isAuthenticated, user, navigate, retorno]);
 
@@ -46,15 +46,17 @@ export default function LoginPage() {
     
     try {
       if (isRegister) {
-        await register({
-          nome: form.name,
-          email: form.email,
-          password: form.password,
-          // phone is not directly handled by register model yet but we pass it anyway 
-        } as any);
-        setMessage({ type: "success", text: "Cadastro realizado com sucesso!" });
+        const res = register(form.name, form.email, form.password, form.phone);
+        if (res.success) {
+          setMessage({ type: "success", text: res.message });
+        } else {
+          throw new Error(res.message);
+        }
       } else {
-        await login({ email: form.email, password: form.password });
+        const res = login(form.email, form.password);
+        if (!res.success) {
+          throw new Error(res.message);
+        }
         // The useEffect will handle redirection
       }
     } catch (err: any) {

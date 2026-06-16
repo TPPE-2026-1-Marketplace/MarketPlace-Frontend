@@ -11,7 +11,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/utils";
 
 type Step = "dados" | "entrega" | "pagamento" | "confirmado";
@@ -111,7 +111,7 @@ export default function CheckoutPage() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; cpf?: string }>({});
 
   const [form, setForm] = useState({
-    nome: user?.nome || "",
+    nome: user?.name || "",
     email: user?.email || "",
     cpf: "",
     telefone: "",

@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { User, Package, Heart, LogOut, ChevronRight, Edit2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ContaPage() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -47,10 +47,10 @@ export default function ContaPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-white/20 flex items-center justify-center text-white text-2xl font-serif">
-              {user?.nome?.charAt(0) || "U"}
+              {user?.name?.charAt(0) || "U"}
             </div>
             <div>
-              <h1 className="text-white font-serif text-2xl">{user?.nome || "Usuário"}</h1>
+              <h1 className="text-white font-serif text-2xl">{user?.name || "Usuário"}</h1>
               <p className="text-gray-300 text-sm font-sans">{user?.email}</p>
             </div>
           </div>
@@ -97,7 +97,7 @@ export default function ContaPage() {
                 </div>
                 <div className="space-y-1">
                   {[
-                    ["Nome", user?.nome],
+                    ["Nome", user?.name],
                     ["E-mail", user?.email],
                     ["Telefone", "Não informado"],
                     ["CPF", "***.***.***-**"],

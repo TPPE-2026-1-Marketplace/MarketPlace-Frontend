@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { ShoppingCart, User, Menu, X, Search, Heart, LogOut, LayoutDashboard, Store, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 
 const MAIN_CATEGORIES = [
   { label: "Festa", path: "/produtos?categoria=festa" },
