@@ -44,9 +44,11 @@ export function Coupons() {
 
   const activeCoupons = coupons.filter((c) => c.active).length;
   const totalUsage = coupons.reduce((sum, c) => sum + c.usageCount, 0);
+  // "Desconto Médio" is shown as a %, so only average percentage coupons (fixed-value coupons aren't comparable)
+  const percentageCoupons = coupons.filter((c) => c.discountType === "percentage");
   const averageDiscount =
-    coupons.length > 0
-      ? coupons.reduce((sum, c) => sum + c.discountValue, 0) / coupons.length
+    percentageCoupons.length > 0
+      ? percentageCoupons.reduce((sum, c) => sum + c.discountValue, 0) / percentageCoupons.length
       : 0;
 
   const handleOpenModal = (coupon?: Coupon) => {
@@ -214,7 +216,9 @@ export function Coupons() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((coupon) => {
-                const usagePercent = (coupon.usageCount / coupon.usageLimit) * 100;
+                // usageLimit of 0 means "unlimited" — avoid dividing by zero (Infinity)
+                const usagePercent =
+                  coupon.usageLimit > 0 ? (coupon.usageCount / coupon.usageLimit) * 100 : 0;
                 return (
                   <tr key={coupon.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
@@ -252,7 +256,7 @@ export function Coupons() {
                     <td className="px-4 py-3 text-center">
                       <div className="space-y-1">
                         <p className="text-gray-900 text-sm">
-                          {coupon.usageCount} / {coupon.usageLimit}
+                          {coupon.usageCount} / {coupon.usageLimit > 0 ? coupon.usageLimit : "∞"}
                         </p>
                         <div className="w-full bg-gray-200 h-1.5">
                           <div

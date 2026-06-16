@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   Package,
@@ -425,7 +425,7 @@ export function CashierNew() {
                             type="number"
                             min="1"
                             value={quantity}
-                            onChange={(e) => setQuantity(Number(e.target.value))}
+                            onChange={(e) => setQuantity(Math.max(1, Math.floor(Number(e.target.value)) || 1))}
                             className="w-full border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
                           />
                         </div>
@@ -736,7 +736,7 @@ export function CashierNew() {
                   type="number"
                   min="1"
                   value={customProduct.quantity}
-                  onChange={(e) => setCustomProduct({ ...customProduct, quantity: Number(e.target.value) })}
+                  onChange={(e) => setCustomProduct({ ...customProduct, quantity: Math.max(1, Math.floor(Number(e.target.value)) || 1) })}
                   className="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
                 />
               </div>

@@ -1,7 +1,7 @@
 /**
  * HTTP client for the DK Fashion backend API.
  *
- * Base URL is set via NEXT_PUBLIC_API_URL env variable.
+ * Base URL is set via the VITE_API_URL env variable.
  * Defaults to http://localhost:3001/api in development.
  *
  * Automatically attaches JWT token from localStorage when available.

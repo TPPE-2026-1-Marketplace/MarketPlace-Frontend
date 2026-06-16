@@ -128,7 +128,9 @@ export default function CheckoutPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const shipping = cart.total >= 500 ? 0 : 29.9;
-  const finalTotal = cart.total + shipping;
+  // PIX discount applies to the merchandise only, never to shipping
+  const pixDiscount = payment === "pix" ? cart.total * 0.05 : 0;
+  const finalTotal = cart.total - pixDiscount + shipping;
 
   const steps: { key: Step; label: string }[] = [
     { key: "dados", label: "Dados Pessoais" },
@@ -500,7 +502,7 @@ export default function CheckoutPage() {
                         Após confirmar, você receberá o QR Code para pagamento.
                       </p>
                       <p className="text-green-600 text-xs mt-1">
-                        Você economizará {formatCurrency(finalTotal * 0.05)}!
+                        Você economizará {formatCurrency(pixDiscount)}!
                       </p>
                     </div>
                   )}
@@ -569,14 +571,14 @@ export default function CheckoutPage() {
                   {payment === "pix" && (
                     <div className="flex justify-between text-green-600 text-xs font-medium">
                       <span>Desconto PIX (5%)</span>
-                      <span>-{formatCurrency(finalTotal * 0.05)}</span>
+                      <span>-{formatCurrency(pixDiscount)}</span>
                     </div>
                   )}
                 </div>
                 <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
                   <span className="text-gray-900 font-medium">Total</span>
                   <span className="text-gray-900 font-bold text-lg">
-                    {formatCurrency(payment === "pix" ? finalTotal * 0.95 : finalTotal)}
+                    {formatCurrency(finalTotal)}
                   </span>
                 </div>
 

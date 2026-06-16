@@ -136,7 +136,14 @@ const INITIAL_USERS: ManagedUser[] = [
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem("dk_user");
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored) as User;
+    } catch {
+      // Corrupt stored session — clear it instead of white-screening the app
+      localStorage.removeItem("dk_user");
+      return null;
+    }
   });
   const [users, setUsers] = useState<ManagedUser[]>(INITIAL_USERS);
 

@@ -46,17 +46,25 @@ export function useProducts(initialFilters?: ProductFilters): UseProductsResult 
   const [meta, setMeta] = useState<PaginatedResponse<Product>["meta"] | null>(null);
   const [filters, setFilters] = useState<ProductFilters>(initialFilters ?? {});
 
+  // Keep internal filters in sync when the caller passes new filters (category/search/page changes)
+  const initialFiltersKey = JSON.stringify(initialFilters ?? {});
+  useEffect(() => {
+    setFilters(initialFilters ?? {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFiltersKey]);
+
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await api.get<{data: Product[], meta: any}>("/products", filters as any).then(res => res).catch(() => ({ data: [], meta: {} }) as any);
-      setProducts(response.data);
-      setMeta(response.meta);
+      const response = await api.get<PaginatedResponse<Product>>("/products", filters as any);
+      setProducts(response.data ?? []);
+      setMeta(response.meta ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar produtos");
       setProducts([]);
+      setMeta(null);
     } finally {
       setIsLoading(false);
     }

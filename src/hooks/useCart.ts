@@ -45,7 +45,13 @@ function calculateCart(cart: Cart): Cart {
 export function useCart() {
   const [cart, setCart] = useState<Cart>(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("cart") : null;
-    return saved ? JSON.parse(saved) : EMPTY_CART;
+    if (!saved) return EMPTY_CART;
+    try {
+      return JSON.parse(saved) as Cart;
+    } catch {
+      // Corrupt/legacy data — discard it instead of crashing on mount
+      return EMPTY_CART;
+    }
   });
 
   useEffect(() => {
