@@ -117,12 +117,26 @@ export default function ProductDetailPage() {
   const categoryName = product.categories?.[0]?.nome || "Vestido";
   const firstVariantSku = baseVariant?.id || `SKU-${product.id_produto}`;
 
+  // Builds the cart-variant shape useCart expects (enriches the variant with its parent product)
+  const buildCartVariant = (variant: any) => ({
+    id: variant.id,
+    produto: {
+      id: product.id_produto,
+      titulo: product.titulo,
+      preco_base: product.preco_base,
+    },
+    preco_variante: variant.preco_variante,
+    cor: variant.cor,
+    tamanho: variant.tamanho,
+    images: variant.images,
+  });
+
   const handleAddToCart = () => {
     if (!selectedSize || !selectedColor) {
       alert("Por favor, selecione o tamanho e a cor antes de adicionar ao carrinho.");
       return;
     }
-    
+
     // Find the variant
     const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
     if (!variant) {
@@ -130,7 +144,7 @@ export default function ProductDetailPage() {
       return;
     }
 
-    addItem(variant?.id as any, quantity);
+    addItem(buildCartVariant(variant), quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -143,7 +157,7 @@ export default function ProductDetailPage() {
     const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
     if (!variant) return;
 
-    addItem(variant?.id as any, quantity);
+    addItem(buildCartVariant(variant), quantity);
     navigate("/carrinho");
   };
 

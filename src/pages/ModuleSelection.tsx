@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { LayoutDashboard, ShoppingBag, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
