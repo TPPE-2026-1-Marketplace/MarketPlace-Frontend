@@ -31,7 +31,7 @@ export default function LoginPage() {
           navigate("/checkout");
         } else {
           const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee";
-          navigate(isInternalUser ? "/" : "/conta");
+          navigate(isInternalUser ? "/selecionar-modulo" : "/conta");
         }
     }
   }, [isAuthenticated, user, navigate, retorno]);
