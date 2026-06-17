@@ -81,11 +81,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * Internal users kept locally for manager/POS modules.
- * These roles don't have self-registration via the public API yet,
- * so we maintain them as seed data for the admin dashboard.
- */
 const INITIAL_USERS: ManagedUser[] = [
   {
     id: "u-001",

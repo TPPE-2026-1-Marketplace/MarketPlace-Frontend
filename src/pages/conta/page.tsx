@@ -1,14 +1,64 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { User, Package, Heart, LogOut, ChevronRight, Edit2 } from "lucide-react";
+import { User, Package, Heart, LogOut, ChevronRight, Edit2, Save, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
+
+interface UserProfile {
+  id: number;
+  name: string;
+  email: string;
+  telefone?: string | null;
+  cpf?: string | null;
+  role: string;
+  createdAt: string;
+}
 
 export default function ContaPage() {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"dados" | "pedidos" | "favoritos">("dados");
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Profile data from the backend (may have more fields than the auth context)
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // Form state for editing
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    telefone: "",
+    cpf: "",
+  });
+
+  // Fetch full profile from backend on mount
+  useEffect(() => {
+    if (!user?.id) return;
+
+    api.get<UserProfile>(`/users/${user.id}`)
+      .then((data) => {
+        setProfile(data);
+        setForm({
+          name: data.name || "",
+          email: data.email || "",
+          telefone: data.telefone || "",
+          cpf: data.cpf || "",
+        });
+      })
+      .catch(() => {
+        // Fallback: use auth context data
+        setForm({
+          name: user.name || "",
+          email: user.email || "",
+          telefone: user.phone || "",
+          cpf: "",
+        });
+      });
+  }, [user]);
 
   if (!isAuthenticated) {
     return (
@@ -33,6 +83,108 @@ export default function ContaPage() {
     navigate("/");
   };
 
+  const handleEdit = () => {
+    setIsEditing(true);
+    setMessage(null);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setMessage(null);
+    // Reset form to current profile data
+    setForm({
+      name: profile?.name || user?.name || "",
+      email: profile?.email || user?.email || "",
+      telefone: profile?.telefone || user?.phone || "",
+      cpf: profile?.cpf || "",
+    });
+  };
+
+  const handleSave = async () => {
+    if (!user?.id) return;
+
+    // Verifica se o ID é numérico (usuário cadastrado no backend)
+    const numericId = Number(user.id);
+    if (isNaN(numericId)) {
+      setMessage({
+        type: "error",
+        text: "Sua conta é local e não pode ser editada. Faça logout e cadastre-se novamente.",
+      });
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const updatePayload: Record<string, string | undefined> = {};
+
+      // Only send changed fields
+      const currentName = profile?.name || user?.name || "";
+      const currentEmail = profile?.email || user?.email || "";
+      const currentTelefone = profile?.telefone || "";
+      const currentCpf = profile?.cpf || "";
+
+      if (form.name !== currentName) updatePayload.name = form.name;
+      if (form.email !== currentEmail) updatePayload.email = form.email;
+      if (form.telefone !== currentTelefone) updatePayload.telefone = form.telefone || undefined;
+      if (form.cpf !== currentCpf) updatePayload.cpf = form.cpf || undefined;
+
+      if (Object.keys(updatePayload).length === 0) {
+        setMessage({ type: "error", text: "Nenhuma alteração detectada." });
+        setSaving(false);
+        return;
+      }
+
+      const updated = await api.patch<UserProfile>(`/users/${numericId}`, updatePayload);
+      setProfile(updated);
+      setForm({
+        name: updated.name || "",
+        email: updated.email || "",
+        telefone: updated.telefone || "",
+        cpf: updated.cpf || "",
+      });
+
+      // Update localStorage user data
+      const storedUser = localStorage.getItem("dk_user");
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        parsed.name = updated.name;
+        parsed.email = updated.email;
+        parsed.phone = updated.telefone || undefined;
+        localStorage.setItem("dk_user", JSON.stringify(parsed));
+      }
+
+      setIsEditing(false);
+      setMessage({ type: "success", text: "Dados atualizados com sucesso!" });
+    } catch (err: any) {
+      // Traduz mensagens comuns do backend para português
+      const rawMsg: string = err?.message || "";
+      let translated = "Erro ao atualizar dados. Tente novamente.";
+
+      if (rawMsg.includes("numeric string is expected")) {
+        translated = "ID de usuário inválido. Faça logout e entre novamente.";
+      } else if (rawMsg.includes("not found") || rawMsg.includes("não encontrado")) {
+        translated = "Usuário não encontrado. Faça logout e cadastre-se novamente.";
+      } else if (rawMsg.includes("already") || rawMsg.includes("já cadastrado")) {
+        translated = "E-mail ou CPF já cadastrado por outro usuário.";
+      } else if (rawMsg.includes("Validation") || rawMsg.includes("validation")) {
+        translated = "Dados inválidos. Verifique os campos e tente novamente.";
+      } else if (rawMsg) {
+        translated = rawMsg;
+      }
+
+      setMessage({ type: "error", text: translated });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const displayName = profile?.name || user?.name || "Usuário";
+  const displayEmail = profile?.email || user?.email || "";
+  const displayPhone = profile?.telefone || user?.phone || "";
+  const displayCpf = profile?.cpf || "";
+
   const myOrders: any[] = []; // Placeholder for actual orders
 
   const tabs = [
@@ -47,11 +199,11 @@ export default function ContaPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-white/20 flex items-center justify-center text-white text-2xl font-serif">
-              {user?.name?.charAt(0) || "U"}
+              {displayName.charAt(0) || "U"}
             </div>
             <div>
-              <h1 className="text-white font-serif text-2xl">{user?.name || "Usuário"}</h1>
-              <p className="text-gray-300 text-sm font-sans">{user?.email}</p>
+              <h1 className="text-white font-serif text-2xl">{displayName}</h1>
+              <p className="text-gray-300 text-sm font-sans">{displayEmail}</p>
             </div>
           </div>
         </div>
@@ -91,24 +243,87 @@ export default function ContaPage() {
               <div className="bg-white p-6 border border-gray-100">
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="text-gray-900 font-serif text-xl">Meus Dados</h2>
-                  <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800">
-                    <Edit2 className="w-4 h-4" /> Editar
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  {[
-                    ["Nome", user?.name],
-                    ["E-mail", user?.email],
-                    ["Telefone", "Não informado"],
-                    ["CPF", "***.***.***-**"],
-                    ["Data de Nascimento", "Não informado"],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex gap-4 py-3 border-b border-gray-50 last:border-0">
-                      <span className="text-gray-400 text-sm w-36 shrink-0">{label}</span>
-                      <span className="text-gray-900 text-sm">{value || "Não informado"}</span>
+                  {!isEditing ? (
+                    <button
+                      onClick={handleEdit}
+                      className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" /> Editar
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleCancel}
+                        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+                      >
+                        <X className="w-4 h-4" /> Cancelar
+                      </button>
+                      <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex items-center gap-1 text-sm px-3 py-1.5 transition-colors disabled:opacity-50"
+                        style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+                      >
+                        {saving ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        Salvar
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
+
+                {message && (
+                  <div
+                    className={`mb-4 p-3 text-sm ${
+                      message.type === "success"
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : "bg-red-50 text-red-700 border border-red-200"
+                    }`}
+                  >
+                    {message.text}
+                  </div>
+                )}
+
+                {isEditing ? (
+                  <div className="space-y-4">
+                    {[
+                      { label: "Nome", key: "name", type: "text" },
+                      { label: "E-mail", key: "email", type: "email" },
+                      { label: "Telefone", key: "telefone", type: "tel" },
+                      { label: "CPF", key: "cpf", type: "text" },
+                    ].map((field) => (
+                      <div key={field.key} className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        <label className="text-gray-400 text-sm w-36 shrink-0">{field.label}</label>
+                        <input
+                          type={field.type}
+                          value={form[field.key as keyof typeof form]}
+                          onChange={(e) =>
+                            setForm((prev) => ({ ...prev, [field.key]: e.target.value }))
+                          }
+                          className="flex-1 border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gray-400 transition-colors"
+                          placeholder={`Informe seu ${field.label.toLowerCase()}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {[
+                      ["Nome", displayName],
+                      ["E-mail", displayEmail],
+                      ["Telefone", displayPhone || "Não informado"],
+                      ["CPF", displayCpf ? `***.***.***-${displayCpf.slice(-2)}` : "Não informado"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex gap-4 py-3 border-b border-gray-50 last:border-0">
+                        <span className="text-gray-400 text-sm w-36 shrink-0">{label}</span>
+                        <span className="text-gray-900 text-sm">{value || "Não informado"}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
