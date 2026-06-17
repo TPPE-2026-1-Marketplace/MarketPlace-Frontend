@@ -29,7 +29,7 @@ export default function Header() {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Auth state
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, isManager, isSuperAdmin, isInternalUser } = useAuth();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -56,6 +56,12 @@ export default function Header() {
     } else {
       navigate("/conta");
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setUserMenuOpen(false);
+    navigate("/");
   };
 
   return (
@@ -124,23 +130,95 @@ export default function Header() {
               </button>
               {userMenuOpen && (
                 <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 shadow-lg py-1 w-52 z-50">
-                  <Link
-                    to={isAuthenticated ? "/conta" : "/login"}
-                    onClick={() => setUserMenuOpen(false)}
-                    className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    {isAuthenticated ? "Minha Conta" : "Entrar / Cadastrar"}
-                  </Link>
-                  {isAuthenticated && (
-                    <button
-                      onClick={() => {
-                        logout();
-                        setUserMenuOpen(false);
-                      }}
-                      className="block w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      Sair
-                    </button>
+                  {user ? (
+                    <>
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="text-sm text-gray-900">{user.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{user.email}</p>
+                        {user.role && (
+                          <span className="inline-block mt-1.5 bg-[#1a1a1a] text-white text-xs px-2 py-0.5">
+                            {user.role === "superadmin"
+                              ? "Super Admin"
+                              : user.role === "manager"
+                              ? "Gerente"
+                              : user.role === "employee"
+                              ? "Funcionário"
+                              : "Cliente"}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Module navigation for internal users */}
+                      {isInternalUser && (
+                        <>
+                          <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                            <p className="text-xs text-gray-400 uppercase tracking-widest">Módulos</p>
+                          </div>
+                          <Link
+                            to="/"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            <ShoppingBag className="w-4 h-4" />
+                            Loja Online
+                          </Link>
+                          {(isManager || isSuperAdmin) && (
+                            <Link
+                              to="/gerente"
+                              onClick={() => setUserMenuOpen(false)}
+                              className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                              <LayoutDashboard className="w-4 h-4" />
+                              Painel Gerencial
+                            </Link>
+                          )}
+                          <Link
+                            to="/pdv"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            <Store className="w-4 h-4" />
+                            PDV - Vendas Presenciais
+                          </Link>
+                          <div className="border-t border-gray-100 my-1"></div>
+                        </>
+                      )}
+
+                      <Link
+                        to="/conta"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        Minha Conta
+                      </Link>
+                      <div className="border-t border-gray-100 mt-1 pt-1">
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Sair
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        to="/login"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Entrar
+                      </Link>
+                      <Link
+                        to="/login?modo=cadastro"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Criar Conta
+                      </Link>
+                    </>
                   )}
                 </div>
               )}
