@@ -368,7 +368,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
         onSave={async (product) => {
           try {
             const created = await api.post<any>("/products", {
-              titulo: product.name,
+              titulo: product.name || product.title,
               preco_base: product.price || 0,
               descricao: product.description,
               categoria: product.category,
