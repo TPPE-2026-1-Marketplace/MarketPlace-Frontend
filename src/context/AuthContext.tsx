@@ -35,27 +35,24 @@ export interface User {
 /** Shape returned by POST /api/auth/login */
 interface LoginApiResponse {
   access_token: string;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-    role: string;
-    cpf?: string | null;
-    telefone?: string | null;
-    createdAt: string;
-  };
 }
 
-/** Shape returned by POST /api/users */
-interface RegisterApiResponse {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  cpf?: string | null;
-  telefone?: string | null;
-  createdAt: string;
-}
+const decodeJwt = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(window.atob(base64));
+  } catch {
+    return {};
+  }
+};
+
+const mapRole = (backendRole: string): UserRole => {
+  if (backendRole === "administrador") return "superadmin";
+  if (backendRole === "gerente") return "manager";
+  if (backendRole === "vendedor" || backendRole === "caixa") return "employee";
+  return "customer";
+};
 
 interface AuthContextType {
   user: User | null;
@@ -177,25 +174,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * that may not exist in the database yet.
    */
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
-    // 1. Try the real backend API
     try {
-      const response = await api.post<LoginApiResponse>("/auth/login", { email, password });
+      const response = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
 
-      // Store the JWT token for authenticated API calls
-      localStorage.setItem("dk_token", response.access_token);
+      const token = response.access_token;
+      localStorage.setItem("dk_token", token);
+
+      const payload = decodeJwt(token);
+      const cpf = payload.sub;
+      const role = mapRole(payload.role);
+
+      let userName = "Usuário";
+      let userPhone = undefined;
+
+      try {
+        const person = await api.get<{ nome: string; telefone: string }>(`/people/${cpf}`);
+        if (person) {
+          userName = person.nome || userName;
+          userPhone = person.telefone;
+        }
+      } catch (err) {
+        console.warn("Não foi possível buscar perfil da pessoa:", err);
+      }
 
       const apiUser: User = {
-        id: String(response.user.id),
-        name: response.user.name,
-        email: response.user.email,
-        role: (response.user.role as UserRole) || "customer",
-        phone: response.user.telefone || undefined,
+        id: String(cpf),
+        name: userName,
+        email: payload.email,
+        role: role,
+        phone: userPhone,
       };
 
       setUser(apiUser);
       return { success: true, message: "Login realizado com sucesso!" };
     } catch (err) {
-      // If the API is unreachable or returns 401, fall back to local users
       const isApiError = err instanceof ApiError;
       const isUnauthorized = isApiError && err.status === 401;
       const isNetworkError = !isApiError;
@@ -204,13 +216,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn("Backend indisponível, usando autenticação local como fallback.");
       }
 
-      // 2. Fallback: check local users (for manager/employee/superadmin roles)
       if (isUnauthorized || isNetworkError) {
         const found = users.find(
           (u) => u.email === email && u.password === password && u.active
         );
         if (found) {
-          // Generate a mock token for internal users
           localStorage.setItem("dk_token", `local_${found.id}_${Date.now()}`);
           setUser({
             id: found.id,
@@ -245,48 +255,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     phone: string
   ): Promise<{ success: boolean; message: string }> => {
-    // 1. Try the real backend API
     try {
-      const newUser = await api.post<RegisterApiResponse>("/users", {
-        name,
+      await api.post("/people/register-user", {
+        nome: name,
         email,
-        password,
+        senha: password,
         telefone: phone || undefined,
       });
 
-      // Auto-login after registration: call the login endpoint to get a JWT
       try {
-        const loginRes = await api.post<LoginApiResponse>("/auth/login", { email, password });
+        const loginRes = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
         localStorage.setItem("dk_token", loginRes.access_token);
+
+        const payload = decodeJwt(loginRes.access_token);
+        
+        const apiUser: User = {
+          id: String(payload.sub),
+          name: name,
+          email: payload.email,
+          role: mapRole(payload.role),
+          phone: phone || undefined,
+        };
+
+        setUser(apiUser);
       } catch {
-        // If auto-login fails, the user can log in manually
-        localStorage.setItem("dk_token", `registered_${newUser.id}_${Date.now()}`);
+        localStorage.setItem("dk_token", `registered_${Date.now()}`);
+        setUser({ id: `u-${Date.now()}`, name, email, role: "customer", phone });
       }
 
-      const apiUser: User = {
-        id: String(newUser.id),
-        name: newUser.name,
-        email: newUser.email,
-        role: (newUser.role as UserRole) || "customer",
-        phone: newUser.telefone || undefined,
-      };
-
-      setUser(apiUser);
       return { success: true, message: "Cadastro realizado com sucesso!" };
     } catch (err) {
       const isApiError = err instanceof ApiError;
 
-      // Conflict (email already exists)
       if (isApiError && err.status === 409) {
         return { success: false, message: "E-mail ou CPF já cadastrado." };
       }
 
-      // Validation error
       if (isApiError && err.status === 400) {
         return { success: false, message: err.message || "Dados inválidos. Verifique os campos." };
       }
 
-      // Network error — fallback to local registration
       if (!isApiError) {
         console.warn("Backend indisponível, usando cadastro local como fallback.");
 

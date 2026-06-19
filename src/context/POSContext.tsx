@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { POSSale, POSSaleItem } from "../data/pos-types";
+import { api } from "../lib/api";
 
 interface POSContextType {
   currentSale: POSSaleItem[];
@@ -15,7 +16,7 @@ interface POSContextType {
     customerName?: string,
     customerPhone?: string,
     customerEmail?: string
-  ) => { success: boolean; saleId?: string };
+  ) => Promise<{ success: boolean; message?: string; saleId?: string }>;
   getSalesBySeller: (sellerId: string) => POSSale[];
   getTotalSales: () => number;
 }
@@ -28,10 +29,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const addItem = (item: POSSaleItem) => {
     const existingIndex = currentSale.findIndex(
-      (i) =>
-        i.product.id === item.product.id &&
-        i.size === item.size &&
-        i.color === item.color
+      (i) => i.variantSku === item.variantSku
     );
 
     if (existingIndex >= 0) {
@@ -61,42 +59,58 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setCurrentSale([]);
   };
 
-  const completeSale = (
+  const completeSale = async (
     paymentMethod: "pix" | "card",
     sellerId: string,
     sellerName: string,
     customerName?: string,
     customerPhone?: string,
     customerEmail?: string
-  ) => {
+  ): Promise<{ success: boolean; message?: string; saleId?: string }> => {
     if (currentSale.length === 0) {
-      return { success: false };
+      return { success: false, message: "Carrinho vazio" };
     }
 
-    const subtotal = currentSale.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0
-    );
+    try {
+      const payload = {
+        idFuncionario: sellerId,
+        idUsuario: null, // we don't have CPF directly in Cashier customer fields yet, so we send null to be safe or if there's a CPF field, we map it
+        items: currentSale.map((item) => ({
+          variantSku: item.variantSku,
+          quantidade: item.quantity,
+        })),
+        couponNumero: null,
+      };
 
-    const newSale: POSSale = {
-      id: `pos-${Date.now()}`,
-      items: [...currentSale],
-      subtotal,
-      total: subtotal,
-      paymentMethod,
-      sellerId,
-      sellerName,
-      customerName,
-      customerPhone,
-      customerEmail,
-      date: new Date().toISOString().split("T")[0],
-      timestamp: Date.now(),
-    };
+      const response = await api.post<{ idPedido: number }>("/orders/in-store", payload);
 
-    setSales([newSale, ...sales]);
-    setCurrentSale([]);
+      const subtotal = currentSale.reduce(
+        (sum, item) => sum + item.unitPrice * item.quantity,
+        0
+      );
 
-    return { success: true, saleId: newSale.id };
+      const newSale: POSSale = {
+        id: String(response.idPedido),
+        items: [...currentSale],
+        subtotal,
+        total: subtotal,
+        paymentMethod,
+        sellerId,
+        sellerName,
+        customerName,
+        customerPhone,
+        customerEmail,
+        date: new Date().toISOString().split("T")[0],
+        timestamp: Date.now(),
+      };
+
+      setSales([newSale, ...sales]);
+      setCurrentSale([]);
+
+      return { success: true, saleId: newSale.id };
+    } catch (err: any) {
+      return { success: false, message: err.message || "Erro ao processar a venda na API" };
+    }
   };
 
   const getSalesBySeller = (sellerId: string) => {
