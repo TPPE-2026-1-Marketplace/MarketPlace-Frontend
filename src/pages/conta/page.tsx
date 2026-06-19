@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { User, Package, Heart, LogOut, ChevronRight, Edit2, Save, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
+import { useProducts } from "@/hooks/useProducts";
 import { api } from "@/lib/api";
 
 interface UserProfile {
@@ -18,6 +20,8 @@ interface UserProfile {
 
 export default function ContaPage() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { favorites } = useFavorites();
+  const { products } = useProducts({ page: 1, limit: 200 });
   const navigate = useNavigate();
   const [tab, setTab] = useState<"dados" | "pedidos" | "favoritos">("dados");
   const [isEditing, setIsEditing] = useState(false);
@@ -69,7 +73,7 @@ export default function ContaPage() {
           <p className="text-gray-500 text-sm mb-4">Faça login para acessar sua conta.</p>
           <Link
             to="/login"
-            className="bg-[#1a1a1a] text-white px-6 py-2 hover:bg-[#333333] transition-colors text-sm inline-block"
+            className="bt-principal px-6 py-2 text-sm inline-block"
           >
             Fazer Login
           </Link>
@@ -261,8 +265,7 @@ export default function ContaPage() {
                       <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center gap-1 text-sm px-3 py-1.5 transition-colors disabled:opacity-50"
-                        style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+                        className="bt-principal flex items-center gap-1 text-sm px-3 py-1.5"
                       >
                         {saving ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -348,18 +351,67 @@ export default function ContaPage() {
             )}
 
             {tab === "favoritos" && (
-              <div className="bg-white p-6 border border-gray-100 text-center py-16">
-                <Heart className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                <h3 className="text-gray-500 mb-2 font-serif text-xl">Nenhum favorito ainda</h3>
-                <p className="text-gray-400 text-sm mb-4">
-                  Salve seus vestidos favoritos para não perder!
-                </p>
-                <Link
-                  to="/produtos"
-                  className="text-gray-700 text-sm hover:underline"
-                >
-                  Explorar vestidos
-                </Link>
+              <div className="bg-white p-6 border border-gray-100">
+                <h2 className="text-gray-900 mb-5 font-serif text-xl">Meus Favoritos</h2>
+                {(() => {
+                  const favProducts = products.filter((p: any) =>
+                    favorites.includes(String(p.id_produto ?? p.id))
+                  );
+                  if (favProducts.length === 0) {
+                    return (
+                      <div className="text-center py-10">
+                        <Heart className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                        <h3 className="text-gray-500 mb-2 font-serif text-xl">Nenhum favorito ainda</h3>
+                        <p className="text-gray-400 text-sm mb-4">
+                          Salve seus vestidos favoritos para não perder!
+                        </p>
+                        <Link
+                          to="/produtos"
+                          className="text-gray-700 text-sm hover:underline"
+                        >
+                          Explorar vestidos
+                        </Link>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {favProducts.map((product: any) => {
+                        const price = product.variants?.[0]?.preco_variante ?? product.preco_base ?? product.price;
+                        const image = product.imagens?.[0]?.url ?? product.images?.[0] ?? "";
+                        const nome = product.titulo ?? product.name ?? "";
+                        const cat = product.categoria ?? product.category ?? "Vestido";
+                        const id = product.id_produto ?? product.id;
+                        return (
+                          <Link
+                            key={id}
+                            to={`/produtos/${id}`}
+                            className="flex gap-4 p-3 border border-gray-100 hover:border-gray-300 transition-colors group"
+                          >
+                            <div className="w-20 h-28 shrink-0 bg-gray-50 overflow-hidden">
+                              {image && (
+                                <img
+                                  src={image}
+                                  alt={nome}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-400 uppercase tracking-widest">{cat}</p>
+                              <h4 className="text-sm text-gray-900 truncate group-hover:text-gray-600 transition-colors">
+                                {nome}
+                              </h4>
+                              <p className="text-sm text-gray-900 mt-1">
+                                R$ {typeof price === "number" ? price.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : price}
+                              </p>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

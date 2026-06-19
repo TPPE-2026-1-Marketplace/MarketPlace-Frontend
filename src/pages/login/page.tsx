@@ -79,19 +79,13 @@ export default function LoginPage() {
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => { setIsRegister(false); setMessage(null); }}
-              className={`flex-1 py-3 text-sm transition-colors rounded-xl font-medium ${
-                !isRegister ? "" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              style={!isRegister ? { backgroundColor: '#1a1a1a', color: '#ffffff' } : {}}
+              className={`flex-1 py-3 text-sm rounded-xl font-medium ${!isRegister ? "bt-principal" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
             >
               Entrar
             </button>
             <button
               onClick={() => { setIsRegister(true); setMessage(null); }}
-              className={`flex-1 py-3 text-sm transition-colors rounded-xl font-medium ${
-                isRegister ? "" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              style={isRegister ? { backgroundColor: '#1a1a1a', color: '#ffffff' } : {}}
+              className={`flex-1 py-3 text-sm rounded-xl font-medium ${isRegister ? "bt-principal" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
             >
               Criar Conta
             </button>
@@ -197,8 +191,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl py-3 hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium tracking-wide mt-2"
-              style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+              className="bt-principal w-full rounded-xl py-3 text-sm font-medium tracking-wide mt-2"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

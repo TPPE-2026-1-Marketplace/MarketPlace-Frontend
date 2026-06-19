@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 
 export interface CartItem {
   id: number;
@@ -23,6 +23,15 @@ export interface Cart {
   cupom?: string | null;
 }
 
+interface CartContextType {
+  cart: Cart;
+  addItem: (item: any, quantity?: number) => void;
+  updateQuantity: (variantId: number, quantity: number) => void;
+  removeItem: (variantId: number) => void;
+  clear: () => void;
+  itemCount: number;
+}
+
 const EMPTY_CART: Cart = {
   id: 1,
   items: [],
@@ -42,17 +51,22 @@ function calculateCart(cart: Cart): Cart {
   };
 }
 
-export function useCart() {
-  const [cart, setCart] = useState<Cart>(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem("cart") : null;
-    if (!saved) return EMPTY_CART;
-    try {
+const CartContext = createContext<CartContextType | undefined>(undefined);
+
+function loadCart(): Cart {
+  try {
+    const saved = localStorage.getItem("cart");
+    if (saved) {
       return JSON.parse(saved) as Cart;
-    } catch {
-      // Corrupt/legacy data — discard it instead of crashing on mount
-      return EMPTY_CART;
     }
-  });
+  } catch {
+    // Corrupt data
+  }
+  return EMPTY_CART;
+}
+
+export function CartProvider({ children }: { children: ReactNode }) {
+  const [cart, setCart] = useState<Cart>(loadCart);
 
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart));
@@ -90,12 +104,15 @@ export function useCart() {
 
   const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
 
-  return {
-    cart,
-    addItem,
-    updateQuantity,
-    removeItem,
-    clear,
-    itemCount,
-  };
+  return (
+    <CartContext.Provider value={{ cart, addItem, updateQuantity, removeItem, clear, itemCount }}>
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+export function useCart() {
+  const ctx = useContext(CartContext);
+  if (!ctx) throw new Error("useCart must be used within <CartProvider>");
+  return ctx;
 }

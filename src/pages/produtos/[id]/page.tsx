@@ -486,7 +486,7 @@ export default function ProductDetailPage() {
             <div className="flex gap-3 mb-6">
               <button
                 onClick={handleBuyNow}
-                className="flex-1 bg-[#1a1a1a] text-white py-3.5 hover:bg-[#333333] transition-colors text-sm tracking-wide"
+                className="bt-principal flex-1 py-3.5 text-sm tracking-wide"
               >
                 Comprar Agora
               </button>

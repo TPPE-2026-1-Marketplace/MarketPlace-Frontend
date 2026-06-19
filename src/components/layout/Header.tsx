@@ -54,7 +54,7 @@ export default function Header() {
     if (user) {
       navigate("/favoritos");
     } else {
-      navigate("/conta");
+      navigate("/login");
     }
   };
 
