@@ -21,7 +21,7 @@ import FavoritesPage from './pages/favorites/page';
 // New Pages
 import { ModuleSelection } from './pages/ModuleSelection';
 import { ManagerDashboard } from './pages/manager/Dashboard';
-import { CashierNew } from './pages/pos/CashierNew';
+import { Cashier } from './pages/pos/Cashier';
 
 function ShopLayout() {
   return (
@@ -53,7 +53,7 @@ export default function App() {
         
         <Route path="/selecionar-modulo" element={<ModuleSelection />} />
         <Route path="/gerente/*" element={<ManagerDashboard />} />
-        <Route path="/pdv" element={<CashierNew />} />
+        <Route path="/caixa" element={<Cashier />} />
       </Routes>
     </BrowserRouter>
   );
