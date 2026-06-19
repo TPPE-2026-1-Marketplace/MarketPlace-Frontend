@@ -1,8 +1,10 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { ShoppingCart, Heart } from "lucide-react";
+import { ShoppingCart, Heart, Check } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useFavorites } from "@/context/FavoritesContext";
+import { useCart } from "@/hooks/useCart";
 
 interface ProductCardProps {
   id: number;
@@ -27,6 +29,11 @@ export default function ProductCard({
   className,
   style,
 }: ProductCardProps) {
+  const { toggleFavorite, isFavorite } = useFavorites();
+  const { addItem } = useCart();
+  const [added, setAdded] = useState(false);
+  const favorited = isFavorite(String(id));
+
   const desconto = precoOriginal
     ? Math.round(((precoOriginal - preco) / precoOriginal) * 100)
     : null;
@@ -59,20 +66,52 @@ export default function ProductCard({
             </span>
           </div>
           {/* Wishlist */}
-          <button className="absolute top-3 right-3 w-8 h-8 bg-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100 border border-gray-100">
-            <Heart className="w-4 h-4 text-gray-600" />
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              toggleFavorite(String(id));
+            }}
+            className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center transition-opacity border border-gray-100 ${
+              favorited
+                ? "bg-[#1a1a1a] text-white opacity-100"
+                : "bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-100"
+            }`}
+          >
+            <Heart className={`w-4 h-4 ${favorited ? "fill-current" : ""}`} />
           </button>
           {/* Quick add */}
           <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
             <button
               onClick={(e) => {
                 e.preventDefault();
-                // Add to cart logic will go here
+                if (added) return;
+                setAdded(true);
+                addItem(
+                  {
+                    id: Date.now() + Math.random(),
+                    preco_variante: preco,
+                    tamanho: mockSizes[0],
+                    cor: "Padrão",
+                    produto: { id, titulo, preco_base: preco },
+                    images: [{ image: { url: imagem } }],
+                  },
+                  1
+                );
+                setTimeout(() => setAdded(false), 1500);
               }}
-              className="w-full bg-[#1a1a1a] text-white py-2.5 flex items-center justify-center gap-2 hover:bg-[#333333] transition-colors text-xs tracking-wide"
+              className="bt-principal w-full py-2.5 flex items-center justify-center gap-2 text-xs tracking-wide"
             >
-              <ShoppingCart className="w-4 h-4" />
-              Adicionar ao Carrinho
+              {added ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  Adicionado!
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="w-4 h-4" />
+                  Adicionar ao Carrinho
+                </>
+              )}
             </button>
           </div>
         </div>
