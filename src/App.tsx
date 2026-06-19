@@ -16,6 +16,7 @@ import ContaPage from './pages/conta/page';
 import PoliticasPage from './pages/politicas/page';
 import CarrinhoPage from './pages/carrinho/page';
 import CheckoutPage from './pages/checkout/page';
+import FavoritesPage from './pages/favorites/page';
 
 // New Pages
 import { ModuleSelection } from './pages/ModuleSelection';
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/conta" element={<ContaPage />} />
           <Route path="/politicas" element={<PoliticasPage />} />
+          <Route path="/favoritos" element={<FavoritesPage />} />
         </Route>
         
         <Route path="/selecionar-modulo" element={<ModuleSelection />} />

@@ -13,6 +13,7 @@ import {
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 type Step = "dados" | "entrega" | "pagamento" | "confirmado";
 
@@ -41,7 +42,7 @@ function GuestCheckoutModal({
         <div className="space-y-3 font-sans">
           <button
             onClick={onContinueAsGuest}
-            className="w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide flex items-center justify-center gap-2"
+            className="bt-principal w-full py-3 text-sm tracking-wide flex items-center justify-center gap-2"
           >
             <ShoppingBag className="w-4 h-4" />
             Continuar sem conta
@@ -161,7 +162,43 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    try {
+      await api.post("/orders", {
+        items: cart.items.map((i) => ({
+          productId: i.variant.produto.id,
+          variantId: i.variant.id,
+          titulo: i.variant.produto.titulo,
+          tamanho: i.variant.tamanho,
+          cor: i.variant.cor,
+          quantidade: i.quantity,
+          preco_unitario: i.variant.preco_variante || i.variant.produto.preco_base,
+        })),
+        subtotal: cart.total,
+        frete: shipping,
+        desconto: pixDiscount,
+        total: finalTotal,
+        paymentMethod: payment,
+        endereco: {
+          cep: form.cep,
+          rua: form.rua,
+          numero: form.numero,
+          complemento: form.complemento,
+          bairro: form.bairro,
+          cidade: form.cidade,
+          estado: form.estado,
+        },
+        cliente: {
+          nome: form.nome || undefined,
+          email: form.email,
+          cpf: form.cpf,
+          telefone: form.telefone || undefined,
+        },
+      });
+    } catch (err) {
+      console.error("Erro ao criar pedido:", err);
+      // Continua para tela de confirmação mesmo se API falhar
+    }
     clear();
     setStep("confirmado");
   };
@@ -198,7 +235,7 @@ export default function CheckoutPage() {
           </p>
           <button
             onClick={() => navigate("/")}
-            className="w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide"
+            className="bt-principal w-full py-3 text-sm tracking-wide"
           >
             Voltar à Loja
           </button>
@@ -342,7 +379,7 @@ export default function CheckoutPage() {
 
                   <button
                     onClick={handleDadosContinue}
-                    className="mt-6 w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors flex items-center justify-center gap-2 text-sm tracking-wide"
+                    className="bt-principal mt-6 w-full py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
                   >
                     Continuar <ChevronRight className="w-4 h-4" />
                   </button>
@@ -387,7 +424,7 @@ export default function CheckoutPage() {
                     </button>
                     <button
                       onClick={() => setStep("pagamento")}
-                      className="flex-1 bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors flex items-center justify-center gap-2 text-sm tracking-wide"
+                      className="bt-principal flex-1 py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
                     >
                       Continuar <ChevronRight className="w-4 h-4" />
                     </button>

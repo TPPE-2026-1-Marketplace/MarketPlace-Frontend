@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Product, PRODUCTS } from "../../data/products";
 import { AddProduct } from "./AddProduct";
+import { api } from "@/lib/api";
 
 type StockType = "all" | "ecommerce" | "physical";
 type FilterCategory = "all" | Product["category"];
@@ -364,8 +365,21 @@ export function Inventory({ readOnly = false }: InventoryProps) {
     return (
       <AddProduct
         onBack={() => setShowAddProduct(false)}
-        onSave={(product) => {
-          setProducts((prev) => [...prev, product as Product]);
+        onSave={async (product) => {
+          try {
+            const created = await api.post<any>("/products", {
+              titulo: product.name || product.title,
+              preco_base: product.price || 0,
+              descricao: product.description,
+              categoria: product.category,
+              imagem_url: product.images?.[0] || null,
+            });
+            setProducts((prev) => [...prev, { ...product, id: String(created.id_produto ?? created.id) } as Product]);
+          } catch (err) {
+            console.error("Erro ao salvar produto:", err);
+            // Fallback: salva localmente mesmo se a API falhar
+            setProducts((prev) => [...prev, product as Product]);
+          }
           setShowAddProduct(false);
         }}
       />
