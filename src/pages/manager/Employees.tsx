@@ -14,8 +14,39 @@ import {
   EyeOff,
   AlertTriangle,
 } from "lucide-react";
-import { useAuth, ManagedUser, UserRole } from "../../context/AuthContext";
+import { useAuth, UserRole } from "../../context/AuthContext";
 import { MOCK_EMPLOYEE_SALES } from "../../data/employees";
+import { api, ApiError } from "../../lib/api";
+
+export interface ApiEmployee {
+  cpf: string;
+  ativo: boolean;
+  role_perfil: string;
+  taxa_comissao: string | number;
+  meta_vendas: string | number | null;
+  codigo_funcionario: string | null;
+  person: {
+    cpf: string;
+    nome: string;
+    email: string;
+    telefone: string | null;
+  };
+  createdAt?: string;
+}
+
+export const mapRoleToFrontend = (role: string): UserRole => {
+  if (role === "administrador") return "superadmin";
+  if (role === "gerente") return "manager";
+  if (role === "cliente") return "customer";
+  return "employee";
+};
+
+export const mapFrontendToRole = (role: UserRole): string => {
+  if (role === "superadmin") return "administrador";
+  if (role === "manager") return "gerente";
+  if (role === "customer") return "cliente";
+  return "vendedor";
+};
 
 type Tab = "list" | "add" | "edit";
 
@@ -34,17 +65,37 @@ const ROLE_COLORS: Record<UserRole, string> = {
 };
 
 export function Employees() {
-  const { users, user: currentUser, addUser, updateUser, deleteUser, isSuperAdmin } = useAuth();
+  const { user: currentUser, isSuperAdmin } = useAuth();
+  const [employees, setEmployees] = React.useState<ApiEmployee[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("list");
-  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [editingUser, setEditingUser] = useState<ApiEmployee | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [roleFilter, setRoleFilter] = useState<"all" | UserRole>("all");
-  const [detailUser, setDetailUser] = useState<ManagedUser | null>(null);
+  const [detailUser, setDetailUser] = useState<ApiEmployee | null>(null);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const canManageManagers = isSuperAdmin;
 
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get<{ data: ApiEmployee[] }>("/employees?limit=1000");
+      setEmployees(res.data);
+    } catch (err) {
+      console.error(err);
+      setMsg({ type: "error", text: "Erro ao carregar funcionários." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchEmployees();
+  }, []);
+
   const [form, setForm] = useState<{
+    cpf: string;
     name: string;
     email: string;
     password: string;
@@ -57,6 +108,7 @@ export function Employees() {
     bonusAmount: string;
     active: boolean;
   }>({
+    cpf: "",
     name: "",
     email: "",
     password: "",
@@ -70,10 +122,11 @@ export function Employees() {
     active: true,
   });
 
-  const filteredUsers = users.filter((u) => {
-    if (u.role === "customer") return false; // Don't show customers
-    if (!canManageManagers && u.role === "superadmin") return false;
-    if (roleFilter !== "all" && u.role !== roleFilter) return false;
+  const filteredUsers = employees.filter((u) => {
+    const frontendRole = mapRoleToFrontend(u.role_perfil);
+    if (frontendRole === "customer") return false; // Don't show customers
+    if (!canManageManagers && frontendRole === "superadmin") return false;
+    if (roleFilter !== "all" && frontendRole !== roleFilter) return false;
     return true;
   });
 
@@ -83,7 +136,7 @@ export function Employees() {
 
   const resetForm = () => {
     setForm({
-      name: "", email: "", password: "", phone: "", sellerCode: "",
+      cpf: "", name: "", email: "", password: "", phone: "", sellerCode: "",
       role: "employee", commissionRate: "5", salesTarget: "20000",
       bonusEnabled: true, bonusAmount: "500", active: true,
     });
@@ -91,94 +144,91 @@ export function Employees() {
     setShowPassword(false);
   };
 
-  const openEdit = (u: ManagedUser) => {
+  const openEdit = (u: ApiEmployee) => {
     setEditingUser(u);
     setForm({
-      name: u.name,
-      email: u.email,
-      password: u.password,
-      phone: u.phone || "",
-      sellerCode: u.sellerCode || "",
-      role: u.role,
-      commissionRate: String(u.commissionRate || 5),
-      salesTarget: String(u.salesTarget || 20000),
-      bonusEnabled: u.bonusEnabled ?? true,
-      bonusAmount: String(u.bonusAmount || 500),
-      active: u.active,
+      cpf: u.cpf,
+      name: u.person.nome,
+      email: u.person.email,
+      password: "", // Senha não vem da API
+      phone: u.person.telefone || "",
+      sellerCode: u.codigo_funcionario || "",
+      role: mapRoleToFrontend(u.role_perfil),
+      commissionRate: String(Number(u.taxa_comissao) * 100 || 5),
+      salesTarget: String(u.meta_vendas || 20000),
+      bonusEnabled: true,
+      bonusAmount: "500", // Bônus não tem mapeamento direto no Employee entity ainda
+      active: u.ativo,
     });
     setActiveTab("edit");
   };
 
-  const handleSave = () => {
-    if (!form.name || !form.email || !form.password) {
+  const handleSave = async () => {
+    if (!form.cpf || !form.name || !form.email || (!editingUser && !form.password)) {
       setMsg({ type: "error", text: "Preencha todos os campos obrigatórios." });
       return;
     }
 
-    // Validate seller code for employees
-    if (form.role === "employee") {
-      if (!form.sellerCode.trim()) {
-        setMsg({ type: "error", text: "Código do vendedor é obrigatório para funcionários." });
-        return;
-      }
-      // Check uniqueness
-      const isDuplicate = users.some((u) =>
-        u.sellerCode === form.sellerCode && u.id !== editingUser?.id
-      );
-      if (isDuplicate) {
-        setMsg({ type: "error", text: "Este código de vendedor já está em uso." });
-        return;
-      }
+    const cleanCpf = form.cpf.replace(/\D/g, "");
+    if (cleanCpf.length !== 11) {
+      setMsg({ type: "error", text: "CPF deve conter exatamente 11 dígitos numéricos." });
+      return;
     }
 
-    if (editingUser) {
-      const result = updateUser(editingUser.id, {
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        phone: form.phone,
-        sellerCode: form.role === "employee" ? form.sellerCode : undefined,
-        role: form.role,
-        commissionRate: form.role === "employee" ? Number(form.commissionRate) : undefined,
-        salesTarget: form.role === "employee" ? Number(form.salesTarget) : undefined,
-        bonusEnabled: form.role === "employee" ? form.bonusEnabled : undefined,
-        bonusAmount: form.role === "employee" ? Number(form.bonusAmount) : undefined,
-        active: form.active,
-      });
-      setMsg({ type: result.success ? "success" : "error", text: result.message });
-    } else {
-      const result = addUser({
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        phone: form.phone,
-        sellerCode: form.role === "employee" ? form.sellerCode : undefined,
-        role: form.role,
-        commissionRate: form.role === "employee" ? Number(form.commissionRate) : undefined,
-        salesTarget: form.role === "employee" ? Number(form.salesTarget) : undefined,
-        bonusEnabled: form.role === "employee" ? form.bonusEnabled : undefined,
-        bonusAmount: form.role === "employee" ? Number(form.bonusAmount) : undefined,
-        active: form.active,
-      });
-      setMsg({ type: result.success ? "success" : "error", text: result.message });
-      if (result.success) resetForm();
+    if (form.role === "employee" && !form.sellerCode.trim()) {
+      setMsg({ type: "error", text: "Código do vendedor é obrigatório para funcionários." });
+      return;
     }
-    if (editingUser) {
+
+    try {
+      const payload: any = {
+        nome: form.name,
+        email: form.email,
+        telefone: form.phone || undefined,
+        ativo: form.active,
+        role_perfil: mapFrontendToRole(form.role),
+        taxa_comissao: form.role === "employee" ? Number(form.commissionRate) / 100 : undefined,
+        meta_vendas: form.role === "employee" ? Number(form.salesTarget) : undefined,
+        codigo_funcionario: form.role === "employee" ? form.sellerCode : undefined,
+      };
+
+      if (form.password) {
+        payload.senha = form.password;
+      }
+
+      if (editingUser) {
+        await api.patch(`/employees/${editingUser.cpf}`, payload);
+        setMsg({ type: "success", text: "Usuário atualizado com sucesso!" });
+      } else {
+        payload.cpf = cleanCpf;
+        await api.post("/employees", payload);
+        setMsg({ type: "success", text: "Usuário cadastrado com sucesso!" });
+      }
+
+      await fetchEmployees();
       resetForm();
       setActiveTab("list");
+    } catch (err) {
+      const e = err as ApiError;
+      setMsg({ type: "error", text: e.message || "Erro ao salvar o usuário." });
     }
     setTimeout(() => setMsg(null), 3000);
   };
 
-  const handleDelete = (u: ManagedUser) => {
-    if (u.id === currentUser?.id) {
+  const handleDelete = async (u: ApiEmployee) => {
+    if (u.cpf === currentUser?.id) {
       setMsg({ type: "error", text: "Não é possível remover o próprio usuário." });
       setTimeout(() => setMsg(null), 3000);
       return;
     }
-    if (confirm(`Remover ${u.name}?`)) {
-      const result = deleteUser(u.id);
-      setMsg({ type: result.success ? "success" : "error", text: result.message });
+    if (confirm(`Desativar ${u.person.nome}?`)) {
+      try {
+        await api.patch(`/employees/${u.cpf}`, { ativo: false });
+        await fetchEmployees();
+        setMsg({ type: "success", text: "Usuário desativado com sucesso." });
+      } catch (err) {
+        setMsg({ type: "error", text: "Erro ao desativar o usuário." });
+      }
       setTimeout(() => setMsg(null), 3000);
     }
   };
@@ -195,7 +245,7 @@ export function Employees() {
     <div className="bg-white border border-gray-100 p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-gray-900">
-          {editingUser ? `Editar: ${editingUser.name}` : "Novo Usuário"}
+          {editingUser ? `Editar: ${editingUser.person.nome}` : "Novo Usuário"}
         </h3>
         <button
           onClick={() => { resetForm(); setActiveTab("list"); }}
@@ -206,6 +256,25 @@ export function Employees() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">CPF *</label>
+          <input
+            type="text"
+            value={form.cpf}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, "");
+              let formatted = val;
+              if (val.length > 9) formatted = val.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, "$1.$2.$3-$4");
+              else if (val.length > 6) formatted = val.replace(/(\d{3})(\d{3})(\d{1,3})/, "$1.$2.$3");
+              else if (val.length > 3) formatted = val.replace(/(\d{3})(\d{1,3})/, "$1.$2");
+              setForm({ ...form, cpf: formatted });
+            }}
+            disabled={!!editingUser}
+            className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a] disabled:bg-gray-100 disabled:text-gray-500"
+            placeholder="000.000.000-00"
+            maxLength={14}
+          />
+        </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Nome Completo *</label>
           <input
@@ -227,14 +296,14 @@ export function Employees() {
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Senha *</label>
+          <label className="block text-xs text-gray-500 mb-1">Senha {!editingUser && "*"}</label>
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="w-full border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:border-[#1a1a1a]"
-              placeholder="Senha de acesso"
+              placeholder={editingUser ? "Deixe em branco para manter" : "Senha de acesso"}
             />
             <button
               type="button"
@@ -385,8 +454,8 @@ export function Employees() {
   );
 
   const staffUsers = filteredUsers;
-  const employeeCount = users.filter((u) => u.role === "employee").length;
-  const managerCount = users.filter((u) => u.role === "manager").length;
+  const employeeCount = employees.filter((u) => mapRoleToFrontend(u.role_perfil) === "employee").length;
+  const managerCount = employees.filter((u) => mapRoleToFrontend(u.role_perfil) === "manager").length;
 
   return (
     <div className="space-y-5">
@@ -470,56 +539,57 @@ export function Employees() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {staffUsers.map((u) => {
-                const totalSales = getEmployeeTotal(u.id);
-                const isCurrent = u.id === currentUser?.id;
+                const totalSales = getEmployeeTotal(u.cpf);
+                const isCurrent = u.cpf === currentUser?.id;
+                const frontendRole = mapRoleToFrontend(u.role_perfil);
                 return (
-                  <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={u.cpf} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-gray-200 flex items-center justify-center shrink-0 text-gray-600 text-xs">
-                          {u.name.charAt(0)}
+                          {u.person.nome.charAt(0)}
                         </div>
                         <div className="min-w-0">
                           <p className="text-gray-900 truncate max-w-36">
-                            {u.name}
+                            {u.person.nome}
                             {isCurrent && (
                               <span className="ml-1 text-xs text-gray-400">(você)</span>
                             )}
                           </p>
-                          <p className="text-gray-400 text-xs truncate">{u.email}</p>
+                          <p className="text-gray-400 text-xs truncate">{u.person.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <span className={`inline-block text-xs px-2 py-0.5 ${ROLE_COLORS[u.role]}`}>
-                        {ROLE_LABELS[u.role]}
+                      <span className={`inline-block text-xs px-2 py-0.5 ${ROLE_COLORS[frontendRole]}`}>
+                        {ROLE_LABELS[frontendRole]}
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1 text-xs text-gray-500">
-                          <Mail className="w-3 h-3" />{u.email}
+                          <Mail className="w-3 h-3" />{u.person.email}
                         </div>
-                        {u.phone && (
+                        {u.person.telefone && (
                           <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Phone className="w-3 h-3" />{u.phone}
+                            <Phone className="w-3 h-3" />{u.person.telefone}
                           </div>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center hidden lg:table-cell">
-                      {u.role === "employee" && u.sellerCode ? (
+                      {frontendRole === "employee" && u.codigo_funcionario ? (
                         <span className="font-mono text-xs text-gray-700 bg-gray-50 px-2 py-0.5">
-                          {u.sellerCode}
+                          {u.codigo_funcionario}
                         </span>
                       ) : (
                         <span className="text-gray-300 text-xs">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center hidden lg:table-cell">
-                      {u.role === "employee" ? (
+                      {frontendRole === "employee" ? (
                         <div>
-                          <p className="text-gray-700 text-xs">{u.commissionRate}%</p>
+                          <p className="text-gray-700 text-xs">{(Number(u.taxa_comissao) * 100).toFixed(1).replace(".0", "")}%</p>
                           {totalSales > 0 && (
                             <p className="text-gray-400 text-xs">
                               R$ {totalSales.toLocaleString("pt-BR")} em vendas
@@ -531,14 +601,14 @@ export function Employees() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center hidden lg:table-cell">
-                      <span className={`text-xs px-2 py-0.5 ${u.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-500"}`}>
-                        {u.active ? "Ativo" : "Inativo"}
+                      <span className={`text-xs px-2 py-0.5 ${u.ativo ? "bg-green-50 text-green-700" : "bg-red-50 text-red-500"}`}>
+                        {u.ativo ? "Ativo" : "Inativo"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button
-                          onClick={() => setDetailUser(detailUser?.id === u.id ? null : u)}
+                          onClick={() => setDetailUser(detailUser?.cpf === u.cpf ? null : u)}
                           className="p-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                           title="Ver detalhes"
                         >
@@ -551,11 +621,11 @@ export function Employees() {
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        {!isCurrent && (
+                        {!isCurrent && u.ativo && (
                           <button
                             onClick={() => handleDelete(u)}
                             className="p-1.5 bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
-                            title="Remover"
+                            title="Desativar"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -579,45 +649,41 @@ export function Employees() {
       {detailUser && (
         <div className="bg-white border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-900">{detailUser.name}</h3>
+            <h3 className="text-gray-900">{detailUser.person.nome}</h3>
             <button onClick={() => setDetailUser(null)} className="text-gray-400 hover:text-gray-600">
               <X className="w-5 h-5" />
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2.5 text-sm">
-              <p><span className="text-gray-400">Perfil:</span> <span className={`inline-block text-xs px-2 py-0.5 ml-1 ${ROLE_COLORS[detailUser.role]}`}>{ROLE_LABELS[detailUser.role]}</span></p>
-              <p className="text-gray-600"><span className="text-gray-400">E-mail:</span> {detailUser.email}</p>
-              <p className="text-gray-600"><span className="text-gray-400">Telefone:</span> {detailUser.phone || "—"}</p>
-              <p className="text-gray-600"><span className="text-gray-400">Cadastrado em:</span> {new Date(detailUser.createdAt).toLocaleDateString("pt-BR")}</p>
-              <p><span className="text-gray-400">Status:</span> <span className={`text-xs ml-1 px-2 py-0.5 ${detailUser.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-500"}`}>{detailUser.active ? "Ativo" : "Inativo"}</span></p>
+              <p><span className="text-gray-400">Perfil:</span> <span className={`inline-block text-xs px-2 py-0.5 ml-1 ${ROLE_COLORS[mapRoleToFrontend(detailUser.role_perfil)]}`}>{ROLE_LABELS[mapRoleToFrontend(detailUser.role_perfil)]}</span></p>
+              <p className="text-gray-600"><span className="text-gray-400">E-mail:</span> {detailUser.person.email}</p>
+              <p className="text-gray-600"><span className="text-gray-400">Telefone:</span> {detailUser.person.telefone || "—"}</p>
+              <p className="text-gray-600"><span className="text-gray-400">CPF:</span> {detailUser.cpf}</p>
+              <p><span className="text-gray-400">Status:</span> <span className={`text-xs ml-1 px-2 py-0.5 ${detailUser.ativo ? "bg-green-50 text-green-700" : "bg-red-50 text-red-500"}`}>{detailUser.ativo ? "Ativo" : "Inativo"}</span></p>
             </div>
-            {detailUser.role === "employee" && (
+            {mapRoleToFrontend(detailUser.role_perfil) === "employee" && (
               <div className="border border-gray-100 p-4 space-y-2.5 text-sm">
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">Comissão</p>
                 <p className="text-gray-600">
                   <span className="text-gray-400">Código Vendedor:</span>{" "}
-                  <span className="font-mono text-gray-900">{detailUser.sellerCode || "—"}</span>
+                  <span className="font-mono text-gray-900">{detailUser.codigo_funcionario || "—"}</span>
                 </p>
-                <p className="text-gray-600"><span className="text-gray-400">Taxa:</span> {detailUser.commissionRate}%</p>
-                <p className="text-gray-600"><span className="text-gray-400">Meta:</span> R$ {Number(detailUser.salesTarget).toLocaleString("pt-BR")}</p>
+                <p className="text-gray-600"><span className="text-gray-400">Taxa:</span> {(Number(detailUser.taxa_comissao) * 100).toFixed(1).replace(".0", "")}%</p>
+                <p className="text-gray-600"><span className="text-gray-400">Meta:</span> R$ {Number(detailUser.meta_vendas || 20000).toLocaleString("pt-BR")}</p>
                 <p className="text-gray-600">
                   <span className="text-gray-400">Bônus:</span>{" "}
-                  {detailUser.bonusEnabled ? (
-                    <span className="text-green-700">R$ {Number(detailUser.bonusAmount).toLocaleString("pt-BR")} (ativo)</span>
-                  ) : (
-                    <span className="text-gray-400">Desativado</span>
-                  )}
+                  <span className="text-gray-400">Módulo em Desenvolvimento</span>
                 </p>
                 <div className="pt-2 border-t border-gray-100">
                   <p className="text-gray-600">
                     <span className="text-gray-400">Total vendido:</span>{" "}
-                    R$ {getEmployeeTotal(detailUser.id).toLocaleString("pt-BR")}
+                    R$ {getEmployeeTotal(detailUser.cpf).toLocaleString("pt-BR")}
                   </p>
                   <p className="text-gray-600">
                     <span className="text-gray-400">Progresso da meta:</span>{" "}
-                    {detailUser.salesTarget
-                      ? `${Math.min(100, Math.round((getEmployeeTotal(detailUser.id) / detailUser.salesTarget) * 100))}%`
+                    {detailUser.meta_vendas
+                      ? `${Math.min(100, Math.round((getEmployeeTotal(detailUser.cpf) / Number(detailUser.meta_vendas)) * 100))}%`
                       : "—"}
                   </p>
                 </div>

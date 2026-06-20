@@ -58,7 +58,7 @@ interface AuthContextType {
   user: User | null;
   users: ManagedUser[];
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
-  register: (name: string, email: string, password: string, phone: string) => Promise<{ success: boolean; message: string }>;
+  register: (name: string, email: string, password: string, phone: string, cpf: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   isManager: boolean;
   isSuperAdmin: boolean;
@@ -213,29 +213,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isNetworkError = !isApiError;
 
       if (isNetworkError) {
-        console.warn("Backend indisponível, usando autenticação local como fallback.");
-      }
-
-      if (isUnauthorized || isNetworkError) {
-        const found = users.find(
-          (u) => u.email === email && u.password === password && u.active
-        );
-        if (found) {
-          localStorage.setItem("dk_token", `local_${found.id}_${Date.now()}`);
-          setUser({
-            id: found.id,
-            name: found.name,
-            email: found.email,
-            role: found.role,
-            phone: found.phone,
-            sellerCode: found.sellerCode,
-            commissionRate: found.commissionRate,
-            salesTarget: found.salesTarget,
-            bonusEnabled: found.bonusEnabled,
-            bonusAmount: found.bonusAmount,
-          });
-          return { success: true, message: "Login realizado com sucesso!" };
-        }
+        return {
+          success: false,
+          message: "Erro de conexão com o servidor. Tente novamente mais tarde.",
+        };
       }
 
       return {
@@ -253,14 +234,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name: string,
     email: string,
     password: string,
-    phone: string
+    phone: string,
+    cpf: string
   ): Promise<{ success: boolean; message: string }> => {
     try {
+      const cleanCpf = cpf.replace(/\D/g, "");
       await api.post("/people/register-user", {
         nome: name,
         email,
         senha: password,
         telefone: phone || undefined,
+        cpf: cleanCpf,
       });
 
       try {
@@ -278,9 +262,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         setUser(apiUser);
-      } catch {
-        localStorage.setItem("dk_token", `registered_${Date.now()}`);
-        setUser({ id: `u-${Date.now()}`, name, email, role: "customer", phone });
+      } catch (err) {
+        console.error("Erro no login automático após cadastro", err);
+        return { success: false, message: "Cadastro concluído, mas falha no auto-login." };
       }
 
       return { success: true, message: "Cadastro realizado com sucesso!" };
@@ -296,29 +280,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!isApiError) {
-        console.warn("Backend indisponível, usando cadastro local como fallback.");
-
-        if (users.some((u) => u.email === email)) {
-          return { success: false, message: "E-mail já cadastrado." };
-        }
-
-        const localUser: ManagedUser = {
-          id: `u-${Date.now()}`,
-          name,
-          email,
-          password,
-          role: "customer",
-          phone,
-          active: true,
-          createdAt: new Date().toISOString().split("T")[0],
+        return {
+          success: false,
+          message: "Erro de conexão com o servidor ao tentar realizar o cadastro.",
         };
-        setUsers((prev) => [...prev, localUser]);
-        localStorage.setItem("dk_token", `local_${localUser.id}_${Date.now()}`);
-        setUser({ id: localUser.id, name, email, role: "customer", phone });
-        return { success: true, message: "Cadastro realizado com sucesso!" };
       }
 
-      return { success: false, message: isApiError ? err.message : "Erro ao criar conta." };
+      return { success: false, message: "Erro ao criar conta." };
     }
   };
 
