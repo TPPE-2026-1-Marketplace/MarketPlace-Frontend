@@ -32,21 +32,19 @@ export interface User {
   bonusAmount?: number;
 }
 
-/** Usuário seguro (sem senha) retornado pelo backend. */
-interface ApiSafeUser {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  cpf?: string | null;
-  telefone?: string | null;
-}
-
 /** Shape returned by POST /api/auth/login */
 interface LoginApiResponse {
   access_token: string;
-  user: ApiSafeUser;
 }
+const decodeJwt = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(window.atob(base64));
+  } catch {
+    return {};
+  }
+};
 
 const mapRole = (backendRole: string): UserRole => {
   // Papéis já em inglês (formato atual do backend).
@@ -181,16 +179,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     try {
-      const response = await api.post<LoginApiResponse>("/auth/login", { email, password });
+      const loginPayload = { email, senha: password };
+      console.log("LOGIN URL", import.meta.env.VITE_API_URL ?? "http://localhost:3001/api");
+      console.log("LOGIN PAYLOAD", loginPayload);
+      const response = await api.post<LoginApiResponse>("/auth/login", loginPayload);
 
       localStorage.setItem("dk_token", response.access_token);
 
+      const decodedPayload = decodeJwt(response.access_token);
+      const cpf = String(decodedPayload.sub);
+      
+      let userName = decodedPayload.name || "Usuário";
+      let userPhone = undefined;
+
+      try {
+        const person = await api.get<{ nome: string; telefone: string }>(`/people/${cpf}`);
+        if (person) {
+          userName = person.nome || userName;
+          userPhone = person.telefone;
+        }
+      } catch (err) {
+        console.warn("Não foi possível buscar perfil da pessoa:", err);
+      }
+
       const apiUser: User = {
-        id: String(response.user.id),
-        name: response.user.name,
-        email: response.user.email,
-        role: mapRole(response.user.role),
-        phone: response.user.telefone ?? undefined,
+        id: cpf,
+        name: userName,
+        email: decodedPayload.email,
+        role: mapRole(decodedPayload.role),
+        phone: userPhone,
       };
 
       setUser(apiUser);
@@ -227,24 +244,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<{ success: boolean; message: string }> => {
     try {
       const cleanCpf = cpf.replace(/\D/g, "");
-      await api.post("/users", {
-        name,
+      await api.post("/people/register-user", {
+        nome: name,
         email,
-        password,
+        senha: password,
         telefone: phone || undefined,
-        cpf: cleanCpf || undefined,
+        cpf: cleanCpf,
       });
 
       try {
-        const loginRes = await api.post<LoginApiResponse>("/auth/login", { email, password });
+        const loginRes = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
         localStorage.setItem("dk_token", loginRes.access_token);
 
+        const payload = decodeJwt(loginRes.access_token);
+        const subCpf = String(payload.sub);
+
         const apiUser: User = {
-          id: String(loginRes.user.id),
-          name: loginRes.user.name,
-          email: loginRes.user.email,
-          role: mapRole(loginRes.user.role),
-          phone: loginRes.user.telefone ?? undefined,
+          id: subCpf,
+          name: name,
+          email: payload.email,
+          role: mapRole(payload.role),
+          phone: phone || undefined,
         };
 
         setUser(apiUser);
