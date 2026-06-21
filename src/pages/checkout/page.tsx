@@ -110,6 +110,8 @@ export default function CheckoutPage() {
   const [payment, setPayment] = useState<"cartao" | "pix">("cartao");
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; cpf?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     nome: user?.name || "",
@@ -163,6 +165,8 @@ export default function CheckoutPage() {
   };
 
   const handleConfirm = async () => {
+    setSubmitting(true);
+    setSubmitError(null);
     try {
       await api.post("/orders", {
         items: cart.items.map((i) => ({
@@ -174,7 +178,7 @@ export default function CheckoutPage() {
           quantidade: i.quantity,
           preco_unitario: i.variant.preco_variante || i.variant.produto.preco_base,
         })),
-        subtotal: cart.total,
+        subtotal: cart.subtotal,
         frete: shipping,
         desconto: pixDiscount,
         total: finalTotal,
@@ -197,9 +201,16 @@ export default function CheckoutPage() {
       });
     } catch (err) {
       console.error("Erro ao criar pedido:", err);
-      // Continua para tela de confirmação mesmo se API falhar
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível concluir o pedido. Tente novamente.",
+      );
+      setSubmitting(false);
+      return;
     }
     clear();
+    setSubmitting(false);
     setStep("confirmado");
   };
 
@@ -544,18 +555,27 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
+                  {submitError && (
+                    <p className="flex items-center gap-1 text-red-500 text-xs mt-4">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {submitError}
+                    </p>
+                  )}
+
                   <div className="flex gap-3 mt-6">
                     <button
                       onClick={() => setStep("entrega")}
-                      className="flex-1 border border-gray-200 text-gray-600 py-3 hover:border-gray-400 transition-colors text-sm"
+                      disabled={submitting}
+                      className="flex-1 border border-gray-200 text-gray-600 py-3 hover:border-gray-400 transition-colors text-sm disabled:opacity-50"
                     >
                       Voltar
                     </button>
                     <button
                       onClick={handleConfirm}
-                      className="flex-1 bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide"
+                      disabled={submitting}
+                      className="flex-1 bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide disabled:opacity-60"
                     >
-                      Confirmar Pedido
+                      {submitting ? "Processando..." : "Confirmar Pedido"}
                     </button>
                   </div>
                 </div>
