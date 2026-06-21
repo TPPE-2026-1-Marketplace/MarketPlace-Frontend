@@ -3,12 +3,12 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 export interface CartItem {
   id: number;
   variant: {
-    id: number;
-    produto: { id: number; titulo: string; preco_base: number };
-    preco_variante?: number;
-    cor?: string;
-    tamanho?: string;
-    images?: { image: { url: string } }[];
+    codigoSku: string;
+    produto: { idProduto: number; titulo: string; precoBase: number };
+    precoVariante?: number;
+    cor?: string | null;
+    tamanho?: string | null;
+    images?: Array<{ url: string }>;
   };
   quantity: number;
 }
@@ -25,9 +25,9 @@ export interface Cart {
 
 interface CartContextType {
   cart: Cart;
-  addItem: (item: any, quantity?: number) => void;
-  updateQuantity: (variantId: number, quantity: number) => void;
-  removeItem: (variantId: number) => void;
+  addItem: (item: CartItem["variant"], quantity?: number) => void;
+  updateQuantity: (codigoSku: string, quantity: number) => void;
+  removeItem: (codigoSku: string) => void;
   clear: () => void;
   itemCount: number;
 }
@@ -43,7 +43,11 @@ const EMPTY_CART: Cart = {
 };
 
 function calculateCart(cart: Cart): Cart {
-  const subtotal = cart.items.reduce((sum, item) => sum + (item.variant.preco_variante || item.variant.produto.preco_base) * item.quantity, 0);
+  const subtotal = cart.items.reduce(
+    (sum, item) =>
+      sum + (item.variant.precoVariante ?? item.variant.produto.precoBase) * item.quantity,
+    0,
+  );
   return {
     ...cart,
     subtotal,
@@ -72,28 +76,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("cart", JSON.stringify(cart));
   }, [cart]);
 
-  const addItem = useCallback((item: any, quantity: number = 1) => {
+  const addItem = useCallback((item: CartItem["variant"], quantity: number = 1) => {
     setCart(prev => {
-      const existing = prev.items.find(i => i.variant.id === item.id);
+      const existing = prev.items.find(i => i.variant.codigoSku === item.codigoSku);
       const items = existing
-        ? prev.items.map(i => i.variant.id === item.id ? { ...i, quantity: i.quantity + quantity } : i)
+        ? prev.items.map(i =>
+            i.variant.codigoSku === item.codigoSku
+              ? { ...i, quantity: i.quantity + quantity }
+              : i,
+          )
         : [...prev.items, { id: Date.now(), variant: item, quantity }];
       return calculateCart({ ...prev, items });
     });
   }, []);
 
-  const updateQuantity = useCallback((variantId: number, quantity: number) => {
+  const updateQuantity = useCallback((codigoSku: string, quantity: number) => {
     setCart(prev => {
       const items = quantity <= 0
-        ? prev.items.filter(i => i.variant.id !== variantId)
-        : prev.items.map(i => i.variant.id === variantId ? { ...i, quantity } : i);
+        ? prev.items.filter(i => i.variant.codigoSku !== codigoSku)
+        : prev.items.map(i => i.variant.codigoSku === codigoSku ? { ...i, quantity } : i);
       return calculateCart({ ...prev, items });
     });
   }, []);
 
-  const removeItem = useCallback((variantId: number) => {
+  const removeItem = useCallback((codigoSku: string) => {
     setCart(prev => {
-      const items = prev.items.filter(i => i.variant.id !== variantId);
+      const items = prev.items.filter(i => i.variant.codigoSku !== codigoSku);
       return calculateCart({ ...prev, items });
     });
   }, []);

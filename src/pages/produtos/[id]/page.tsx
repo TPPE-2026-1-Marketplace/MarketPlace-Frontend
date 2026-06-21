@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
-import { api } from "@/lib/api";
+import { fetchProduct, fetchProducts, type Product } from "@/lib/catalog";
 import ProductCard from "@/components/ui/ProductCard";
 
 const SIZE_TABLE: [string, string, string, string, string][] = [
@@ -43,8 +43,8 @@ export default function ProductDetailPage() {
   const navigate = useNavigate();
   const { addItem } = useCart();
   
-  const [product, setProduct] = useState<AnyModel | null>(null);
-  const [related, setRelated] = useState<AnyModel[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [related, setRelated] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedSize, setSelectedSize] = useState("");
@@ -60,64 +60,18 @@ export default function ProductDetailPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const data = await api.get<Record<string, unknown>>(`/products/${Number(id)}`);
-
-        // Normalise backend camelCase to frontend format
-        const idProduto = (data.idProduto ?? data.id_produto ?? 0) as number;
-        const categories = data.categories as Array<{ nome: string }> | undefined;
-        const variants = data.variants as Array<Record<string, unknown>> | undefined;
-
-        const normalised = {
-          ...data,
-          id_produto: idProduto,
-          preco_base: data.precoBase ?? data.preco_base ?? 0,
-          categories: categories?.length ? categories : [],
-          variants: variants?.length ? variants : [
-            {
-              id: idProduto,
-              preco_variante: data.precoBase ?? data.preco_base ?? 0,
-              cor: null,
-              tamanho: null,
-              images: [],
-            },
-          ],
-        };
-
-        setProduct(normalised);
-        
-        // Load related products
-        const catName = categories?.[0]?.nome;
-        if (catName) {
-          try {
-            const res = await api.get<{ data: Record<string, unknown>[] }>("/products", { limit: 4 });
-            const relatedProducts = (res.data || [])
-              .filter((p) => (p.idProduto ?? p.id_produto) !== idProduto)
-              .map((p) => {
-                const pid = (p.idProduto ?? p.id_produto ?? 0) as number;
-                const pCat = p.categories as Array<{ nome: string }> | undefined;
-                const pVar = p.variants as Array<Record<string, unknown>> | undefined;
-                return {
-                  ...p,
-                  id_produto: pid,
-                  preco_base: p.precoBase ?? p.preco_base ?? 0,
-                  categories: pCat?.length ? pCat : [],
-                  variants: pVar?.length ? pVar : [
-                    {
-                      id: pid,
-                      preco_variante: p.precoBase ?? p.preco_base ?? 0,
-                      images: [],
-                    },
-                  ],
-                };
-              });
-            setRelated(relatedProducts);
-          } catch {
-            // If related products fail, it's not critical
-            setRelated([]);
-          }
-        }
-      } catch (err) {
-        console.error(err);
+        const [loadedProduct, relatedResponse] = await Promise.all([
+          fetchProduct(Number(id)),
+          fetchProducts({ page: 1, limit: 4 }),
+        ]);
+        setProduct(loadedProduct);
+        setRelated(
+          relatedResponse.data.filter(
+            (relatedProduct) => relatedProduct.idProduto !== loadedProduct.idProduto,
+          ),
+        );
+      } catch (loadError) {
+        console.error(loadError);
       } finally {
         setLoading(false);
       }
@@ -150,30 +104,31 @@ export default function ProductDetailPage() {
   const colors = Array.from(new Set(product.variants?.map((v: any) => v.cor).filter(Boolean))) as string[];
   const sizes = Array.from(new Set(product.variants?.map((v: any) => v.tamanho).filter(Boolean))) as string[];
   
-  const allImages = product.variants?.flatMap((v: any) => v.images?.map((img: any) => img.image.url) || []) || [];
+  const allImages = product.variants.flatMap((variant) =>
+    variant.images.map((image) => image.url),
+  );
   const gallery = allImages.length > 0 ? Array.from(new Set(allImages)) : ["/hero-dress.png"];
 
-  // Default to first variant's price or base price
-  const baseVariant = product.variants?.[0];
-  const price = baseVariant?.preco_variante ?? product.preco_base;
-  const originalPrice = product.preco_base > price ? product.preco_base : null;
+  const baseVariant = product.variants[0];
+  const price = baseVariant?.precoVariante ?? product.precoBase;
+  const originalPrice = product.precoBase > price ? product.precoBase : null;
   const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : null;
-  const stockEcommerce = baseVariant?.estoque_ecommerce ?? 0;
-  const totalStock = (baseVariant?.estoque_ecommerce ?? 0) + (baseVariant?.estoque_fisico ?? 0);
+  const stockEcommerce = baseVariant?.stock.qtdOnline ?? 0;
+  const totalStock =
+    (baseVariant?.stock.qtdOnline ?? 0) + (baseVariant?.stock.qtdLojaFisica ?? 0);
   const isLowStock = totalStock > 0 && totalStock <= 3;
-  
-  const categoryName = product.categories?.[0]?.nome || "Vestido";
-  const firstVariantSku = baseVariant?.id || `SKU-${product.id_produto}`;
 
-  // Builds the cart-variant shape useCart expects (enriches the variant with its parent product)
-  const buildCartVariant = (variant: any) => ({
-    id: variant.id,
+  const categoryName = product.categories[0]?.nome || "Vestido";
+  const firstVariantSku = baseVariant?.codigoSku || product.sku;
+
+  const buildCartVariant = (variant: Product["variants"][number]) => ({
+    codigoSku: variant.codigoSku,
     produto: {
-      id: product.id_produto,
+      idProduto: product.idProduto,
       titulo: product.titulo,
-      preco_base: product.preco_base,
+      precoBase: product.precoBase,
     },
-    preco_variante: variant.preco_variante,
+    precoVariante: variant.precoVariante,
     cor: variant.cor,
     tamanho: variant.tamanho,
     images: variant.images,
@@ -685,12 +640,13 @@ export default function ProductDetailPage() {
                 const variant = p.variants?.[0];
                 return (
                   <ProductCard
-                    key={p.id_produto}
-                    id={p.id_produto}
+                    key={p.idProduto}
+                    id={p.idProduto}
                     titulo={p.titulo}
-                    preco={variant?.preco_variante ?? p.preco_base}
-                    imagem={variant?.images?.[0]?.image?.url || "/hero-dress.png"}
-                    categoria={p.categories?.[0]?.nome}
+                    preco={variant?.precoVariante ?? p.precoBase}
+                    imagem={variant?.images[0]?.url || "/hero-dress.png"}
+                    categoria={p.categories[0]?.nome}
+                    variant={variant}
                   />
                 );
               })}

@@ -1,51 +1,4 @@
-
-export interface CatalogImage {
-  id: number;
-  url: string;
-}
-export interface ProductVariant {
-  id: number;
-  preco_variante?: number;
-  images?: { image: CatalogImage }[];
-  cor?: string;
-  tamanho?: string;
-}
-export interface Product {
-  id_produto: number;
-  titulo: string;
-  preco_base: number;
-  descricao?: string;
-  categoria?: string | null;
-  imagem_url?: string | null;
-  variants?: ProductVariant[];
-  categories?: { nome: string }[];
-}
-
-/**
- * Maps a backend Product (camelCase fields, categories array) to
- * the frontend Product shape (snake_case fields, categoria string).
- */
-function normalizeBackendProduct(raw: Record<string, unknown>): Product {
-  const idProduto = (raw.idProduto ?? raw.id_produto ?? 0) as number;
-  const categories = raw.categories as Array<{ nome: string }> | undefined;
-  const variants = raw.variants as ProductVariant[] | undefined;
-
-  return {
-    id_produto: idProduto,
-    titulo: (raw.titulo as string) ?? '',
-    preco_base: (raw.precoBase ?? raw.preco_base ?? 0) as number,
-    descricao: (raw.descricao as string) ?? undefined,
-    categoria: categories?.[0]?.nome ?? null,
-    imagem_url: null, // Backend atual não retorna imagem_url direta no produto
-    categories,
-    variants: variants?.length ? variants : [
-      {
-        id: idProduto,
-        preco_variante: (raw.precoBase ?? raw.preco_base ?? 0) as number,
-      },
-    ],
-  };
-}
+export type { CatalogImage, Product, ProductVariant } from "@/lib/catalog";
 export interface ProductFilters {
   categoria?: string;
   busca?: string;
@@ -54,8 +7,8 @@ export interface ProductFilters {
 }
 
 import { useState, useEffect, useCallback } from "react";
-import { api } from "@/lib/api";
 import type { PaginatedResponse } from "@/lib/api";
+import { fetchProducts as fetchCatalogProducts, type Product } from "@/lib/catalog";
 
 interface UseProductsResult {
   products: Product[];
@@ -86,12 +39,30 @@ export function useProducts(initialFilters?: ProductFilters): UseProductsResult 
     setError(null);
 
     try {
-      const response = await api.get<PaginatedResponse<Record<string, unknown>>>("/products", filters as any);
+      const response = await fetchCatalogProducts({
+        page: filters.page,
+        limit: Math.min(filters.limit ?? 20, 100),
+      });
+      const busca = filters.busca?.trim().toLocaleLowerCase("pt-BR");
+      const categoria = filters.categoria?.trim().toLocaleLowerCase("pt-BR");
+      const filtered = response.data.filter((product) => {
+        const matchesSearch =
+          !busca ||
+          product.titulo.toLocaleLowerCase("pt-BR").includes(busca) ||
+          product.sku.toLocaleLowerCase("pt-BR").includes(busca) ||
+          product.variants.some((variant) =>
+            variant.codigoSku.toLocaleLowerCase("pt-BR").includes(busca),
+          );
+        const matchesCategory =
+          !categoria ||
+          categoria === "all" ||
+          product.categories.some(
+            (item) => item.nome.toLocaleLowerCase("pt-BR") === categoria,
+          );
+        return matchesSearch && matchesCategory;
+      });
 
-      // Normalise backend products from camelCase to frontend snake_case format
-      const normalised = (response.data ?? []).map(normalizeBackendProduct);
-
-      setProducts(normalised);
+      setProducts(filtered);
       setMeta(response.meta ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar produtos");

@@ -20,6 +20,8 @@ import {
 import { Product, PRODUCTS } from "../../data/products";
 import { AddProduct } from "./AddProduct";
 import { api } from "@/lib/api";
+import { useProducts } from "@/hooks/useProducts";
+import type { Product as CatalogProduct } from "@/lib/catalog";
 
 type StockType = "all" | "ecommerce" | "physical";
 type FilterCategory = "all" | Product["category"];
@@ -121,7 +123,7 @@ function ImageManager({ images, onChange, coverIndex, onCoverChange }: ImageMana
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="px-3 py-2 bg-[#1a1a1a] text-white hover:bg-[#333333] transition-colors text-xs flex items-center gap-1"
+          className="px-3 py-2 bg-black text-white hover:bg-gray-800 transition-colors text-xs flex items-center gap-1"
         >
           <Upload className="w-3.5 h-3.5" /> Upload
         </button>
@@ -165,7 +167,7 @@ function ImageManager({ images, onChange, coverIndex, onCoverChange }: ImageMana
               </div>
               {/* Cover badge */}
               {coverIndex === idx && (
-                <div className="absolute top-1 left-1 bg-[#1a1a1a] text-white text-xs px-1.5 py-0.5 flex items-center gap-0.5">
+                <div className="absolute top-1 left-1 bg-black text-white text-xs px-1.5 py-0.5 flex items-center gap-0.5">
                   <Star className="w-2.5 h-2.5" /> Capa
                 </div>
               )}
@@ -237,12 +239,11 @@ interface InventoryProps {
   readOnly?: boolean;
 }
 
-export function Inventory({ readOnly = false }: InventoryProps) {
+function LegacyInventory({ readOnly = false }: InventoryProps) {
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<Product>>({});
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [stockView, setStockView] = useState<StockType>("all");
   const [filterCategory, setFilterCategory] = useState<FilterCategory>("all");
@@ -324,7 +325,6 @@ export function Inventory({ readOnly = false }: InventoryProps) {
       brand: newProduct.brand || "DK Fashion",
     };
     setProducts((prev) => [...prev, product]);
-    setShowAddModal(false);
     setCoverIndex(0);
     setNewProduct({
       name: "", sku: "", description: "", price: 0, category: "festa",
@@ -363,18 +363,105 @@ export function Inventory({ readOnly = false }: InventoryProps) {
     return (
       <AddProduct
         onBack={() => setShowAddProduct(false)}
-        onSave={async (product) => {
+        onSave={async (product, payload) => {
           try {
-            const created = await api.post<any>("/products", {
-              titulo: (product as any).name || (product as any).title || "",
-              preco_base: (product as any).price || 0,
-              sku: `DK-${Date.now()}`,
-              descricao: (product as any).description,
+            if (!payload) {
+              setShowAddProduct(false);
+              return;
+            }
+            const { form, variants } = payload;
+
+            // 1. Criar Produto Base
+            const createdProd = await api.post<any>("/products", {
+              titulo: form.title,
+              sku: form.sku,
+              preco_base: form.basePrice,
+              descricao: form.description || undefined,
+              destaque: form.featured,
+              qual_medida: form.attrs["Qual Medida"] || undefined,
+              material: form.attrs["Material"] || undefined,
+              composicao: form.attrs["Composição"] || undefined,
+              silhueta: form.attrs["Silhueta"] || undefined,
+              tags: form.tags?.length > 0 ? form.tags : undefined,
             });
-            setProducts((prev) => [...prev, { ...product, id: String(created.idProduto ?? created.id) } as Product]);
-          } catch (err) {
-            console.error("Erro ao salvar produto:", err);
-            // Fallback: salva localmente mesmo se a API falhar
+            const idProduto = createdProd.idProduto || createdProd.id;
+
+            // 2. Criar Variantes (1 por linha na matrix)
+            const variantsToCreate = variants.length > 0 ? variants : [{
+              id: "unico",
+              color: form.colors?.[0]?.name || "Único",
+              size: form.sizes?.[0] || "U",
+              stockOnline: 0,
+              stockPhysical: 0,
+              price: form.basePrice,
+            }];
+
+            for (const v of variantsToCreate) {
+               // Gera o código sku combinando sku base + cor + tamanho se houver variantes criadas pelo user
+               const skuVariante = variants.length > 0
+                  ? `${form.sku}-${v.color}-${v.size}`.replace(/\s+/g, "").toUpperCase()
+                  : form.sku;
+
+               await api.post("/product-variants", {
+                  idProduto,
+                  codigo_sku: skuVariante,
+                  preco_variante: v.price || form.basePrice,
+                  ativo: true,
+                  cor: v.color,
+                  tamanho: v.size
+               });
+
+               // 3. Ajuste de estoque
+               if (v.stockOnline > 0 || v.stockPhysical > 0) {
+                 await api.patch(`/inventory/${skuVariante}`, {
+                   qtdOnline: v.stockOnline || 0,
+                   qtdLojaFisica: v.stockPhysical || 0,
+                   motivo: "Cadastro inicial",
+                   tipoMovimentacao: "ajuste"
+                 });
+               }
+
+               // 4 & 5. Imagens (simplificado: caso venha como blob/url)
+               const colorObj = form.colors.find((c: any) => c.name === v.color);
+               if (colorObj && colorObj.images && colorObj.images.length > 0) {
+                 for (let i = 0; i < colorObj.images.length; i++) {
+                   const imgSource = colorObj.images[i];
+                   try {
+                     if (imgSource.startsWith("data:image")) {
+                       // Converter dataURI para File
+                       const res = await fetch(imgSource);
+                       const blob = await res.blob();
+                       const file = new File([blob], `img_${i}.jpg`, { type: blob.type });
+
+                       const formData = new FormData();
+                       formData.append("file", file);
+                       formData.append("ordem", String(i + 1));
+
+                       const uploadRes = await api.post<any>("/images/upload", formData, {
+                         headers: { "Content-Type": "multipart/form-data" }
+                       });
+
+                       if (uploadRes.idImagem) {
+                         await api.post("/images/catalog", {
+                           imageId: uploadRes.idImagem,
+                           variantSku: skuVariante,
+                           ordem_no_catalogo: i + 1
+                         });
+                       }
+                     }
+                   } catch (imgErr) {
+                     console.error("Erro ao processar imagem:", imgErr);
+                   }
+                 }
+               }
+            }
+
+            alert("Produto cadastrado com sucesso no banco de dados!");
+            setProducts((prev) => [...prev, { ...product, id: String(idProduto) } as Product]);
+          } catch (err: any) {
+            console.error("Erro ao salvar produto no backend:", err?.response?.data || err);
+            alert("Erro ao salvar no backend. Verifique o console.");
+            // Mantém mock pra não travar a tabela em caso de erro da API
             setProducts((prev) => [...prev, product as Product]);
           }
           setShowAddProduct(false);
@@ -397,7 +484,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
         {!readOnly && (
           <button
             onClick={() => setShowAddProduct(true)}
-            className="flex items-center gap-2 bg-[#1a1a1a] text-white px-4 py-2.5 hover:bg-[#333333] transition-colors text-sm"
+            className="flex items-center gap-2 bg-black text-white px-4 py-2.5 hover:bg-gray-800 transition-colors text-sm"
           >
             <Plus className="w-4 h-4" /> Novo Produto
           </button>
@@ -441,7 +528,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
               <button
                 key={v}
                 onClick={() => setStockView(v)}
-                className={`flex items-center gap-1 px-3 py-2 border text-xs transition-colors ${stockView === v ? "bg-[#1a1a1a] text-white border-[#1a1a1a]" : "border-gray-200 text-gray-600 hover:border-gray-400"
+                className={`flex items-center gap-1 px-3 py-2 border text-xs transition-colors ${stockView === v ? "bg-black text-white border-[#1a1a1a]" : "border-gray-200 text-gray-600 hover:border-gray-400"
                   }`}
               >
                 {v === "all" ? <><Package className="w-3 h-3" /> Todos</> :
@@ -457,7 +544,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
               key={cat}
               onClick={() => setFilterCategory(cat as FilterCategory)}
               className={`px-3 py-1 text-xs transition-colors border ${filterCategory === cat
-                  ? "bg-[#1a1a1a] text-white border-[#1a1a1a]"
+                  ? "bg-black text-white border-[#1a1a1a]"
                   : "border-gray-200 text-gray-600 hover:border-gray-400"
                 }`}
             >
@@ -630,177 +717,377 @@ export function Inventory({ readOnly = false }: InventoryProps) {
           )}
         </div>
       </div>
+    </div>
+  );
 
-      {/* Add Product Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-10 overflow-y-auto">
-          <div className="bg-white w-full max-w-2xl mb-10">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 className="text-gray-900">Novo Produto</h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 space-y-5">
-              {/* Images section */}
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">Imagens do Produto</p>
-                <ImageManager
-                  images={newProduct.images || []}
-                  onChange={(images) => setNewProduct({ ...newProduct, images })}
-                  coverIndex={coverIndex}
-                  onCoverChange={setCoverIndex}
-                />
-              </div>
+}
+interface InventoryVariantRow {
+  product: CatalogProduct;
+  codigoSku: string;
+  title: string;
+  baseSku: string;
+  color: string | null;
+  size: string | null;
+  price: number;
+  stockOnline: number;
+  stockPhysical: number;
+  image: string;
+  category: string;
+}
 
-              <div className="border-t border-gray-100 pt-5">
-                <p className="text-xs text-gray-400 uppercase tracking-widest mb-4">Informações do Produto</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1">Nome do Produto *</label>
-                    <input
-                      type="text"
-                      value={newProduct.name}
-                      onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                      placeholder="Ex: Vestido Rosa Encanto"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">SKU *</label>
-                    <input
-                      type="text"
-                      value={newProduct.sku}
-                      onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                      placeholder="DK-009"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Categoria</label>
-                    <select
-                      value={newProduct.category}
-                      onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value as Product["category"] })}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                    >
-                      <option value="debutante">Debutante</option>
-                      <option value="formatura">Formatura</option>
-                      <option value="casamento">Casamento</option>
-                      <option value="festa">Festa</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Preço *</label>
-                    <input
-                      type="number"
-                      value={newProduct.price || ""}
-                      onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Preço Original</label>
-                    <input
-                      type="number"
-                      value={newProduct.originalPrice || ""}
-                      onChange={(e) => setNewProduct({ ...newProduct, originalPrice: Number(e.target.value) })}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                      placeholder="Opcional"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Estoque Online</label>
-                    <input
-                      type="number"
-                      value={newProduct.stockEcommerce || ""}
-                      onChange={(e) => setNewProduct({ ...newProduct, stockEcommerce: Number(e.target.value) })}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Estoque Loja Física</label>
-                    <input
-                      type="number"
-                      value={newProduct.stockPhysical || ""}
-                      onChange={(e) => setNewProduct({ ...newProduct, stockPhysical: Number(e.target.value) })}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1">Descrição</label>
-                    <textarea
-                      value={newProduct.description}
-                      onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a] resize-none"
-                      rows={2}
-                      placeholder="Descrição do produto..."
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1">Cores (Enter para adicionar)</label>
-                    <div className="flex gap-2 flex-wrap mb-2">
-                      {(newProduct.colors || []).map((c) => (
-                        <span key={c} className="flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-1">
-                          {c}
-                          <button onClick={() => setNewProduct({ ...newProduct, colors: (newProduct.colors || []).filter(x => x !== c) })}>
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                    <input
-                      type="text"
-                      value={colorInput}
-                      onChange={(e) => setColorInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && colorInput.trim()) {
-                          e.preventDefault();
-                          setNewProduct({ ...newProduct, colors: [...(newProduct.colors || []), colorInput.trim()] });
-                          setColorInput("");
-                        }
-                      }}
-                      className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                      placeholder="Ex: Rosa (Enter para adicionar)"
-                    />
-                  </div>
-                  <div className="col-span-2 flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="featured"
-                      checked={newProduct.featured}
-                      onChange={(e) => setNewProduct({ ...newProduct, featured: e.target.checked })}
-                      className="accent-[#1a1a1a]"
-                    />
-                    <label htmlFor="featured" className="text-sm text-gray-600">
-                      Produto em destaque
-                    </label>
-                  </div>
-                </div>
-              </div>
+export function Inventory({ readOnly = false }: InventoryProps) {
+  const { products, isLoading, error, refetch } = useProducts({ page: 1, limit: 100 });
+  const [search, setSearch] = useState("");
+  const [stockView, setStockView] = useState<StockType>("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [editingSku, setEditingSku] = useState<string | null>(null);
+  const [editStock, setEditStock] = useState({ online: 0, physical: 0 });
+  const [savingSku, setSavingSku] = useState<string | null>(null);
+
+  const rows: InventoryVariantRow[] = products.flatMap((product) =>
+    product.variants.map((variant) => ({
+      product,
+      codigoSku: variant.codigoSku,
+      title: product.titulo,
+      baseSku: product.sku,
+      color: variant.cor,
+      size: variant.tamanho,
+      price: variant.precoVariante || product.precoBase,
+      stockOnline: variant.stock.qtdOnline,
+      stockPhysical: variant.stock.qtdLojaFisica,
+      image: variant.images[0]?.url || "/hero-dress.png",
+      category: product.categories[0]?.nome || "Sem categoria",
+    })),
+  );
+
+  const normalizedSearch = search.trim().toLocaleLowerCase("pt-BR");
+  const filteredRows = rows.filter((row) => {
+    const matchesSearch =
+      !normalizedSearch ||
+      row.title.toLocaleLowerCase("pt-BR").includes(normalizedSearch) ||
+      row.codigoSku.toLocaleLowerCase("pt-BR").includes(normalizedSearch) ||
+      row.baseSku.toLocaleLowerCase("pt-BR").includes(normalizedSearch);
+    const matchesCategory =
+      filterCategory === "all" ||
+      row.category.toLocaleLowerCase("pt-BR") === filterCategory;
+    return matchesSearch && matchesCategory;
+  });
+  const categories = Array.from(
+    new Set(rows.map((row) => row.category.toLocaleLowerCase("pt-BR"))),
+  ).sort();
+  const totals = rows.reduce(
+    (sum, row) => ({
+      online: sum.online + row.stockOnline,
+      physical: sum.physical + row.stockPhysical,
+    }),
+    { online: 0, physical: 0 },
+  );
+
+  const startStockEdit = (row: InventoryVariantRow) => {
+    setEditingSku(row.codigoSku);
+    setEditStock({ online: row.stockOnline, physical: row.stockPhysical });
+  };
+
+  const saveStock = async (codigoSku: string) => {
+    setSavingSku(codigoSku);
+    try {
+      await api.patch(`/inventory/${encodeURIComponent(codigoSku)}`, {
+        qtdOnline: editStock.online,
+        qtdLojaFisica: editStock.physical,
+        motivo: "Ajuste pelo inventário",
+        tipoMovimentacao: "ajuste",
+      });
+      setEditingSku(null);
+      refetch();
+    } catch (saveError) {
+      console.error("Erro ao atualizar estoque:", saveError);
+      alert("Não foi possível atualizar o estoque.");
+    } finally {
+      setSavingSku(null);
+    }
+  };
+
+  const persistProduct = async (
+    _localProduct: Partial<Product>,
+    payload?: { form: any; variants: any[] },
+  ) => {
+    if (!payload) {
+      setShowAddProduct(false);
+      return;
+    }
+
+    const { form, variants } = payload;
+    try {
+      const createdProduct = await api.post<{ idProduto: number }>("/products", {
+        titulo: form.title,
+        sku: form.sku,
+        preco_base: form.basePrice,
+        descricao: form.description || undefined,
+        destaque: form.featured,
+        qual_medida: form.attrs["Qual Medida"] || undefined,
+        material: form.attrs.Material || undefined,
+        composicao: form.attrs["Composição"] || undefined,
+        silhueta: form.attrs.Silhueta || undefined,
+        tags: form.tags?.length ? form.tags : undefined,
+      });
+
+      const variantsToCreate = variants.length
+        ? variants
+        : [{
+            color: form.colors?.[0]?.name || "Único",
+            size: form.sizes?.[0] || "U",
+            stockOnline: 0,
+            stockPhysical: 0,
+            price: form.basePrice,
+          }];
+
+      for (const variant of variantsToCreate) {
+        const codigoSku = variants.length
+          ? `${form.sku}-${variant.color}-${variant.size}`
+              .replace(/\s+/g, "")
+              .toUpperCase()
+          : form.sku;
+
+        await api.post("/product-variants", {
+          idProduto: createdProduct.idProduto,
+          codigo_sku: codigoSku,
+          preco_variante: variant.price || form.basePrice,
+          ativo: true,
+          cor: variant.color,
+          tamanho: variant.size,
+        });
+
+        await api.patch(`/inventory/${encodeURIComponent(codigoSku)}`, {
+          qtdOnline: variant.stockOnline || 0,
+          qtdLojaFisica: variant.stockPhysical || 0,
+          motivo: "Cadastro inicial",
+          tipoMovimentacao: "ajuste",
+        });
+
+        const color = form.colors.find((item: any) => item.name === variant.color);
+        for (let index = 0; index < (color?.images?.length ?? 0); index += 1) {
+          const source = color.images[index] as string;
+          let imageId: number;
+
+          if (source.startsWith("data:image")) {
+            const response = await fetch(source);
+            const blob = await response.blob();
+            const file = new File([blob], `img_${index}.jpg`, { type: blob.type });
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("ordem", String(index + 1));
+            const uploaded = await api.post<{ idImagem: number }>("/images/upload", formData, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+            imageId = uploaded.idImagem;
+          } else {
+            const registered = await api.post<{ idImagem: number }>("/images", {
+              url: source,
+              ordem: index + 1,
+            });
+            imageId = registered.idImagem;
+          }
+
+          await api.post("/images/catalog", {
+            imageId,
+            variantSku: codigoSku,
+            ordem_no_catalogo: index + 1,
+          });
+        }
+      }
+
+      await refetch();
+      alert("Produto cadastrado com sucesso no banco de dados!");
+      setShowAddProduct(false);
+    } catch (saveError) {
+      console.error("Erro ao salvar produto no backend:", saveError);
+      alert("Erro ao salvar no backend. O cadastro pode ter sido parcialmente concluído.");
+    }
+  };
+
+  if (showAddProduct) {
+    return <AddProduct onBack={() => setShowAddProduct(false)} onSave={persistProduct} />;
+  }
+
+  if (isLoading) {
+    return <div className="py-16 text-center text-sm text-gray-500">Carregando inventário...</div>;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-gray-900">Controle de Estoque{readOnly && " (Visualização)"}</h2>
+          <p className="text-gray-500 text-sm">{rows.length} variantes cadastradas</p>
+        </div>
+        {!readOnly && (
+          <button
+            onClick={() => setShowAddProduct(true)}
+            className="flex items-center gap-2 bg-black text-white px-4 py-2.5 hover:bg-gray-800 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" /> Novo Produto
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+      )}
+
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: "Total Geral", value: totals.online + totals.physical, icon: <Package className="w-4 h-4" /> },
+          { label: "E-commerce", value: totals.online, icon: <Globe className="w-4 h-4" /> },
+          { label: "Loja Física", value: totals.physical, icon: <Store className="w-4 h-4" /> },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-white border border-gray-100 p-4 flex items-center gap-3">
+            <div className="w-9 h-9 text-gray-700 bg-gray-100 flex items-center justify-center shrink-0">
+              {stat.icon}
             </div>
-            <div className="p-5 border-t border-gray-100 flex gap-3">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 border border-gray-200 text-gray-600 py-2 hover:border-gray-400 transition-colors text-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={addProduct}
-                className="flex-1 bg-[#1a1a1a] text-white py-2 hover:bg-[#333333] transition-colors text-sm"
-              >
-                Adicionar Produto
-              </button>
+            <div>
+              <p className="text-xs text-gray-500">{stat.label}</p>
+              <p className="text-gray-900 text-lg">{stat.value}</p>
             </div>
           </div>
+        ))}
+      </div>
+
+      <div className="bg-white border border-gray-100 p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por produto, SKU base ou SKU da variante..."
+              className="w-full border border-gray-200 pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
+            />
+          </div>
+          <div className="flex gap-2">
+            {(["all", "ecommerce", "physical"] as StockType[]).map((view) => (
+              <button
+                key={view}
+                onClick={() => setStockView(view)}
+                className={`px-3 py-2 border text-xs ${stockView === view ? "bg-black text-white" : "text-gray-600"}`}
+              >
+                {view === "all" ? "Todos" : view === "ecommerce" ? "Online" : "Loja"}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
+        <div className="flex gap-2 flex-wrap">
+          {["all", ...categories].map((category) => (
+            <button
+              key={category}
+              onClick={() => setFilterCategory(category)}
+              className={`px-3 py-1 text-xs border ${filterCategory === category ? "bg-black text-white" : "text-gray-600"}`}
+            >
+              {category === "all" ? "Todas" : category}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-100 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-gray-400 text-xs">
+              <th className="text-left px-4 py-3">Produto / Variante</th>
+              <th className="text-left px-4 py-3">SKU da variante</th>
+              <th className="text-right px-4 py-3">Preço</th>
+              {(stockView === "all" || stockView === "ecommerce") && <th className="text-center px-4 py-3">Online</th>}
+              {(stockView === "all" || stockView === "physical") && <th className="text-center px-4 py-3">Loja</th>}
+              <th className="text-center px-4 py-3">Total</th>
+              {!readOnly && <th className="text-center px-4 py-3">Ações</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filteredRows.map((row) => {
+              const editing = editingSku === row.codigoSku;
+              const online = editing ? editStock.online : row.stockOnline;
+              const physical = editing ? editStock.physical : row.stockPhysical;
+              const total = online + physical;
+              return (
+                <tr key={row.codigoSku} className={total <= 5 ? "bg-red-50/20" : ""}>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <img src={row.image} alt={row.title} className="w-10 h-12 object-cover object-top" />
+                      <div>
+                        <p className="text-gray-900">{row.title}</p>
+                        <p className="text-xs text-gray-400">
+                          {[row.color, row.size].filter(Boolean).join(" · ") || "Variante padrão"}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-gray-500 text-xs font-mono">{row.codigoSku}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    R$ {row.price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </td>
+                  {(stockView === "all" || stockView === "ecommerce") && (
+                    <td className="px-4 py-3 text-center">
+                      {editing ? (
+                        <input
+                          type="number"
+                          min={0}
+                          value={editStock.online}
+                          onChange={(event) => setEditStock((value) => ({ ...value, online: Math.max(0, Number(event.target.value)) }))}
+                          className="w-16 border px-2 py-1 text-center"
+                        />
+                      ) : online}
+                    </td>
+                  )}
+                  {(stockView === "all" || stockView === "physical") && (
+                    <td className="px-4 py-3 text-center">
+                      {editing ? (
+                        <input
+                          type="number"
+                          min={0}
+                          value={editStock.physical}
+                          onChange={(event) => setEditStock((value) => ({ ...value, physical: Math.max(0, Number(event.target.value)) }))}
+                          className="w-16 border px-2 py-1 text-center"
+                        />
+                      ) : physical}
+                    </td>
+                  )}
+                  <td className="px-4 py-3 text-center">{total}</td>
+                  {!readOnly && (
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center gap-1">
+                        {editing ? (
+                          <>
+                            <button
+                              onClick={() => saveStock(row.codigoSku)}
+                              disabled={savingSku === row.codigoSku}
+                              className="p-1.5 bg-green-100 text-green-700"
+                              title="Salvar estoque"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setEditingSku(null)} className="p-1.5 bg-gray-100" title="Cancelar">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <button onClick={() => startStockEdit(row)} className="p-1.5 bg-gray-100" title="Editar estoque">
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {filteredRows.length === 0 && (
+          <div className="text-center py-10 text-gray-400 text-sm">Nenhuma variante encontrada.</div>
+        )}
+      </div>
     </div>
   );
 }

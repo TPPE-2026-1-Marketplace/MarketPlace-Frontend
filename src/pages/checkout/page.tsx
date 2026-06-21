@@ -170,13 +170,8 @@ export default function CheckoutPage() {
     try {
       await api.post("/orders", {
         items: cart.items.map((i) => ({
-          productId: i.variant.produto.id,
-          variantId: i.variant.id,
-          titulo: i.variant.produto.titulo,
-          tamanho: i.variant.tamanho,
-          cor: i.variant.cor,
+          variantSku: i.variant.codigoSku,
           quantidade: i.quantity,
-          preco_unitario: i.variant.preco_variante || i.variant.produto.preco_base,
         })),
         subtotal: cart.subtotal,
         frete: shipping,
@@ -588,12 +583,12 @@ export default function CheckoutPage() {
                 <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pr-2">
                   {cart.items.map((item) => (
                     <div
-                      key={item.variant.id}
+                      key={item.variant.codigoSku}
                       className="flex gap-2"
                     >
                       <div className="w-12 h-14 relative shrink-0">
                         <img
-                          src={item.variant.images?.[0]?.image.url || "/hero-dress.png"}
+                          src={item.variant.images?.[0]?.url || "/hero-dress.png"}
                           alt={item.variant.produto.titulo}
                           className="object-cover object-top"
                         />
@@ -606,7 +601,7 @@ export default function CheckoutPage() {
                           {item.variant.tamanho} · {item.variant.cor} · x{item.quantity}
                         </p>
                         <p className="text-xs text-gray-800 font-medium">
-                          {formatCurrency((item.variant.preco_variante || item.variant.produto.preco_base) * item.quantity)}
+                          {formatCurrency((item.variant.precoVariante ?? item.variant.produto.precoBase) * item.quantity)}
                         </p>
                       </div>
                     </div>

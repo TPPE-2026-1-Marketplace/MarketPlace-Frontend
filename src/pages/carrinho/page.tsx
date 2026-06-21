@@ -98,12 +98,12 @@ export default function CarrinhoPage() {
 
             {cart.items.map((item) => (
               <div
-                key={item.variant.id}
+                key={item.variant.codigoSku}
                 className="bg-white p-4 border border-gray-100 flex gap-4"
               >
-                <Link to={`/produtos/${item.variant.produto.id}`} className="shrink-0 relative w-20 h-24 sm:w-24 sm:h-32">
+                <Link to={`/produtos/${item.variant.produto.idProduto}`} className="shrink-0 relative w-20 h-24 sm:w-24 sm:h-32">
                   <img
-                    src={item.variant.images?.[0]?.image.url || "/hero-dress.png"}
+                    src={item.variant.images?.[0]?.url || "/hero-dress.png"}
                     alt={item.variant.produto.titulo}
                     className="object-cover object-top"
                   />
@@ -112,7 +112,7 @@ export default function CarrinhoPage() {
                   <div className="flex justify-between gap-2">
                     <div>
                       <Link
-                        to={`/produtos/${item.variant.produto.id}`}
+                        to={`/produtos/${item.variant.produto.idProduto}`}
                         className="text-gray-900 hover:text-gray-600 transition-colors line-clamp-1 text-sm font-medium"
                       >
                         {item.variant.produto.titulo}
@@ -130,11 +130,11 @@ export default function CarrinhoPage() {
                         )}
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {item.variant.id}
+                        {item.variant.codigoSku}
                       </p>
                     </div>
                     <button
-                      onClick={() => removeItem(item.variant.id)}
+                      onClick={() => removeItem(item.variant.codigoSku)}
                       className="text-gray-300 hover:text-red-500 transition-colors p-1 shrink-0 h-fit"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -145,7 +145,7 @@ export default function CarrinhoPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() =>
-                          updateQuantity(item.variant.id, item.quantity - 1)
+                          updateQuantity(item.variant.codigoSku, item.quantity - 1)
                         }
                         className="w-7 h-7 border border-gray-200 flex items-center justify-center hover:border-gray-500 transition-colors text-gray-600"
                       >
@@ -156,7 +156,7 @@ export default function CarrinhoPage() {
                       </span>
                       <button
                         onClick={() =>
-                          updateQuantity(item.variant.id, item.quantity + 1)
+                          updateQuantity(item.variant.codigoSku, item.quantity + 1)
                         }
                         className="w-7 h-7 border border-gray-200 flex items-center justify-center hover:border-gray-500 transition-colors text-gray-600"
                       >
@@ -165,11 +165,11 @@ export default function CarrinhoPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-gray-900 text-sm font-medium">
-                        {formatCurrency((item.variant.preco_variante || item.variant.produto.preco_base) * item.quantity)}
+                        {formatCurrency((item.variant.precoVariante ?? item.variant.produto.precoBase) * item.quantity)}
                       </p>
                       {item.quantity > 1 && (
                         <p className="text-xs text-gray-400">
-                          {formatCurrency(item.variant.preco_variante || item.variant.produto.preco_base)} cada
+                          {formatCurrency(item.variant.precoVariante ?? item.variant.produto.precoBase)} cada
                         </p>
                       )}
                     </div>

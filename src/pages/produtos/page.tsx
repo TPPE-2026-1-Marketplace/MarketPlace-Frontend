@@ -71,7 +71,7 @@ function ProdutosContent() {
   }, [category, search]);
 
   // Apply the sidebar filters/sort on the client (the API only handles categoria/busca)
-  const productPrice = (p: any) => p.variants?.[0]?.preco_variante ?? p.preco_base;
+  const productPrice = (p: any) => p.variants?.[0]?.precoVariante ?? p.precoBase;
 
   const displayedProducts = useMemo(() => {
     let list = products.filter((p: any) => {
@@ -96,7 +96,7 @@ function ProdutosContent() {
     } else if (sort === "maior-preco") {
       list = [...list].sort((a, b) => productPrice(b) - productPrice(a));
     } else if (sort === "novidade") {
-      list = [...list].sort((a, b) => b.id_produto - a.id_produto);
+      list = [...list].sort((a, b) => b.idProduto - a.idProduto);
     }
 
     return list;
@@ -323,12 +323,13 @@ function ProdutosContent() {
                   const firstVariant = product.variants?.[0];
                   return (
                     <ProductCard
-                      key={product.id_produto}
-                      id={product.id_produto}
+                      key={product.idProduto}
+                      id={product.idProduto}
                       titulo={product.titulo}
-                      preco={firstVariant?.preco_variante ?? product.preco_base}
-                      imagem={firstVariant?.images?.[0]?.image?.url || "/hero-dress.png"}
+                      preco={firstVariant?.precoVariante ?? product.precoBase}
+                      imagem={firstVariant?.images[0]?.url || "/hero-dress.png"}
                       categoria={product.categories?.[0]?.nome}
+                      variant={firstVariant}
                     />
                   );
                 })}

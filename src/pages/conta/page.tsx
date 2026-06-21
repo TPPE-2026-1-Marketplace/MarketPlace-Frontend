@@ -351,8 +351,8 @@ export default function ContaPage() {
               <div className="bg-white p-6 border border-gray-100">
                 <h2 className="text-gray-900 mb-5 font-serif text-xl">Meus Favoritos</h2>
                 {(() => {
-                  const favProducts = products.filter((p: any) =>
-                    favorites.includes(String(p.id_produto ?? p.id))
+                  const favProducts = products.filter((product) =>
+                    favorites.includes(String(product.idProduto))
                   );
                   if (favProducts.length === 0) {
                     return (
@@ -373,12 +373,12 @@ export default function ContaPage() {
                   }
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {favProducts.map((product: any) => {
-                        const price = product.variants?.[0]?.preco_variante ?? product.preco_base ?? product.price;
-                        const image = product.imagens?.[0]?.url ?? product.images?.[0] ?? "";
-                        const nome = product.titulo ?? product.name ?? "";
-                        const cat = product.categoria ?? product.category ?? "Vestido";
-                        const id = product.id_produto ?? product.id;
+                      {favProducts.map((product) => {
+                        const price = product.variants[0]?.precoVariante ?? product.precoBase;
+                        const image = product.variants[0]?.images[0]?.url ?? "/hero-dress.png";
+                        const nome = product.titulo;
+                        const cat = product.categories[0]?.nome ?? "Vestido";
+                        const id = product.idProduto;
                         return (
                           <Link
                             key={id}

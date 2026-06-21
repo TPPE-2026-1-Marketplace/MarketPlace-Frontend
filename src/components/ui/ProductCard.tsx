@@ -5,6 +5,7 @@ import { ShoppingCart, Heart, Check } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useCart } from "@/hooks/useCart";
+import type { ProductVariant } from "@/lib/catalog";
 
 interface ProductCardProps {
   id: number;
@@ -16,6 +17,7 @@ interface ProductCardProps {
   nota?: number;
   className?: string;
   style?: React.CSSProperties;
+  variant?: ProductVariant;
 }
 
 export default function ProductCard({
@@ -28,6 +30,7 @@ export default function ProductCard({
   nota,
   className,
   style,
+  variant,
 }: ProductCardProps) {
   const { toggleFavorite, isFavorite } = useFavorites();
   const { addItem } = useCart();
@@ -88,12 +91,14 @@ export default function ProductCard({
                 setAdded(true);
                 addItem(
                   {
-                    id: Date.now() + Math.random(),
-                    preco_variante: preco,
-                    tamanho: mockSizes[0],
-                    cor: "Padrão",
-                    produto: { id, titulo, preco_base: preco },
-                    images: [{ image: { url: imagem } }],
+                    codigoSku: variant?.codigoSku ?? `PRODUCT-${id}`,
+                    precoVariante: variant?.precoVariante ?? preco,
+                    tamanho: variant?.tamanho ?? mockSizes[0],
+                    cor: variant?.cor ?? "Padrão",
+                    produto: { idProduto: id, titulo, precoBase: preco },
+                    images: variant?.images ?? [
+                      { idImagem: 0, url: imagem, ordem: 0, descricao: null },
+                    ],
                   },
                   1
                 );

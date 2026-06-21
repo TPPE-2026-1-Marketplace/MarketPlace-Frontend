@@ -13,8 +13,8 @@ export default function FavoritesPage() {
   // Fetch all products so we can filter by favorite IDs
   const { products, isLoading } = useProducts({ page: 1, limit: 200 });
 
-  const favoriteProducts = products.filter((p: any) =>
-    favorites.includes(String(p.id_produto ?? p.id))
+  const favoriteProducts = products.filter((product) =>
+    favorites.includes(String(product.idProduto))
   );
 
   if (!isAuthenticated) {
@@ -78,22 +78,20 @@ export default function FavoritesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {favoriteProducts.map((product: any) => (
-              <ProductCard
-                key={product.id_produto ?? product.id}
-                id={product.id_produto ?? product.id}
-                titulo={product.titulo ?? product.name}
-                preco={product.variants?.[0]?.preco_variante ?? product.preco_base ?? product.price}
-                precoOriginal={product.preco_original ?? product.originalPrice}
-                imagem={
-                  product.imagens?.[0]?.url ??
-                  product.images?.[0] ??
-                  ""
-                }
-                categoria={product.categoria ?? product.category}
-                nota={product.nota_media}
-              />
-            ))}
+            {favoriteProducts.map((product) => {
+              const variant = product.variants[0];
+              return (
+                <ProductCard
+                  key={product.idProduto}
+                  id={product.idProduto}
+                  titulo={product.titulo}
+                  preco={variant?.precoVariante ?? product.precoBase}
+                  imagem={variant?.images[0]?.url || "/hero-dress.png"}
+                  categoria={product.categories[0]?.nome}
+                  variant={variant}
+                />
+              );
+            })}
           </div>
         )}
       </div>
