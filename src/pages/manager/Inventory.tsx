@@ -153,9 +153,8 @@ function ImageManager({ images, onChange, coverIndex, onCoverChange }: ImageMana
               onDragOver={(e) => handleDragOver(e, idx)}
               onDrop={(e) => handleDrop(e, idx)}
               onDragEnd={handleDragEnd}
-              className={`relative group border-2 transition-all cursor-move ${
-                coverIndex === idx ? "border-[#1a1a1a]" : "border-gray-200"
-              } ${dragOverIdx === idx && draggingIdx !== idx ? "border-gray-500 scale-105" : ""}`}
+              className={`relative group border-2 transition-all cursor-move ${coverIndex === idx ? "border-[#1a1a1a]" : "border-gray-200"
+                } ${dragOverIdx === idx && draggingIdx !== idx ? "border-gray-500 scale-105" : ""}`}
             >
               <div className="aspect-[3/4] overflow-hidden bg-gray-50">
                 <img
@@ -341,10 +340,9 @@ export function Inventory({ readOnly = false }: InventoryProps) {
     const isMid = value > 3 && value <= 8;
     return (
       <div className="flex flex-col items-center gap-0.5">
-        <span className={`text-xs px-2 py-0.5 ${
-          isLow ? "bg-red-100 text-red-700" :
-          isMid ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"
-        }`}>
+        <span className={`text-xs px-2 py-0.5 ${isLow ? "bg-red-100 text-red-700" :
+            isMid ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"
+          }`}>
           {value}
         </span>
         <span className="text-xs text-gray-400">
@@ -368,7 +366,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
         onSave={async (product) => {
           try {
             const created = await api.post<any>("/products", {
-              titulo: product.name || (product as any).title,
+              titulo: product.name || product.title,
               preco_base: product.price || 0,
               descricao: product.description,
               categoria: product.category,
@@ -444,13 +442,12 @@ export function Inventory({ readOnly = false }: InventoryProps) {
               <button
                 key={v}
                 onClick={() => setStockView(v)}
-                className={`flex items-center gap-1 px-3 py-2 border text-xs transition-colors ${
-                  stockView === v ? "bg-[#1a1a1a] text-white border-[#1a1a1a]" : "border-gray-200 text-gray-600 hover:border-gray-400"
-                }`}
+                className={`flex items-center gap-1 px-3 py-2 border text-xs transition-colors ${stockView === v ? "bg-[#1a1a1a] text-white border-[#1a1a1a]" : "border-gray-200 text-gray-600 hover:border-gray-400"
+                  }`}
               >
                 {v === "all" ? <><Package className="w-3 h-3" /> Todos</> :
-                 v === "ecommerce" ? <><Globe className="w-3 h-3" /> Online</> :
-                 <><Store className="w-3 h-3" /> Loja</>}
+                  v === "ecommerce" ? <><Globe className="w-3 h-3" /> Online</> :
+                    <><Store className="w-3 h-3" /> Loja</>}
               </button>
             ))}
           </div>
@@ -460,11 +457,10 @@ export function Inventory({ readOnly = false }: InventoryProps) {
             <button
               key={cat}
               onClick={() => setFilterCategory(cat as FilterCategory)}
-              className={`px-3 py-1 text-xs transition-colors border ${
-                filterCategory === cat
+              className={`px-3 py-1 text-xs transition-colors border ${filterCategory === cat
                   ? "bg-[#1a1a1a] text-white border-[#1a1a1a]"
                   : "border-gray-200 text-gray-600 hover:border-gray-400"
-              }`}
+                }`}
             >
               {catLabels[cat]}
             </button>
