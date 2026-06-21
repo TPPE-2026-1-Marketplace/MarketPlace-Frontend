@@ -36,6 +36,19 @@ export interface User {
 interface LoginApiResponse {
   access_token: string;
 }
+
+/**
+ * Decodifica o payload de um JWT sem validar assinatura.
+ * Usado apenas para extrair dados do token após login bem-sucedido.
+ */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
 const decodeJwt = (token: string) => {
   try {
     const base64Url = token.split('.')[1];
@@ -47,14 +60,15 @@ const decodeJwt = (token: string) => {
 };
 
 const mapRole = (backendRole: string): UserRole => {
-  // Papéis já em inglês (formato atual do backend).
+  // Backend usa papéis em português
+  if (backendRole === "administrador") return "superadmin";
+  if (backendRole === "gerente") return "manager";
+  if (backendRole === "caixa" || backendRole === "vendedor") return "employee";
+  if (backendRole === "cliente") return "customer";
+  // Compatibilidade com papéis em inglês (legado)
   if (backendRole === "superadmin") return "superadmin";
   if (backendRole === "manager") return "manager";
   if (backendRole === "employee") return "employee";
-  // Compatibilidade com papéis em português, caso existam.
-  if (backendRole === "administrador") return "superadmin";
-  if (backendRole === "gerente") return "manager";
-  if (backendRole === "vendedor" || backendRole === "caixa") return "employee";
   return "customer";
 };
 
@@ -179,34 +193,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     try {
-      const loginPayload = { email, senha: password };
-      console.log("LOGIN URL", import.meta.env.VITE_API_URL ?? "http://localhost:3001/api");
-      console.log("LOGIN PAYLOAD", loginPayload);
-      const response = await api.post<LoginApiResponse>("/auth/login", loginPayload);
+      const response = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
 
       localStorage.setItem("dk_token", response.access_token);
 
-      const decodedPayload = decodeJwt(response.access_token);
-      const cpf = String(decodedPayload.sub);
-      
-      let userName = decodedPayload.name || "Usuário";
-      let userPhone = undefined;
+      // Decode JWT to get user info (sub=cpf, email, role)
+      const payload = decodeJwtPayload(response.access_token);
+      const cpf = (payload?.sub as string) ?? '';
+      const role = (payload?.role as string) ?? 'cliente';
+      const tokenEmail = (payload?.email as string) ?? email;
 
-      try {
-        const person = await api.get<{ nome: string; telefone: string }>(`/people/${cpf}`);
-        if (person) {
-          userName = person.nome || userName;
-          userPhone = person.telefone;
+      let userName = tokenEmail;
+      let userPhone: string | undefined;
+
+      // Fetch full profile from people endpoint
+      if (cpf) {
+        try {
+          const profile = await api.get<{ nome?: string; email?: string; telefone?: string | null }>(`/people/${cpf}`);
+          userName = profile.nome ?? tokenEmail;
+          userPhone = profile.telefone ?? undefined;
+        } catch {
+          // Profile fetch failed — use token data
         }
-      } catch (err) {
-        console.warn("Não foi possível buscar perfil da pessoa:", err);
       }
 
       const apiUser: User = {
         id: cpf,
         name: userName,
-        email: decodedPayload.email,
-        role: mapRole(decodedPayload.role),
+        email: tokenEmail,
+        role: mapRole(role),
         phone: userPhone,
       };
 
@@ -214,7 +229,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true, message: "Login realizado com sucesso!" };
     } catch (err) {
       const isApiError = err instanceof ApiError;
-      const isUnauthorized = isApiError && err.status === 401;
       const isNetworkError = !isApiError;
 
       if (isNetworkError) {
@@ -256,14 +270,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const loginRes = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
         localStorage.setItem("dk_token", loginRes.access_token);
 
-        const payload = decodeJwt(loginRes.access_token);
-        const subCpf = String(payload.sub);
+        // Decode JWT to get user info
+        const payload = decodeJwtPayload(loginRes.access_token);
+        const role = (payload?.role as string) ?? 'cliente';
 
         const apiUser: User = {
-          id: subCpf,
-          name: name,
-          email: payload.email,
-          role: mapRole(payload.role),
+          id: cleanCpf || email,
+          name,
+          email,
+          role: mapRole(role),
           phone: phone || undefined,
         };
 

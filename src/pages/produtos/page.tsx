@@ -55,7 +55,6 @@ function ProdutosContent() {
 
   // Hook state
   const [apiFilters, setApiFilters] = useState<ProductFiltersType>({
-    categoria: category !== "all" ? category : undefined,
     busca: search || undefined,
     page: 1,
     limit: 20,
@@ -66,7 +65,6 @@ function ProdutosContent() {
   useEffect(() => {
     setApiFilters((prev: any) => ({
       ...prev,
-      categoria: category !== "all" ? category : undefined,
       busca: search || undefined,
       page: 1,
     }));

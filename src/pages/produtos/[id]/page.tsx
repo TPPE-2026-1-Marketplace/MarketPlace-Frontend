@@ -60,55 +60,55 @@ export default function ProductDetailPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const data = await api.get<AnyModel>(`/products/${Number(id)}`);
+        const data = await api.get<Record<string, unknown>>(`/products/${Number(id)}`);
 
-        // Normalise: the backend may return a flat entity without variants/categories
-        const normalised = { ...data };
-        if (!normalised.categories || normalised.categories.length === 0) {
-          normalised.categories = normalised.categoria
-            ? [{ nome: normalised.categoria }]
-            : [];
-        }
-        if (!normalised.variants || normalised.variants.length === 0) {
-          normalised.variants = [
+        // Normalise backend camelCase to frontend format
+        const idProduto = (data.idProduto ?? data.id_produto ?? 0) as number;
+        const categories = data.categories as Array<{ nome: string }> | undefined;
+        const variants = data.variants as Array<Record<string, unknown>> | undefined;
+
+        const normalised = {
+          ...data,
+          id_produto: idProduto,
+          preco_base: data.precoBase ?? data.preco_base ?? 0,
+          categories: categories?.length ? categories : [],
+          variants: variants?.length ? variants : [
             {
-              id: normalised.id_produto,
-              preco_variante: normalised.preco_base,
+              id: idProduto,
+              preco_variante: data.precoBase ?? data.preco_base ?? 0,
               cor: null,
               tamanho: null,
-              images: normalised.imagem_url
-                ? [{ image: { id: normalised.id_produto, url: normalised.imagem_url } }]
-                : [],
+              images: [],
             },
-          ];
-        }
+          ],
+        };
 
         setProduct(normalised);
         
         // Load related products
-        const catName = normalised.categories?.[0]?.nome;
+        const catName = categories?.[0]?.nome;
         if (catName) {
           try {
-            const res = await api.get<AnyModel>("/products", { categoria: catName, limit: 4 });
+            const res = await api.get<{ data: Record<string, unknown>[] }>("/products", { limit: 4 });
             const relatedProducts = (res.data || [])
-              .filter((p: any) => p.id_produto !== normalised.id_produto)
-              .map((p: any) => {
-                // Normalise related products too
-                if (!p.categories || p.categories.length === 0) {
-                  p.categories = p.categoria ? [{ nome: p.categoria }] : [];
-                }
-                if (!p.variants || p.variants.length === 0) {
-                  p.variants = [
+              .filter((p) => (p.idProduto ?? p.id_produto) !== idProduto)
+              .map((p) => {
+                const pid = (p.idProduto ?? p.id_produto ?? 0) as number;
+                const pCat = p.categories as Array<{ nome: string }> | undefined;
+                const pVar = p.variants as Array<Record<string, unknown>> | undefined;
+                return {
+                  ...p,
+                  id_produto: pid,
+                  preco_base: p.precoBase ?? p.preco_base ?? 0,
+                  categories: pCat?.length ? pCat : [],
+                  variants: pVar?.length ? pVar : [
                     {
-                      id: p.id_produto,
-                      preco_variante: p.preco_base,
-                      images: p.imagem_url
-                        ? [{ image: { id: p.id_produto, url: p.imagem_url } }]
-                        : [],
+                      id: pid,
+                      preco_variante: p.precoBase ?? p.preco_base ?? 0,
+                      images: [],
                     },
-                  ];
-                }
-                return p;
+                  ],
+                };
               });
             setRelated(relatedProducts);
           } catch {
