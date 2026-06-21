@@ -13,6 +13,7 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { api } from "../../lib/api";
 import { PRODUCTS } from "../../data/products";
 
@@ -33,6 +34,7 @@ export interface Coupon {
 }
 
 export function Coupons() {
+  const { isSuperAdmin } = useAuth();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +82,20 @@ export function Coupons() {
   };
 
   useEffect(() => {
+    if (!isSuperAdmin) {
+      setLoading(false);
+      return;
+    }
     fetchCoupons();
-  }, []);
+  }, [isSuperAdmin]);
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="bg-white border border-gray-100 p-6 text-sm text-gray-600">
+        Acesso restrito: apenas administradores podem gerenciar cupons.
+      </div>
+    );
+  }
 
   const filtered = coupons.filter(
     (c) =>

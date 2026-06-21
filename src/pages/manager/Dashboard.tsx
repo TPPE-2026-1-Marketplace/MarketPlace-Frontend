@@ -104,7 +104,7 @@ export function ManagerDashboard() {
     { key: "vendas-pdv", label: "Vendas PDV", icon: <Store className="w-5 h-5" /> },
     { key: "relatorios", label: "Relatórios", icon: <BarChart2 className="w-5 h-5" />, requiresPermission: () => isManager },
     { key: "comissoes", label: "Comissões", icon: <Award className="w-5 h-5" /> },
-    { key: "cupons", label: "Cupons", icon: <TrendingUp className="w-5 h-5" />, requiresPermission: () => isManager },
+    { key: "cupons", label: "Cupons", icon: <TrendingUp className="w-5 h-5" />, requiresPermission: () => isSuperAdmin },
     { key: "exportar", label: "Exportar Clientes", icon: <Download className="w-5 h-5" />, requiresPermission: () => isManager },
     { key: "usuarios", label: "Usuários", icon: <Users className="w-5 h-5" />, requiresPermission: () => canEditUsers },
     { key: "banners", label: "Banners", icon: <Globe className="w-5 h-5" />, requiresPermission: () => isManager },

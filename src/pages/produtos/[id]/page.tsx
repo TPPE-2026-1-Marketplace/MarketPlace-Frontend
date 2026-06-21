@@ -28,6 +28,8 @@ import {
   getDisplayVariant,
   type Product,
 } from "@/lib/catalog";
+import { api } from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
 import ProductCard from "@/components/ui/ProductCard";
 
 const SIZE_TABLE: [string, string, string, string, string][] = [
@@ -60,7 +62,9 @@ export default function ProductDetailPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [tab, setTab] = useState<"descricao" | "tamanhos" | "info">("descricao");
   const [cep, setCep] = useState("");
-  const [cepResult, setCepResult] = useState<null | "ok" | "erro">(null);
+  const [shippingQuote, setShippingQuote] = useState<{ valor: number; prazo_dias: number } | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
   const [showSizeModal, setShowSizeModal] = useState(false);
 
   useEffect(() => {
@@ -193,11 +197,28 @@ export default function ProductDetailPage() {
     navigate("/carrinho");
   };
 
-  const handleShippingCheck = (e: React.FormEvent) => {
+  const handleShippingCheck = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cep.replace(/\D/g, "").length === 8) {
-      const num = parseInt(cep.replace(/\D/g, "").slice(0, 2));
-      setCepResult(num >= 70 && num <= 73 ? "ok" : "erro");
+    const cleanCep = cep.replace(/\D/g, "");
+    if (cleanCep.length !== 8) {
+      setShippingQuote(null);
+      setShippingError("CEP inválido. Use 8 dígitos.");
+      return;
+    }
+
+    setShippingLoading(true);
+    setShippingError(null);
+
+    try {
+      const quote = await api.post<{ valor: number; prazo_dias: number }>("/shipping/calculate", {
+        cep_destino: cleanCep,
+      });
+      setShippingQuote(quote);
+    } catch (err) {
+      setShippingQuote(null);
+      setShippingError(err instanceof Error ? err.message : "Erro ao calcular frete.");
+    } finally {
+      setShippingLoading(false);
     }
   };
 
@@ -376,12 +397,6 @@ export default function ProductDetailPage() {
                 })}{" "}
                 sem juros
               </p>
-              <p className="text-green-700 text-xs mt-1">
-                5% de desconto no PIX: R${" "}
-                {(price * 0.95).toLocaleString("pt-BR", {
-                  minimumFractionDigits: 2,
-                })}
-              </p>
             </div>
 
             <div className="mb-5">
@@ -507,7 +522,8 @@ export default function ProductDetailPage() {
                   value={cep}
                   onChange={(e) => {
                     setCep(e.target.value);
-                    setCepResult(null);
+                    setShippingQuote(null);
+                    setShippingError(null);
                   }}
                   placeholder="Digite seu CEP"
                   maxLength={9}
@@ -520,16 +536,18 @@ export default function ProductDetailPage() {
                   OK
                 </button>
               </form>
-              {cepResult === "ok" && (
+              {shippingLoading && (
+                <p className="text-gray-500 text-xs mt-2">Calculando frete...</p>
+              )}
+              {shippingQuote && !shippingLoading && (
                 <p className="text-green-700 text-xs mt-2 flex items-center gap-1">
                   <Check className="w-3.5 h-3.5" />
-                  Entregamos no seu endereço! Prazo: 3 a 7 dias úteis.
+                  Frete {formatCurrency(shippingQuote.valor)} · prazo de {shippingQuote.prazo_dias} dia
+                  {shippingQuote.prazo_dias !== 1 ? "s" : ""} útil
                 </p>
               )}
-              {cepResult === "erro" && (
-                <p className="text-gray-500 text-xs mt-2">
-                  CEP fora da área de entrega. Atendemos apenas o Distrito Federal.
-                </p>
+              {shippingError && !shippingLoading && (
+                <p className="text-red-600 text-xs mt-2">{shippingError}</p>
               )}
             </div>
 
