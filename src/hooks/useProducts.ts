@@ -20,6 +20,32 @@ export interface Product {
   variants?: ProductVariant[];
   categories?: { nome: string }[];
 }
+
+/**
+ * Maps a backend Product (camelCase fields, categories array) to
+ * the frontend Product shape (snake_case fields, categoria string).
+ */
+function normalizeBackendProduct(raw: Record<string, unknown>): Product {
+  const idProduto = (raw.idProduto ?? raw.id_produto ?? 0) as number;
+  const categories = raw.categories as Array<{ nome: string }> | undefined;
+  const variants = raw.variants as ProductVariant[] | undefined;
+
+  return {
+    id_produto: idProduto,
+    titulo: (raw.titulo as string) ?? '',
+    preco_base: (raw.precoBase ?? raw.preco_base ?? 0) as number,
+    descricao: (raw.descricao as string) ?? undefined,
+    categoria: categories?.[0]?.nome ?? null,
+    imagem_url: null, // Backend atual não retorna imagem_url direta no produto
+    categories,
+    variants: variants?.length ? variants : [
+      {
+        id: idProduto,
+        preco_variante: (raw.precoBase ?? raw.preco_base ?? 0) as number,
+      },
+    ],
+  };
+}
 export interface ProductFilters {
   categoria?: string;
   busca?: string;
@@ -60,31 +86,10 @@ export function useProducts(initialFilters?: ProductFilters): UseProductsResult 
     setError(null);
 
     try {
-      const response = await api.get<PaginatedResponse<Product>>("/products", filters as any);
+      const response = await api.get<PaginatedResponse<Record<string, unknown>>>("/products", filters as any);
 
-      // Normalise backend products: the API may return a flat Product entity
-      // (without variants/categories), so we enrich the shape here to keep
-      // downstream components working.
-      const normalised = (response.data ?? []).map((p) => {
-        // If the backend already returns variants, keep them.
-        if (p.variants && p.variants.length > 0) return p;
-
-        // Otherwise, synthesise a minimal variant & categories array from the
-        // flat entity fields so that ProductCard / details can render correctly.
-        return {
-          ...p,
-          categories: p.categories ?? (p.categoria ? [{ nome: p.categoria }] : []),
-          variants: p.variants ?? [
-            {
-              id: p.id_produto,
-              preco_variante: p.preco_base,
-              images: p.imagem_url
-                ? [{ image: { id: p.id_produto, url: p.imagem_url } }]
-                : [],
-            },
-          ],
-        };
-      });
+      // Normalise backend products from camelCase to frontend snake_case format
+      const normalised = (response.data ?? []).map(normalizeBackendProduct);
 
       setProducts(normalised);
       setMeta(response.meta ?? null);

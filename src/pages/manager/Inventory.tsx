@@ -368,13 +368,12 @@ export function Inventory({ readOnly = false }: InventoryProps) {
         onSave={async (product) => {
           try {
             const created = await api.post<any>("/products", {
-              titulo: product.name || product.title,
-              preco_base: product.price || 0,
-              descricao: product.description,
-              categoria: product.category,
-              imagem_url: product.images?.[0] || null,
+              titulo: (product as any).name || (product as any).title || "",
+              preco_base: (product as any).price || 0,
+              sku: `DK-${Date.now()}`,
+              descricao: (product as any).description,
             });
-            setProducts((prev) => [...prev, { ...product, id: String(created.id_produto ?? created.id) } as Product]);
+            setProducts((prev) => [...prev, { ...product, id: String(created.idProduto ?? created.id) } as Product]);
           } catch (err) {
             console.error("Erro ao salvar produto:", err);
             // Fallback: salva localmente mesmo se a API falhar
