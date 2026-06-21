@@ -22,6 +22,7 @@ import { AddProduct } from "./AddProduct";
 import { api } from "@/lib/api";
 import { useProducts } from "@/hooks/useProducts";
 import type { Product as CatalogProduct } from "@/lib/catalog";
+import { useAuth } from "../../context/AuthContext";
 
 type StockType = "all" | "ecommerce" | "physical";
 type FilterCategory = "all" | Product["category"];
@@ -733,10 +734,12 @@ interface InventoryVariantRow {
   stockPhysical: number;
   image: string;
   category: string;
+  isOrphan?: boolean;
 }
 
 export function Inventory({ readOnly = false }: InventoryProps) {
   const { products, isLoading, error, refetch } = useProducts({ page: 1, limit: 100 });
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [stockView, setStockView] = useState<StockType>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -746,19 +749,37 @@ export function Inventory({ readOnly = false }: InventoryProps) {
   const [savingSku, setSavingSku] = useState<string | null>(null);
 
   const rows: InventoryVariantRow[] = products.flatMap((product) =>
-    product.variants.map((variant) => ({
-      product,
-      codigoSku: variant.codigoSku,
-      title: product.titulo,
-      baseSku: product.sku,
-      color: variant.cor,
-      size: variant.tamanho,
-      price: variant.precoVariante || product.precoBase,
-      stockOnline: variant.stock.qtdOnline,
-      stockPhysical: variant.stock.qtdLojaFisica,
-      image: variant.images[0]?.url || "/hero-dress.png",
-      category: product.categories[0]?.nome || "Sem categoria",
-    })),
+    product.variants.length > 0
+      ? product.variants.map((variant) => ({
+          product,
+          codigoSku: variant.codigoSku,
+          title: product.titulo,
+          baseSku: product.sku,
+          color: variant.cor,
+          size: variant.tamanho,
+          price: variant.precoVariante || product.precoBase,
+          stockOnline: variant.stock?.qtdOnline || 0,
+          stockPhysical: variant.stock?.qtdLojaFisica || 0,
+          image: variant.images[0]?.url || "/hero-dress.png",
+          category: product.categories[0]?.nome || "Sem categoria",
+          isOrphan: false,
+        }))
+      : [
+          {
+            product,
+            codigoSku: product.sku,
+            title: product.titulo,
+            baseSku: product.sku,
+            color: "Sem variantes cadastradas",
+            size: null,
+            price: product.precoBase,
+            stockOnline: 0,
+            stockPhysical: 0,
+            image: "/hero-dress.png",
+            category: product.categories[0]?.nome || "Sem categoria",
+            isOrphan: true,
+          },
+        ]
   );
 
   const normalizedSearch = search.trim().toLocaleLowerCase("pt-BR");
@@ -787,6 +808,38 @@ export function Inventory({ readOnly = false }: InventoryProps) {
   const startStockEdit = (row: InventoryVariantRow) => {
     setEditingSku(row.codigoSku);
     setEditStock({ online: row.stockOnline, physical: row.stockPhysical });
+  };
+
+  const handleDeleteVariant = async (row: InventoryVariantRow) => {
+    const isLastVariant = row.product.variants.length === 1;
+
+    if (row.isOrphan || isLastVariant) {
+      const msg = row.isOrphan
+        ? "Tem certeza que deseja excluir este produto sem variantes?"
+        : "Esta é a última variante. Excluí-la irá remover o produto inteiro do sistema. Deseja continuar?";
+        
+      if (window.confirm(msg)) {
+        try {
+          await api.delete(`/products/${row.product.idProduto}`);
+          alert("Produto excluído com sucesso.");
+          refetch();
+        } catch (error) {
+          console.error("Erro ao excluir produto:", error);
+          alert("Não foi possível excluir o produto.");
+        }
+      }
+    } else {
+      if (window.confirm("Tem certeza que deseja excluir esta variante? Esta ação não pode ser desfeita.")) {
+        try {
+          await api.delete(`/product-variants/${encodeURIComponent(row.codigoSku)}`);
+          alert("Variante excluída com sucesso.");
+          refetch();
+        } catch (error) {
+          console.error("Erro ao excluir variante:", error);
+          alert("Não foi possível excluir a variante.");
+        }
+      }
+    }
   };
 
   const saveStock = async (codigoSku: string) => {
@@ -1076,9 +1129,16 @@ export function Inventory({ readOnly = false }: InventoryProps) {
                             </button>
                           </>
                         ) : (
-                          <button onClick={() => startStockEdit(row)} className="p-1.5 bg-gray-100" title="Editar estoque">
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+                          <>
+                            <button onClick={() => startStockEdit(row)} className="p-1.5 bg-gray-100" title="Editar estoque">
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            {(user?.role === "manager" || user?.role === "superadmin" || user?.role === "admin") && (
+                              <button onClick={() => handleDeleteVariant(row)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-100 transition-colors" title={row.isOrphan ? "Excluir produto" : "Excluir variante"}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
