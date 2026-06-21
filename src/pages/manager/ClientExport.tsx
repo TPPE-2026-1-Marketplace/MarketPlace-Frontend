@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Download, Search, Users } from "lucide-react";
 
 import { fetchPeople, type ApiPerson } from "@/lib/management";
+import { api } from "@/lib/api";
 
 const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
@@ -14,8 +15,12 @@ export function ClientExport() {
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetchPeople();
-        setPeople(response.data);
+        const [peopleRes, empRes] = await Promise.all([
+          fetchPeople(),
+          api.get<{ data: any[] }>("/employees?limit=100")
+        ]);
+        const employeeCpfs = new Set(empRes.data.map((e: any) => e.cpf));
+        setPeople(peopleRes.data.filter((p: ApiPerson) => !employeeCpfs.has(p.cpf)));
       } catch (loadError) {
         console.error(loadError);
         setError("Não foi possível carregar os clientes do backend.");

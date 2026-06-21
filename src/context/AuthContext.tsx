@@ -297,7 +297,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (isApiError && err.status === 400) {
-        return { success: false, message: err.message || "Dados inválidos. Verifique os campos." };
+        let errorMsg = err.message || "Dados inválidos. Verifique os campos.";
+        const errors = (err.data as any)?.errors;
+        if (Array.isArray(errors)) {
+          errorMsg = errors.map((e) => e.message).join(", ");
+        }
+        return { success: false, message: errorMsg };
       }
 
       if (!isApiError) {

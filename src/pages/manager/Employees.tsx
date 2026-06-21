@@ -79,7 +79,7 @@ export function Employees() {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const res = await api.get<{ data: ApiEmployee[] }>("/employees?limit=1000");
+      const res = await api.get<{ data: ApiEmployee[] }>("/employees?limit=100");
       setEmployees(res.data);
     } catch (err) {
       console.error(err);
@@ -232,7 +232,7 @@ export function Employees() {
     }
   };
 
-  const FormSection = () => (
+  const renderFormSection = () => (
     <div className="bg-white border border-gray-100 p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-gray-900">
@@ -505,7 +505,7 @@ export function Employees() {
       </div>
 
       {/* Add / Edit form */}
-      {(activeTab === "add" || activeTab === "edit") && <FormSection />}
+      {(activeTab === "add" || activeTab === "edit") && renderFormSection()}
 
       {msg && activeTab === "list" && (
         <div className={`p-3 text-sm ${msg.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>

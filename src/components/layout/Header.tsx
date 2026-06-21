@@ -164,7 +164,7 @@ export default function Header() {
                           </Link>
                           {(isManager || isSuperAdmin) && (
                             <Link
-                              to="/gerente"
+                              to="/painel"
                               onClick={() => setUserMenuOpen(false)}
                               className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                             >

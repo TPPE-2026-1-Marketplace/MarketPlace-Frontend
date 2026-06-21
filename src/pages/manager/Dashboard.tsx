@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -42,7 +42,12 @@ type Tab = "dashboard" | "estoque" | "pedidos" | "vendas-pdv" | "relatorios" | "
 export function ManagerDashboard() {
   const { user, logout, isManager, isSuperAdmin, isInternalUser, canEditProducts, canEditUsers, canEditStock } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const location = useLocation();
+  const pathPart = location.pathname.split("/")[2];
+  const tab: Tab = (pathPart as Tab) || "dashboard";
+  const setTab = (newTab: Tab) => {
+    navigate(newTab === "dashboard" ? "/painel" : `/painel/${newTab}`);
+  };
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moduleSwitcherOpen, setModuleSwitcherOpen] = useState(false);
   const { products: catalogProducts } = useProducts({ page: 1, limit: 100 });

@@ -52,7 +52,7 @@ export default function App() {
         </Route>
         
         <Route path="/selecionar-modulo" element={<ModuleSelection />} />
-        <Route path="/gerente/*" element={<ManagerDashboard />} />
+        <Route path="/painel/*" element={<ManagerDashboard />} />
         <Route path="/caixa" element={<Cashier />} />
       </Routes>
     </BrowserRouter>

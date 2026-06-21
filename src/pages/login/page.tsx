@@ -207,6 +207,7 @@ export default function LoginPage() {
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="Sua senha"
                   required
+                  minLength={isRegister ? 8 : undefined}
                   className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
                 />
                 <button
