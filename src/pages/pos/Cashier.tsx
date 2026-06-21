@@ -59,7 +59,7 @@ export function Cashier() {
     try {
       setLoading(true);
       setError("");
-      const response = await api.get<{ data: ApiProduct[] }>("/products?limit=500");
+      const response = await api.get<{ data: ApiProduct[] }>("/products?limit=100");
       setProducts(response.data);
     } catch (err: any) {
       setError("Erro ao carregar produtos. Verifique a conexão.");
