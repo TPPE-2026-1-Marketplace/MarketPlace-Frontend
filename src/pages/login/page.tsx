@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, User, Lock, Mail, Phone, AlertCircle, CheckCircle } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -16,6 +16,23 @@ export default function LoginPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   
   const { login, register, isAuthenticated, user } = useAuth();
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, "");
+    if (value.length > 11) value = value.slice(0, 11);
+    
+    // Format: 000.000.000-00
+    let formatted = value;
+    if (value.length > 9) {
+      formatted = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6, 9)}-${value.slice(9)}`;
+    } else if (value.length > 6) {
+      formatted = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6)}`;
+    } else if (value.length > 3) {
+      formatted = `${value.slice(0, 3)}.${value.slice(3)}`;
+    }
+    
+    setForm({ ...form, cpf: formatted });
+  };
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -23,16 +40,17 @@ export default function LoginPage() {
     email: "",
     password: "",
     phone: "",
+    cpf: "",
   });
 
   useEffect(() => {
     if (isAuthenticated) {
-      if (retorno === "checkout") {
-        window.location.href = "/checkout";
-      } else {
-        const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee";
-        window.location.href = isInternalUser ? "/" : "/conta";
-      }
+        if (retorno === "checkout") {
+          navigate("/checkout");
+        } else {
+          const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee";
+          navigate(isInternalUser ? "/selecionar-modulo" : "/conta");
+        }
     }
   }, [isAuthenticated, user, navigate, retorno]);
 
@@ -41,20 +59,23 @@ export default function LoginPage() {
     setLoading(true);
     setMessage(null);
     
-    // Artificial delay for UX
-    await new Promise((r) => setTimeout(r, 600));
-    
     try {
       if (isRegister) {
-        await register({
-          nome: form.name,
-          email: form.email,
-          password: form.password,
-          // phone is not directly handled by register model yet but we pass it anyway 
-        } as any);
-        setMessage({ type: "success", text: "Cadastro realizado com sucesso!" });
+        const cleanCpf = form.cpf.replace(/\D/g, "");
+        if (cleanCpf.length !== 11) {
+          throw new Error("O CPF deve conter exatamente 11 dígitos numéricos.");
+        }
+        const res = await register(form.name, form.email, form.password, form.phone, cleanCpf);
+        if (res.success) {
+          setMessage({ type: "success", text: res.message });
+        } else {
+          throw new Error(res.message);
+        }
       } else {
-        await login({ email: form.email, password: form.password });
+        const res = await login(form.email, form.password);
+        if (!res.success) {
+          throw new Error(res.message);
+        }
         // The useEffect will handle redirection
       }
     } catch (err: any) {
@@ -80,19 +101,13 @@ export default function LoginPage() {
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => { setIsRegister(false); setMessage(null); }}
-              className={`flex-1 py-3 text-sm transition-colors rounded-xl font-medium ${
-                !isRegister ? "" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              style={!isRegister ? { backgroundColor: '#1a1a1a', color: '#ffffff' } : {}}
+              className={`flex-1 py-3 text-sm rounded-xl font-medium ${!isRegister ? "bt-principal" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
             >
               Entrar
             </button>
             <button
               onClick={() => { setIsRegister(true); setMessage(null); }}
-              className={`flex-1 py-3 text-sm transition-colors rounded-xl font-medium ${
-                isRegister ? "" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              style={isRegister ? { backgroundColor: '#1a1a1a', color: '#ffffff' } : {}}
+              className={`flex-1 py-3 text-sm rounded-xl font-medium ${isRegister ? "bt-principal" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
             >
               Criar Conta
             </button>
@@ -127,6 +142,23 @@ export default function LoginPage() {
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Seu nome"
+                    required
+                    className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {isRegister && (
+              <div>
+                <label className="block text-sm text-gray-600 mb-1.5">CPF</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={form.cpf}
+                    onChange={handleCpfChange}
+                    placeholder="000.000.000-00"
                     required
                     className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
                   />
@@ -198,8 +230,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-xl py-3 hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium tracking-wide mt-2"
-              style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+              className="bt-principal w-full rounded-xl py-3 text-sm font-medium tracking-wide mt-2"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

@@ -5,22 +5,42 @@ import { useNavigate } from "react-router-dom";
 import { ShoppingCart, Trash2, Plus, Minus, ArrowLeft, ArrowRight, Info } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 export default function CarrinhoPage() {
-  const { cart, updateQuantity, removeItem, clear } = useCart();
+  const { cart, updateQuantity, removeItem, clear, setShipping } = useCart();
   const navigate = useNavigate();
   const [cep, setCep] = useState("");
   const [shippingMsg, setShippingMsg] = useState<string | null>(null);
+  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [shippingLoading, setShippingLoading] = useState(false);
 
-  const handleShipCalc = (e: React.FormEvent) => {
+  const handleShipCalc = async (e: React.FormEvent) => {
     e.preventDefault();
-    const num = parseInt(cep.replace(/\D/g, "").slice(0, 2));
-    if (cep.replace(/\D/g, "").length === 8) {
-      if (num >= 70 && num <= 73) {
-        setShippingMsg("Entregamos no seu endereço! Prazo: 3 a 7 dias úteis.");
-      } else {
-        setShippingMsg("Atendemos apenas o Distrito Federal.");
+    const cleanCep = cep.replace(/\D/g, "");
+    if (cleanCep.length !== 8) {
+      setShippingMsg("CEP inválido. Use 8 dígitos.");
+      setShippingOptions([]);
+      return;
+    }
+
+    setShippingLoading(true);
+    setShippingMsg(null);
+    setShippingOptions([]);
+
+    try {
+      const options = await api.post<any[]>("/shipping/calculate", {
+        cep_destino: cleanCep,
+        valor_declarado: cart.subtotal,
+      });
+      setShippingOptions(options);
+      if (options.length === 0) {
+        setShippingMsg("Não atendemos essa região no momento.");
       }
+    } catch {
+      setShippingMsg("Erro ao calcular frete. Tente novamente.");
+    } finally {
+      setShippingLoading(false);
     }
   };
 
@@ -37,8 +57,7 @@ export default function CarrinhoPage() {
           </p>
           <Link
             to="/produtos"
-            className="inline-flex items-center gap-2 px-6 py-3 hover:opacity-90 transition-opacity text-sm font-sans"
-            style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+            className="bt-principal inline-flex items-center gap-2 px-6 py-3 text-sm font-sans"
           >
             <ArrowLeft className="w-4 h-4" /> Continuar Comprando
           </Link>
@@ -176,13 +195,42 @@ export default function CarrinhoPage() {
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+                  className="bt-principal px-4 py-2 text-sm"
                 >
                   Calcular
                 </button>
               </form>
-              {shippingMsg && (
+              {shippingLoading && (
+                <p className="text-sm text-gray-500 mt-2">Calculando...</p>
+              )}
+              {shippingOptions.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {shippingOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setShipping({ id: opt.id, name: opt.name, price: opt.price, delivery_time: opt.delivery_time })}
+                      className={`w-full flex items-center justify-between p-3 border text-left transition-colors ${
+                        cart.selectedShipping?.id === opt.id
+                          ? "border-[#1a1a1a] bg-gray-100"
+                          : "border-gray-100 bg-gray-50 hover:border-gray-300"
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm text-gray-800">{opt.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {opt.company?.name} · {opt.delivery_time} dia{opt.delivery_time !== 1 ? "s" : ""}
+                          {opt.delivery_range && ` (${opt.delivery_range.min}-${opt.delivery_range.max} dias)`}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {opt.price === 0 ? "Grátis" : formatCurrency(opt.price)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {shippingMsg && !shippingLoading && shippingOptions.length === 0 && (
                 <p className="text-sm text-gray-600 mt-2">{shippingMsg}</p>
               )}
             </div>
@@ -200,7 +248,11 @@ export default function CarrinhoPage() {
                 </div>
                 <div className="flex justify-between text-sm text-gray-400">
                   <span>Frete</span>
-                  <span>Calculado no checkout</span>
+                  <span>
+                    {cart.selectedShipping
+                      ? (cart.selectedShipping.price === 0 ? "Grátis" : formatCurrency(cart.selectedShipping.price))
+                      : "Selecione acima"}
+                  </span>
                 </div>
                 {cart.desconto > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
@@ -230,8 +282,7 @@ export default function CarrinhoPage() {
 
               <button
                 onClick={() => navigate("/checkout")}
-                className="w-full py-3 hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm tracking-wide"
-                style={{ backgroundColor: '#1a1a1a', color: '#ffffff' }}
+                className="bt-principal w-full py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
               >
                 Finalizar Compra <ArrowRight className="w-4 h-4" />
               </button>

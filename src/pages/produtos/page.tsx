@@ -3,7 +3,7 @@ type AnyModel = any;
 type ProductFiltersType = any;
 
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
@@ -61,7 +61,7 @@ function ProdutosContent() {
     limit: 20,
   });
 
-  const { products, isLoading, meta } = useProducts(apiFilters);
+  const { products, isLoading } = useProducts(apiFilters);
 
   useEffect(() => {
     setApiFilters((prev: any) => ({
@@ -71,6 +71,38 @@ function ProdutosContent() {
       page: 1,
     }));
   }, [category, search]);
+
+  // Apply the sidebar filters/sort on the client (the API only handles categoria/busca)
+  const productPrice = (p: any) => p.variants?.[0]?.preco_variante ?? p.preco_base;
+
+  const displayedProducts = useMemo(() => {
+    let list = products.filter((p: any) => {
+      const price = productPrice(p);
+      if (price < priceRange[0] || price > priceRange[1]) return false;
+      if (
+        selectedSizes.length > 0 &&
+        !p.variants?.some((v: any) => selectedSizes.includes(v.tamanho))
+      )
+        return false;
+      if (
+        selectedColors.length > 0 &&
+        !p.variants?.some((v: any) => selectedColors.includes(v.cor))
+      )
+        return false;
+      if (selectedTipo !== "all" && p.tipo && p.tipo !== selectedTipo) return false;
+      return true;
+    });
+
+    if (sort === "menor-preco") {
+      list = [...list].sort((a, b) => productPrice(a) - productPrice(b));
+    } else if (sort === "maior-preco") {
+      list = [...list].sort((a, b) => productPrice(b) - productPrice(a));
+    } else if (sort === "novidade") {
+      list = [...list].sort((a, b) => b.id_produto - a.id_produto);
+    }
+
+    return list;
+  }, [products, priceRange, selectedSizes, selectedColors, selectedTipo, sort]);
 
   const toggleSize = (size: string) =>
     setSelectedSizes((prev) =>
@@ -112,7 +144,7 @@ function ProdutosContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-white mb-1 font-serif text-3xl">{pageTitle}</h1>
           <p className="text-gray-400 text-sm font-sans">
-            {meta ? meta.total : products.length} vestido{products.length !== 1 ? "s" : ""} encontrado{products.length !== 1 ? "s" : ""}
+            {displayedProducts.length} vestido{displayedProducts.length !== 1 ? "s" : ""} encontrado{displayedProducts.length !== 1 ? "s" : ""}
           </p>
         </div>
       </div>
@@ -271,7 +303,7 @@ function ProdutosContent() {
                    <div key={i} className="aspect-[3/4] bg-gray-100 animate-pulse border border-gray-200"></div>
                  ))}
               </div>
-            ) : products.length === 0 ? (
+            ) : displayedProducts.length === 0 ? (
               <div className="text-center py-20 bg-white border border-gray-100">
                 <div className="w-16 h-16 bg-gray-50 flex items-center justify-center mx-auto mb-4 rounded-full">
                   <SlidersHorizontal className="w-7 h-7 text-gray-400" />
@@ -289,7 +321,7 @@ function ProdutosContent() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {products.map((product) => {
+                {displayedProducts.map((product: any) => {
                   const firstVariant = product.variants?.[0];
                   return (
                     <ProductCard

@@ -11,8 +11,9 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 type Step = "dados" | "entrega" | "pagamento" | "confirmado";
 
@@ -41,7 +42,7 @@ function GuestCheckoutModal({
         <div className="space-y-3 font-sans">
           <button
             onClick={onContinueAsGuest}
-            className="w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide flex items-center justify-center gap-2"
+            className="bt-principal w-full py-3 text-sm tracking-wide flex items-center justify-center gap-2"
           >
             <ShoppingBag className="w-4 h-4" />
             Continuar sem conta
@@ -101,7 +102,7 @@ const inputErrorClass =
   "w-full border border-red-400 px-4 py-2.5 text-sm focus:outline-none focus:border-red-500 transition-colors font-sans";
 
 export default function CheckoutPage() {
-  const { cart, clear } = useCart();
+  const { cart, clear, setShipping } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -109,9 +110,16 @@ export default function CheckoutPage() {
   const [payment, setPayment] = useState<"cartao" | "pix">("cartao");
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; cpf?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Shipping calculator state
+  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingMsg, setShippingMsg] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    nome: user?.nome || "",
+    nome: user?.name || "",
     email: user?.email || "",
     cpf: "",
     telefone: "",
@@ -127,8 +135,12 @@ export default function CheckoutPage() {
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const shipping = cart.total >= 500 ? 0 : 29.9;
-  const finalTotal = cart.total + shipping;
+  // Usa o frete selecionado no carrinho/checkout; sem seleção = ainda não calculado
+  const shippingSelected = !!cart.selectedShipping;
+  const shipping = cart.selectedShipping ? cart.selectedShipping.price : 0;
+  // PIX discount applies to the merchandise only, never to shipping
+  const pixDiscount = payment === "pix" ? cart.subtotal * 0.05 : 0;
+  const finalTotal = cart.subtotal - pixDiscount + shipping;
 
   const steps: { key: Step; label: string }[] = [
     { key: "dados", label: "Dados Pessoais" },
@@ -159,8 +171,53 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await api.post("/orders", {
+        items: cart.items.map((i) => ({
+          productId: i.variant.produto.id,
+          variantId: i.variant.id,
+          titulo: i.variant.produto.titulo,
+          tamanho: i.variant.tamanho,
+          cor: i.variant.cor,
+          quantidade: i.quantity,
+          preco_unitario: i.variant.preco_variante || i.variant.produto.preco_base,
+        })),
+        subtotal: cart.subtotal,
+        frete: shipping,
+        desconto: pixDiscount,
+        total: finalTotal,
+        paymentMethod: payment,
+        endereco: {
+          cep: form.cep,
+          rua: form.rua,
+          numero: form.numero,
+          complemento: form.complemento,
+          bairro: form.bairro,
+          cidade: form.cidade,
+          estado: form.estado,
+        },
+        cliente: {
+          nome: form.nome || undefined,
+          email: form.email,
+          cpf: form.cpf,
+          telefone: form.telefone || undefined,
+        },
+      });
+    } catch (err) {
+      console.error("Erro ao criar pedido:", err);
+      setSubmitError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível concluir o pedido. Tente novamente.",
+      );
+      setSubmitting(false);
+      return;
+    }
     clear();
+    setSubmitting(false);
     setStep("confirmado");
   };
 
@@ -196,7 +253,7 @@ export default function CheckoutPage() {
           </p>
           <button
             onClick={() => navigate("/")}
-            className="w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide"
+            className="bt-principal w-full py-3 text-sm tracking-wide"
           >
             Voltar à Loja
           </button>
@@ -233,18 +290,16 @@ export default function CheckoutPage() {
               {steps.slice(0, 3).map((s, i) => (
                 <React.Fragment key={s.key}>
                   <div
-                    className={`flex items-center gap-2 ${
-                      i <= stepIndex ? "text-white" : "text-gray-500"
-                    }`}
+                    className={`flex items-center gap-2 ${i <= stepIndex ? "text-white" : "text-gray-500"
+                      }`}
                   >
                     <div
-                      className={`w-6 h-6 flex items-center justify-center text-xs border rounded-full ${
-                        i < stepIndex
+                      className={`w-6 h-6 flex items-center justify-center text-xs border rounded-full ${i < stepIndex
                           ? "bg-white text-[#1a1a1a] border-white"
                           : i === stepIndex
-                          ? "border-white text-white"
-                          : "border-gray-600 text-gray-600"
-                      }`}
+                            ? "border-white text-white"
+                            : "border-gray-600 text-gray-600"
+                        }`}
                     >
                       {i < stepIndex ? <Check className="w-3 h-3" /> : i + 1}
                     </div>
@@ -340,7 +395,7 @@ export default function CheckoutPage() {
 
                   <button
                     onClick={handleDadosContinue}
-                    className="mt-6 w-full bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors flex items-center justify-center gap-2 text-sm tracking-wide"
+                    className="bt-principal mt-6 w-full py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
                   >
                     Continuar <ChevronRight className="w-4 h-4" />
                   </button>
@@ -351,31 +406,146 @@ export default function CheckoutPage() {
                 <div className="bg-white p-6 border border-gray-100">
                   <h2 className="text-gray-900 mb-5 font-serif text-xl">Endereço de Entrega</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {[
-                      { key: "cep", label: "CEP", type: "text" },
-                      { key: "estado", label: "Estado", type: "text" },
-                      { key: "rua", label: "Rua", type: "text", full: true },
-                      { key: "numero", label: "Número", type: "text" },
-                      { key: "complemento", label: "Complemento", type: "text" },
-                      { key: "bairro", label: "Bairro", type: "text" },
-                      { key: "cidade", label: "Cidade", type: "text" },
-                    ].map((f) => (
-                      <div key={f.key} className={f.full ? "sm:col-span-2" : ""}>
-                        <label className="block text-sm text-gray-600 mb-1">
-                          {f.label}
-                        </label>
-                        <input
-                          type={f.type}
-                          value={form[f.key as keyof typeof form]}
-                          onChange={(e) =>
-                            set(f.key as keyof typeof form, e.target.value)
+                    {/* CEP field with auto-lookup */}
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">CEP</label>
+                      <input
+                        type="text"
+                        value={form.cep}
+                        maxLength={9}
+                        onChange={async (e) => {
+                          const raw = e.target.value;
+                          set("cep", raw);
+                          const clean = raw.replace(/\D/g, "");
+                          if (clean.length === 8) {
+                            // Auto-fill address via ViaCEP
+                            try {
+                              const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+                              const data = await res.json();
+                              if (!data.erro) {
+                                setForm(prev => ({
+                                  ...prev,
+                                  cep: raw,
+                                  rua: data.logradouro || prev.rua,
+                                  bairro: data.bairro || prev.bairro,
+                                  cidade: data.localidade || prev.cidade,
+                                  estado: data.uf || prev.estado,
+                                }));
+                              }
+                            } catch {
+                              // ViaCEP offline — user fills manually
+                            }
+                            // Auto-calculate shipping
+                            setShippingLoading(true);
+                            setShippingMsg(null);
+                            setShippingOptions([]);
+                            try {
+                              const options = await api.post<any[]>("/shipping/calculate", {
+                                cep_destino: clean,
+                                valor_declarado: cart.subtotal,
+                              });
+                              setShippingOptions(options);
+                              if (options.length === 0) {
+                                setShippingMsg("Não atendemos essa região no momento.");
+                              } else {
+                                // Auto-select cheapest option
+                                const cheapest = options.reduce((min: any, o: any) => o.price < min.price ? o : min, options[0]);
+                                setShipping({ id: cheapest.id, name: cheapest.name, price: cheapest.price, delivery_time: cheapest.delivery_time });
+                              }
+                            } catch {
+                              setShippingMsg("Erro ao calcular frete. Tente novamente.");
+                            } finally {
+                              setShippingLoading(false);
+                            }
                           }
-                          className={inputClass}
-                          placeholder={f.label}
-                        />
-                      </div>
-                    ))}
+                        }}
+                        className={inputClass}
+                        placeholder="00000-000"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Estado</label>
+                      <input type="text" value={form.estado} onChange={(e) => set("estado", e.target.value)} className={inputClass} placeholder="Estado" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm text-gray-600 mb-1">Rua</label>
+                      <input type="text" value={form.rua} onChange={(e) => set("rua", e.target.value)} className={inputClass} placeholder="Rua" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Número</label>
+                      <input type="text" value={form.numero} onChange={(e) => set("numero", e.target.value)} className={inputClass} placeholder="Número" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Complemento</label>
+                      <input type="text" value={form.complemento} onChange={(e) => set("complemento", e.target.value)} className={inputClass} placeholder="Complemento" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Bairro</label>
+                      <input type="text" value={form.bairro} onChange={(e) => set("bairro", e.target.value)} className={inputClass} placeholder="Bairro" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Cidade</label>
+                      <input type="text" value={form.cidade} onChange={(e) => set("cidade", e.target.value)} className={inputClass} placeholder="Cidade" />
+                    </div>
                   </div>
+
+                  {/* Shipping options (auto-loaded when CEP is filled) */}
+                  {shippingLoading && (
+                    <p className="text-sm text-gray-500 mt-4">Calculando frete...</p>
+                  )}
+
+                  {shippingOptions.length > 0 && (
+                    <div className="mt-5 border-t border-gray-100 pt-4">
+                      <h3 className="text-gray-900 text-sm font-medium mb-3">Opções de Frete</h3>
+                      <div className="space-y-2">
+                        {shippingOptions.map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setShipping({ id: opt.id, name: opt.name, price: opt.price, delivery_time: opt.delivery_time })}
+                            className={`w-full flex items-center justify-between p-3 border text-left transition-colors ${
+                              cart.selectedShipping?.id === opt.id
+                                ? "border-[#1a1a1a] bg-gray-100"
+                                : "border-gray-100 bg-gray-50 hover:border-gray-300"
+                            }`}
+                          >
+                            <div>
+                              <p className="text-sm text-gray-800">{opt.name}</p>
+                              <p className="text-xs text-gray-500">
+                                {opt.company?.name} · {opt.delivery_time} dia{opt.delivery_time !== 1 ? "s" : ""}
+                                {opt.delivery_range && ` (${opt.delivery_range.min}-${opt.delivery_range.max} dias)`}
+                              </p>
+                            </div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {opt.price === 0 ? "Grátis" : formatCurrency(opt.price)}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {shippingMsg && !shippingLoading && shippingOptions.length === 0 && (
+                    <p className="text-sm text-gray-600 mt-4">{shippingMsg}</p>
+                  )}
+
+                  {cart.selectedShipping && shippingOptions.length === 0 && !shippingLoading && (
+                    <div className="mt-5 border-t border-gray-100 pt-4">
+                      <h3 className="text-gray-900 text-sm font-medium mb-3">Frete Selecionado</h3>
+                      <div className="p-3 border border-[#1a1a1a] bg-gray-100 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-800">{cart.selectedShipping.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {cart.selectedShipping.delivery_time} dia{cart.selectedShipping.delivery_time !== 1 ? "s" : ""} úteis
+                          </p>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {cart.selectedShipping.price === 0 ? "Grátis" : formatCurrency(cart.selectedShipping.price)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-3 mt-6">
                     <button
                       onClick={() => setStep("dados")}
@@ -385,7 +555,7 @@ export default function CheckoutPage() {
                     </button>
                     <button
                       onClick={() => setStep("pagamento")}
-                      className="flex-1 bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors flex items-center justify-center gap-2 text-sm tracking-wide"
+                      className="bt-principal flex-1 py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
                     >
                       Continuar <ChevronRight className="w-4 h-4" />
                     </button>
@@ -412,11 +582,10 @@ export default function CheckoutPage() {
                       <button
                         key={p.key}
                         onClick={() => setPayment(p.key as typeof payment)}
-                        className={`w-full flex items-center gap-3 p-4 border text-left transition-colors ${
-                          payment === p.key
+                        className={`w-full flex items-center gap-3 p-4 border text-left transition-colors ${payment === p.key
                             ? "border-[#1a1a1a] bg-gray-50 text-[#1a1a1a]"
                             : "border-gray-200 text-gray-700 hover:border-gray-400"
-                        }`}
+                          }`}
                       >
                         <span
                           className={
@@ -500,23 +669,32 @@ export default function CheckoutPage() {
                         Após confirmar, você receberá o QR Code para pagamento.
                       </p>
                       <p className="text-green-600 text-xs mt-1">
-                        Você economizará {formatCurrency(finalTotal * 0.05)}!
+                        Você economizará {formatCurrency(pixDiscount)}!
                       </p>
                     </div>
+                  )}
+
+                  {submitError && (
+                    <p className="flex items-center gap-1 text-red-500 text-xs mt-4">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {submitError}
+                    </p>
                   )}
 
                   <div className="flex gap-3 mt-6">
                     <button
                       onClick={() => setStep("entrega")}
-                      className="flex-1 border border-gray-200 text-gray-600 py-3 hover:border-gray-400 transition-colors text-sm"
+                      disabled={submitting}
+                      className="flex-1 border border-gray-200 text-gray-600 py-3 hover:border-gray-400 transition-colors text-sm disabled:opacity-50"
                     >
                       Voltar
                     </button>
                     <button
                       onClick={handleConfirm}
-                      className="flex-1 bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide"
+                      disabled={submitting}
+                      className="flex-1 bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide disabled:opacity-60"
                     >
-                      Confirmar Pedido
+                      {submitting ? "Processando..." : "Confirmar Pedido"}
                     </button>
                   </div>
                 </div>
@@ -556,11 +734,13 @@ export default function CheckoutPage() {
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-500">
                     <span>Subtotal</span>
-                    <span>{formatCurrency(cart.total)}</span>
+                    <span>{formatCurrency(cart.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-gray-500">
-                    <span>Frete</span>
-                    {shipping === 0 ? (
+                    <span>Frete{cart.selectedShipping ? ` (${cart.selectedShipping.name})` : ""}</span>
+                    {!shippingSelected ? (
+                      <span className="text-amber-500 text-xs">A calcular</span>
+                    ) : shipping === 0 ? (
                       <span className="text-green-600">Grátis</span>
                     ) : (
                       <span>{formatCurrency(shipping)}</span>
@@ -569,14 +749,14 @@ export default function CheckoutPage() {
                   {payment === "pix" && (
                     <div className="flex justify-between text-green-600 text-xs font-medium">
                       <span>Desconto PIX (5%)</span>
-                      <span>-{formatCurrency(finalTotal * 0.05)}</span>
+                      <span>-{formatCurrency(pixDiscount)}</span>
                     </div>
                   )}
                 </div>
                 <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
                   <span className="text-gray-900 font-medium">Total</span>
                   <span className="text-gray-900 font-bold text-lg">
-                    {formatCurrency(payment === "pix" ? finalTotal * 0.95 : finalTotal)}
+                    {formatCurrency(finalTotal)}
                   </span>
                 </div>
 

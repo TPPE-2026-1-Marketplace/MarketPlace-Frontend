@@ -150,6 +150,32 @@ input, textarea, select {
   border: 1px solid var(--glass-border);
 }
 
+/* ============================
+   Design Tokens — Buttons
+   ============================ */
+
+.bt-principal {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  transition: background-color var(--transition-fast);
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.bt-principal:hover {
+  background-color: #333333;
+}
+
+.bt-principal:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================
+   DK Fashion — Primary Brand Button
+   ============================ */
+
 .text-gradient {
   background: linear-gradient(135deg, var(--color-brand-light), var(--color-brand));
   -webkit-background-clip: text;

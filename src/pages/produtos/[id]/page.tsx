@@ -61,12 +61,60 @@ export default function ProductDetailPage() {
     async function loadData() {
       try {
         const data = await api.get<AnyModel>(`/products/${Number(id)}`);
-        setProduct(data);
+
+        // Normalise: the backend may return a flat entity without variants/categories
+        const normalised = { ...data };
+        if (!normalised.categories || normalised.categories.length === 0) {
+          normalised.categories = normalised.categoria
+            ? [{ nome: normalised.categoria }]
+            : [];
+        }
+        if (!normalised.variants || normalised.variants.length === 0) {
+          normalised.variants = [
+            {
+              id: normalised.id_produto,
+              preco_variante: normalised.preco_base,
+              cor: null,
+              tamanho: null,
+              images: normalised.imagem_url
+                ? [{ image: { id: normalised.id_produto, url: normalised.imagem_url } }]
+                : [],
+            },
+          ];
+        }
+
+        setProduct(normalised);
         
         // Load related products
-        if (data.categories && data.categories.length > 0) {
-          const res = await api.get<AnyModel>("/products", { categoria: data.categories[0].nome, limit: 4 });
-          setRelated(res.data.filter((p: any) => p.id_produto !== data.id_produto));
+        const catName = normalised.categories?.[0]?.nome;
+        if (catName) {
+          try {
+            const res = await api.get<AnyModel>("/products", { categoria: catName, limit: 4 });
+            const relatedProducts = (res.data || [])
+              .filter((p: any) => p.id_produto !== normalised.id_produto)
+              .map((p: any) => {
+                // Normalise related products too
+                if (!p.categories || p.categories.length === 0) {
+                  p.categories = p.categoria ? [{ nome: p.categoria }] : [];
+                }
+                if (!p.variants || p.variants.length === 0) {
+                  p.variants = [
+                    {
+                      id: p.id_produto,
+                      preco_variante: p.preco_base,
+                      images: p.imagem_url
+                        ? [{ image: { id: p.id_produto, url: p.imagem_url } }]
+                        : [],
+                    },
+                  ];
+                }
+                return p;
+              });
+            setRelated(relatedProducts);
+          } catch {
+            // If related products fail, it's not critical
+            setRelated([]);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -117,12 +165,26 @@ export default function ProductDetailPage() {
   const categoryName = product.categories?.[0]?.nome || "Vestido";
   const firstVariantSku = baseVariant?.id || `SKU-${product.id_produto}`;
 
+  // Builds the cart-variant shape useCart expects (enriches the variant with its parent product)
+  const buildCartVariant = (variant: any) => ({
+    id: variant.id,
+    produto: {
+      id: product.id_produto,
+      titulo: product.titulo,
+      preco_base: product.preco_base,
+    },
+    preco_variante: variant.preco_variante,
+    cor: variant.cor,
+    tamanho: variant.tamanho,
+    images: variant.images,
+  });
+
   const handleAddToCart = () => {
     if (!selectedSize || !selectedColor) {
       alert("Por favor, selecione o tamanho e a cor antes de adicionar ao carrinho.");
       return;
     }
-    
+
     // Find the variant
     const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
     if (!variant) {
@@ -130,7 +192,7 @@ export default function ProductDetailPage() {
       return;
     }
 
-    addItem(variant?.id as any, quantity);
+    addItem(buildCartVariant(variant), quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -143,7 +205,7 @@ export default function ProductDetailPage() {
     const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
     if (!variant) return;
 
-    addItem(variant?.id as any, quantity);
+    addItem(buildCartVariant(variant), quantity);
     navigate("/carrinho");
   };
 
@@ -424,7 +486,7 @@ export default function ProductDetailPage() {
             <div className="flex gap-3 mb-6">
               <button
                 onClick={handleBuyNow}
-                className="flex-1 bg-[#1a1a1a] text-white py-3.5 hover:bg-[#333333] transition-colors text-sm tracking-wide"
+                className="bt-principal flex-1 py-3.5 text-sm tracking-wide"
               >
                 Comprar Agora
               </button>
