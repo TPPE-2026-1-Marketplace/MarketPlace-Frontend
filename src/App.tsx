@@ -53,7 +53,7 @@ export default function App() {
         
         <Route path="/selecionar-modulo" element={<ModuleSelection />} />
         <Route path="/painel/*" element={<ManagerDashboard />} />
-        <Route path="/caixa" element={<Cashier />} />
+        <Route path="/pdv" element={<Cashier />} />
       </Routes>
     </BrowserRouter>
   );
