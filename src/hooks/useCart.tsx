@@ -13,13 +13,6 @@ export interface CartItem {
   quantity: number;
 }
 
-export interface ShippingSelection {
-  id: number;
-  name: string;
-  price: number;
-  delivery_time: number;
-}
-
 export interface Cart {
   subtotal: number;
   desconto: number;
@@ -28,7 +21,6 @@ export interface Cart {
   items: CartItem[];
   frete?: number;
   cupom?: string | null;
-  selectedShipping?: ShippingSelection | null;
 }
 
 interface CartContextType {
@@ -36,7 +28,6 @@ interface CartContextType {
   addItem: (item: any, quantity?: number) => void;
   updateQuantity: (variantId: number, quantity: number) => void;
   removeItem: (variantId: number) => void;
-  setShipping: (option: ShippingSelection | null) => void;
   clear: () => void;
   itemCount: number;
 }
@@ -49,7 +40,6 @@ const EMPTY_CART: Cart = {
   desconto: 0,
   cupom: null,
   total: 0,
-  selectedShipping: null,
 };
 
 function calculateCart(cart: Cart): Cart {
@@ -108,13 +98,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const setShipping = useCallback((option: ShippingSelection | null) => {
-    setCart(prev => {
-      const frete = option?.price ?? 0;
-      return calculateCart({ ...prev, selectedShipping: option, frete });
-    });
-  }, []);
-
   const clear = useCallback(() => {
     setCart(EMPTY_CART);
   }, []);
@@ -122,7 +105,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addItem, updateQuantity, removeItem, setShipping, clear, itemCount }}>
+    <CartContext.Provider value={{ cart, addItem, updateQuantity, removeItem, clear, itemCount }}>
       {children}
     </CartContext.Provider>
   );

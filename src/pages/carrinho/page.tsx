@@ -8,7 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
 
 export default function CarrinhoPage() {
-  const { cart, updateQuantity, removeItem, clear, setShipping } = useCart();
+  const { cart, updateQuantity, removeItem, clear } = useCart();
   const navigate = useNavigate();
   const [cep, setCep] = useState("");
   const [shippingMsg, setShippingMsg] = useState<string | null>(null);
@@ -206,15 +206,9 @@ export default function CarrinhoPage() {
               {shippingOptions.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {shippingOptions.map((opt) => (
-                    <button
+                    <div
                       key={opt.id}
-                      type="button"
-                      onClick={() => setShipping({ id: opt.id, name: opt.name, price: opt.price, delivery_time: opt.delivery_time })}
-                      className={`w-full flex items-center justify-between p-3 border text-left transition-colors ${
-                        cart.selectedShipping?.id === opt.id
-                          ? "border-[#1a1a1a] bg-gray-100"
-                          : "border-gray-100 bg-gray-50 hover:border-gray-300"
-                      }`}
+                      className="flex items-center justify-between p-3 border border-gray-100 bg-gray-50"
                     >
                       <div>
                         <p className="text-sm text-gray-800">{opt.name}</p>
@@ -226,7 +220,7 @@ export default function CarrinhoPage() {
                       <p className="text-sm font-medium text-gray-900">
                         {opt.price === 0 ? "Grátis" : formatCurrency(opt.price)}
                       </p>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -248,11 +242,7 @@ export default function CarrinhoPage() {
                 </div>
                 <div className="flex justify-between text-sm text-gray-400">
                   <span>Frete</span>
-                  <span>
-                    {cart.selectedShipping
-                      ? (cart.selectedShipping.price === 0 ? "Grátis" : formatCurrency(cart.selectedShipping.price))
-                      : "Selecione acima"}
-                  </span>
+                  <span>Calculado no checkout</span>
                 </div>
                 {cart.desconto > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
