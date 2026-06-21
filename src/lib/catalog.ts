@@ -70,6 +70,32 @@ export interface ProductQuery {
 
 const EMPTY_STOCK: StockResponse = { qtdOnline: 0, qtdLojaFisica: 0 };
 
+export function getDisplayVariant(product: Product): ProductVariant | undefined {
+  const activeVariants = product.variants.filter((variant) => variant.ativo);
+  const candidates = activeVariants.length > 0 ? activeVariants : product.variants;
+
+  return [...candidates].sort((left, right) => {
+    const score = (variant: ProductVariant) =>
+      (variant.images.length > 0 ? 4 : 0) +
+      (variant.stock.qtdOnline > 0 ? 2 : 0) +
+      (variant.stock.qtdLojaFisica > 0 ? 1 : 0);
+    return score(right) - score(left) || left.codigoSku.localeCompare(right.codigoSku);
+  })[0];
+}
+
+export function findVariant(
+  product: Product,
+  color?: string,
+  size?: string,
+): ProductVariant | undefined {
+  return product.variants.find(
+    (variant) =>
+      variant.ativo &&
+      (!color || variant.cor === color) &&
+      (!size || variant.tamanho === size),
+  );
+}
+
 async function hydrateVariant(raw: ProductVariantResponse): Promise<ProductVariant | null> {
   if (!raw.codigoSku) return null;
 
@@ -96,10 +122,14 @@ async function hydrateVariant(raw: ProductVariantResponse): Promise<ProductVaria
 }
 
 export async function normalizeProduct(raw: ProductResponse): Promise<Product> {
+  const idProduto = Number(raw.idProduto);
+  if (!Number.isInteger(idProduto) || idProduto <= 0) {
+    throw new Error("Produto recebido sem idProduto válido");
+  }
   const variants = await Promise.all((raw.variants ?? []).map(hydrateVariant));
 
   return {
-    idProduto: Number(raw.idProduto ?? 0),
+    idProduto,
     titulo: raw.titulo ?? "",
     descricao: raw.descricao ?? null,
     destaque: raw.destaque ?? false,

@@ -6,6 +6,7 @@ import { User, Package, Heart, LogOut, ChevronRight, Edit2, Save, X, Loader2 } f
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useProducts } from "@/hooks/useProducts";
+import { getDisplayVariant } from "@/lib/catalog";
 import { api } from "@/lib/api";
 
 interface UserProfile {
@@ -374,8 +375,9 @@ export default function ContaPage() {
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {favProducts.map((product) => {
-                        const price = product.variants[0]?.precoVariante ?? product.precoBase;
-                        const image = product.variants[0]?.images[0]?.url ?? "/hero-dress.png";
+                        const variant = getDisplayVariant(product);
+                        const price = variant?.precoVariante ?? product.precoBase;
+                        const image = variant?.images[0]?.url ?? "/hero-dress.png";
                         const nome = product.titulo;
                         const cat = product.categories[0]?.nome ?? "Vestido";
                         const id = product.idProduto;

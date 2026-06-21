@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
 import { useProducts } from "@/hooks/useProducts";
+import { getDisplayVariant } from "@/lib/catalog";
 
 export default function FeaturedProducts() {
   const { products, isLoading: loading } = useProducts({ page: 1, limit: 4 });
@@ -38,7 +39,7 @@ export default function FeaturedProducts() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {products.map((product) => {
-            const variant = product.variants[0];
+            const variant = getDisplayVariant(product);
             return (
               <ProductCard
                 key={product.idProduto}

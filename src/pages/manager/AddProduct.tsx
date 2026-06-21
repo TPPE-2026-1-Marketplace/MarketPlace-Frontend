@@ -51,13 +51,26 @@ interface ColorVariant {
 }
 
 interface VariantRow {
-  id: string;
+  codigoSku: string;
   color: string;
   size: string;
   stockOnline: number;
   stockPhysical: number;
   price: number;
 }
+
+const normalizeSkuPart = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "")
+    .toUpperCase();
+
+const createVariantSku = (baseSku: string, color: string, size: string) =>
+  [baseSku, color, size].map(normalizeSkuPart).filter(Boolean).join("-");
+
+const createLocalId = (prefix: string) =>
+  `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
 
 interface FormData {
   title: string;
@@ -631,7 +644,7 @@ export function AddProduct({
         );
         rows.push(
           existing || {
-            id: `${size}__${color}`,
+            codigoSku: createVariantSku(form.sku, color, size),
             color,
             size,
             stockOnline: 0,
@@ -644,9 +657,9 @@ export function AddProduct({
     setVariants(rows);
   };
 
-  const updateVariant = (id: string, field: keyof VariantRow, value: number) => {
+  const updateVariant = (codigoSku: string, field: keyof VariantRow, value: number) => {
     setVariants((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, [field]: value } : v))
+      prev.map((v) => (v.codigoSku === codigoSku ? { ...v, [field]: value } : v))
     );
   };
 
@@ -708,15 +721,25 @@ export function AddProduct({
   };
 
   const addColor = () => {
-    if (!newColor.name.trim()) return;
+    const name = newColor.name.trim();
+    if (!name) {
+      setErrors((prev) => ({ ...prev, color: "Informe um nome para a cor." }));
+      return;
+    }
+    const normalizedName = name.toLocaleLowerCase("pt-BR");
+    if (form.colors.some((color) => color.name.toLocaleLowerCase("pt-BR") === normalizedName)) {
+      setErrors((prev) => ({ ...prev, color: "Esta cor já foi adicionada." }));
+      return;
+    }
     const color: ColorVariant = {
-      id: `color-${Date.now()}`,
-      name: newColor.name.trim(),
+      id: createLocalId("color"),
+      name,
       hex: newColor.hex,
       images: [],
       coverIdx: 0,
     };
     setForm((prev) => ({ ...prev, colors: [...prev.colors, color] }));
+    setErrors((prev) => ({ ...prev, color: "" }));
     setNewColor({ name: "", hex: "#1a1a1a" });
     setAddColorMode(false);
   };
@@ -793,7 +816,7 @@ export function AddProduct({
     });
 
     const product: Partial<Product> = {
-      id: Date.now().toString(),
+      id: createLocalId("product"),
       sku: form.sku,
       name: form.title,
       description: form.description,
@@ -1387,6 +1410,11 @@ export function AddProduct({
                           step={0.01}
                         />
                       </div>
+                      {errors.color && (
+                        <p className="text-xs text-red-600" role="alert">
+                          {errors.color}
+                        </p>
+                      )}
                       {errors.basePrice && (
                         <p className="text-red-500 text-xs mt-1">
                           {errors.basePrice}
@@ -1810,7 +1838,7 @@ export function AddProduct({
                             );
                             return (
                               <tr
-                                key={v.id}
+                                key={v.codigoSku}
                                 className="hover:bg-gray-50/60 transition-colors"
                               >
                                 {/* Variant label */}
@@ -1839,7 +1867,7 @@ export function AddProduct({
                                     value={v.stockOnline}
                                     onChange={(e) =>
                                       updateVariant(
-                                        v.id,
+                                        v.codigoSku,
                                         "stockOnline",
                                         Math.max(0, Number(e.target.value))
                                       )
@@ -1855,7 +1883,7 @@ export function AddProduct({
                                     value={v.stockPhysical}
                                     onChange={(e) =>
                                       updateVariant(
-                                        v.id,
+                                        v.codigoSku,
                                         "stockPhysical",
                                         Math.max(0, Number(e.target.value))
                                       )
@@ -1894,7 +1922,7 @@ export function AddProduct({
                                       value={v.price}
                                       onChange={(e) =>
                                         updateVariant(
-                                          v.id,
+                                          v.codigoSku,
                                           "price",
                                           Number(e.target.value)
                                         )

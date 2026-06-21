@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
 import { useProducts } from "@/hooks/useProducts";
+import { getDisplayVariant } from "@/lib/catalog";
 
 const CATEGORIES = [
   { value: "all", label: "Todas" },
@@ -71,7 +72,7 @@ function ProdutosContent() {
   }, [category, search]);
 
   // Apply the sidebar filters/sort on the client (the API only handles categoria/busca)
-  const productPrice = (p: any) => p.variants?.[0]?.precoVariante ?? p.precoBase;
+  const productPrice = (p: any) => getDisplayVariant(p)?.precoVariante ?? p.precoBase;
 
   const displayedProducts = useMemo(() => {
     let list = products.filter((p: any) => {
@@ -320,7 +321,7 @@ function ProdutosContent() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {displayedProducts.map((product: any) => {
-                  const firstVariant = product.variants?.[0];
+                  const firstVariant = getDisplayVariant(product);
                   return (
                     <ProductCard
                       key={product.idProduto}

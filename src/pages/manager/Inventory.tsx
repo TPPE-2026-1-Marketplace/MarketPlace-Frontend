@@ -841,12 +841,11 @@ export function Inventory({ readOnly = false }: InventoryProps) {
             stockPhysical: 0,
             price: form.basePrice,
           }];
+      const registeredImages = new Map<string, number>();
 
       for (const variant of variantsToCreate) {
         const codigoSku = variants.length
-          ? `${form.sku}-${variant.color}-${variant.size}`
-              .replace(/\s+/g, "")
-              .toUpperCase()
+          ? variant.codigoSku
           : form.sku;
 
         await api.post("/product-variants", {
@@ -868,9 +867,9 @@ export function Inventory({ readOnly = false }: InventoryProps) {
         const color = form.colors.find((item: any) => item.name === variant.color);
         for (let index = 0; index < (color?.images?.length ?? 0); index += 1) {
           const source = color.images[index] as string;
-          let imageId: number;
+          let imageId = registeredImages.get(source);
 
-          if (source.startsWith("data:image")) {
+          if (!imageId && source.startsWith("data:image")) {
             const response = await fetch(source);
             const blob = await response.blob();
             const file = new File([blob], `img_${index}.jpg`, { type: blob.type });
@@ -881,13 +880,14 @@ export function Inventory({ readOnly = false }: InventoryProps) {
               headers: { "Content-Type": "multipart/form-data" },
             });
             imageId = uploaded.idImagem;
-          } else {
+          } else if (!imageId) {
             const registered = await api.post<{ idImagem: number }>("/images", {
               url: source,
               ordem: index + 1,
             });
             imageId = registered.idImagem;
           }
+          registeredImages.set(source, imageId);
 
           await api.post("/images/catalog", {
             imageId,
@@ -902,7 +902,11 @@ export function Inventory({ readOnly = false }: InventoryProps) {
       setShowAddProduct(false);
     } catch (saveError) {
       console.error("Erro ao salvar produto no backend:", saveError);
-      alert("Erro ao salvar no backend. O cadastro pode ter sido parcialmente concluído.");
+      const message = saveError instanceof Error ? saveError.message : "Erro desconhecido";
+      alert(
+        `Não foi possível concluir o cadastro: ${message}. ` +
+        "Verifique produto, variantes, estoque e imagens antes de tentar novamente.",
+      );
     }
   };
 

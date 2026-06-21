@@ -21,7 +21,13 @@ import {
   X,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
-import { fetchProduct, fetchProducts, type Product } from "@/lib/catalog";
+import {
+  fetchProduct,
+  fetchProducts,
+  findVariant,
+  getDisplayVariant,
+  type Product,
+} from "@/lib/catalog";
 import ProductCard from "@/components/ui/ProductCard";
 
 const SIZE_TABLE: [string, string, string, string, string][] = [
@@ -64,7 +70,11 @@ export default function ProductDetailPage() {
           fetchProduct(Number(id)),
           fetchProducts({ page: 1, limit: 4 }),
         ]);
+        const initialVariant = getDisplayVariant(loadedProduct);
         setProduct(loadedProduct);
+        setSelectedColor(initialVariant?.cor ?? "");
+        setSelectedSize(initialVariant?.tamanho ?? "");
+        setActiveImage(0);
         setRelated(
           relatedResponse.data.filter(
             (relatedProduct) => relatedProduct.idProduto !== loadedProduct.idProduto,
@@ -100,26 +110,54 @@ export default function ProductDetailPage() {
     );
   }
 
-  // Extract unique colors and sizes from variants
-  const colors = Array.from(new Set(product.variants?.map((v: any) => v.cor).filter(Boolean))) as string[];
-  const sizes = Array.from(new Set(product.variants?.map((v: any) => v.tamanho).filter(Boolean))) as string[];
-  
-  const allImages = product.variants.flatMap((variant) =>
-    variant.images.map((image) => image.url),
-  );
-  const gallery = allImages.length > 0 ? Array.from(new Set(allImages)) : ["/hero-dress.png"];
+  const selectableVariants = product.variants.filter((variant) => variant.ativo);
+  const colors = Array.from(
+    new Set(selectableVariants.map((variant) => variant.cor).filter(Boolean)),
+  ) as string[];
+  const sizes = Array.from(
+    new Set(
+      selectableVariants
+        .filter((variant) => !selectedColor || variant.cor === selectedColor)
+        .map((variant) => variant.tamanho)
+        .filter(Boolean),
+    ),
+  ) as string[];
+  const activeVariant =
+    findVariant(product, selectedColor || undefined, selectedSize || undefined) ??
+    findVariant(product, selectedColor || undefined) ??
+    getDisplayVariant(product);
+  const gallery = activeVariant?.images.length
+    ? activeVariant.images
+    : [{ idImagem: 0, url: "/hero-dress.png", ordem: 0, descricao: null }];
 
-  const baseVariant = product.variants[0];
-  const price = baseVariant?.precoVariante ?? product.precoBase;
+  const price = activeVariant?.precoVariante ?? product.precoBase;
   const originalPrice = product.precoBase > price ? product.precoBase : null;
   const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : null;
-  const stockEcommerce = baseVariant?.stock.qtdOnline ?? 0;
+  const stockEcommerce = activeVariant?.stock.qtdOnline ?? 0;
   const totalStock =
-    (baseVariant?.stock.qtdOnline ?? 0) + (baseVariant?.stock.qtdLojaFisica ?? 0);
+    (activeVariant?.stock.qtdOnline ?? 0) + (activeVariant?.stock.qtdLojaFisica ?? 0);
   const isLowStock = totalStock > 0 && totalStock <= 3;
 
   const categoryName = product.categories[0]?.nome || "Vestido";
-  const firstVariantSku = baseVariant?.codigoSku || product.sku;
+  const activeVariantSku = activeVariant?.codigoSku || product.sku;
+
+  const selectColor = (color: string) => {
+    const variant =
+      findVariant(product, color, selectedSize || undefined) ?? findVariant(product, color);
+    setSelectedColor(color);
+    setSelectedSize(variant?.tamanho ?? "");
+    setQuantity(1);
+    setActiveImage(0);
+  };
+
+  const selectSize = (size: string) => {
+    const variant =
+      findVariant(product, selectedColor || undefined, size) ?? findVariant(product, undefined, size);
+    setSelectedSize(size);
+    setSelectedColor(variant?.cor ?? selectedColor);
+    setQuantity(1);
+    setActiveImage(0);
+  };
 
   const buildCartVariant = (variant: Product["variants"][number]) => ({
     codigoSku: variant.codigoSku,
@@ -135,32 +173,23 @@ export default function ProductDetailPage() {
   });
 
   const handleAddToCart = () => {
-    if (!selectedSize || !selectedColor) {
+    if (!activeVariant) {
       alert("Por favor, selecione o tamanho e a cor antes de adicionar ao carrinho.");
       return;
     }
 
     // Find the variant
-    const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
-    if (!variant) {
-      alert("Variante não encontrada.");
-      return;
-    }
-
-    addItem(buildCartVariant(variant), quantity);
+    addItem(buildCartVariant(activeVariant), quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
 
   const handleBuyNow = () => {
-    if (!selectedSize || !selectedColor) {
+    if (!activeVariant) {
       alert("Por favor, selecione o tamanho e a cor antes de continuar.");
       return;
     }
-    const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
-    if (!variant) return;
-
-    addItem(buildCartVariant(variant), quantity);
+    addItem(buildCartVariant(activeVariant), quantity);
     navigate("/carrinho");
   };
 
@@ -206,9 +235,9 @@ export default function ProductDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-16">
           <div className="flex gap-3">
             <div className="hidden lg:flex flex-col gap-2 w-16 shrink-0">
-              {gallery.map((img, idx) => (
+              {gallery.map((image, idx) => (
                 <button
-                  key={idx}
+                  key={`${activeVariantSku}-${image.idImagem}`}
                   onClick={() => setActiveImage(idx)}
                   className={`relative w-16 h-20 overflow-hidden border-2 transition-all shrink-0 ${
                     activeImage === idx
@@ -217,7 +246,7 @@ export default function ProductDetailPage() {
                   }`}
                 >
                   <img
-                    src={img as string}
+                    src={image.url}
                     alt={`${product.titulo} ${idx + 1}`}
                     className="object-cover object-top"
                   />
@@ -228,7 +257,7 @@ export default function ProductDetailPage() {
             <div className="flex-1 relative">
               <div className="relative aspect-[3/4] overflow-hidden bg-gray-50">
                 <img
-                  src={gallery[activeImage] as string}
+                  src={gallery[activeImage]?.url ?? gallery[0].url}
                   alt={product.titulo}
                   className="object-cover object-top"
                 />
@@ -268,9 +297,9 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="lg:hidden flex gap-2 mt-3 overflow-x-auto pb-1">
-                {gallery.map((img, idx) => (
+                {gallery.map((image, idx) => (
                   <button
-                    key={idx}
+                    key={`${activeVariantSku}-mobile-${image.idImagem}`}
                     onClick={() => setActiveImage(idx)}
                     className={`relative w-14 shrink-0 overflow-hidden border-2 transition-all ${
                       activeImage === idx ? "border-[#1a1a1a]" : "border-gray-200"
@@ -278,7 +307,7 @@ export default function ProductDetailPage() {
                     style={{ height: "4.5rem" }}
                   >
                     <img
-                      src={img as string}
+                      src={image.url}
                       alt={`${product.titulo} ${idx + 1}`}
                       className="object-cover object-top"
                     />
@@ -293,7 +322,7 @@ export default function ProductDetailPage() {
               <span className="bg-gray-100 text-gray-600 text-xs px-3 py-1 uppercase tracking-widest">
                 {categoryName}
               </span>
-              <span className="text-gray-400 text-xs">{firstVariantSku}</span>
+              <span className="text-gray-400 text-xs">{activeVariantSku}</span>
             </div>
 
             <h1
@@ -366,7 +395,8 @@ export default function ProductDetailPage() {
                 {colors.map((color) => (
                   <button
                     key={color}
-                    onClick={() => setSelectedColor(color)}
+                    type="button"
+                    onClick={() => selectColor(color)}
                     className={`px-4 py-1.5 border text-sm transition-colors ${
                       selectedColor === color
                         ? "border-[#1a1a1a] bg-[#1a1a1a] text-white"
@@ -399,7 +429,8 @@ export default function ProductDetailPage() {
                 {sizes.map((size) => (
                   <button
                     key={size}
-                    onClick={() => setSelectedSize(size)}
+                    type="button"
+                    onClick={() => selectSize(size)}
                     className={`w-11 h-11 border text-sm transition-colors ${
                       selectedSize === size
                         ? "border-[#1a1a1a] bg-[#1a1a1a] text-white"
@@ -609,7 +640,7 @@ export default function ProductDetailPage() {
           {tab === "info" && (
             <div className="space-y-2.5 text-sm text-gray-600">
               {[
-                ["SKU", firstVariantSku],
+                ["SKU", activeVariantSku],
                 ["Categoria", categoryName.charAt(0).toUpperCase() + categoryName.slice(1)],
                 ["Cores disponíveis", colors.join(", ") || "—"],
                 ["Tamanhos disponíveis", sizes.join(", ") || "—"],
@@ -637,7 +668,7 @@ export default function ProductDetailPage() {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {related.map((p) => {
-                const variant = p.variants?.[0];
+                const variant = getDisplayVariant(p);
                 return (
                   <ProductCard
                     key={p.idProduto}

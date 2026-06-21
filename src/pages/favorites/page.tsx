@@ -5,6 +5,7 @@ import { useFavorites } from "@/context/FavoritesContext";
 import { useAuth } from "@/context/AuthContext";
 import ProductCard from "@/components/ui/ProductCard";
 import { useProducts } from "@/hooks/useProducts";
+import { getDisplayVariant } from "@/lib/catalog";
 
 export default function FavoritesPage() {
   const { favorites } = useFavorites();
@@ -79,7 +80,7 @@ export default function FavoritesPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {favoriteProducts.map((product) => {
-              const variant = product.variants[0];
+              const variant = getDisplayVariant(product);
               return (
                 <ProductCard
                   key={product.idProduto}

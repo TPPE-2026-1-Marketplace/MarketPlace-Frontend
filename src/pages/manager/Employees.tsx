@@ -15,7 +15,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useAuth, UserRole } from "../../context/AuthContext";
-import { MOCK_EMPLOYEE_SALES } from "../../data/employees";
 import { api, ApiError } from "../../lib/api";
 
 export interface ApiEmployee {
@@ -231,14 +230,6 @@ export function Employees() {
       }
       setTimeout(() => setMsg(null), 3000);
     }
-  };
-
-  const getSalesForEmployee = (employeeId: string) => {
-    return MOCK_EMPLOYEE_SALES.filter((s) => s.employeeId === employeeId);
-  };
-
-  const getEmployeeTotal = (employeeId: string) => {
-    return getSalesForEmployee(employeeId).reduce((sum, s) => sum + s.amount, 0);
   };
 
   const FormSection = () => (
@@ -539,7 +530,6 @@ export function Employees() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {staffUsers.map((u) => {
-                const totalSales = getEmployeeTotal(u.cpf);
                 const isCurrent = u.cpf === currentUser?.id;
                 const frontendRole = mapRoleToFrontend(u.role_perfil);
                 return (
@@ -590,11 +580,6 @@ export function Employees() {
                       {frontendRole === "employee" ? (
                         <div>
                           <p className="text-gray-700 text-xs">{(Number(u.taxa_comissao) * 100).toFixed(1).replace(".0", "")}%</p>
-                          {totalSales > 0 && (
-                            <p className="text-gray-400 text-xs">
-                              R$ {totalSales.toLocaleString("pt-BR")} em vendas
-                            </p>
-                          )}
                         </div>
                       ) : (
                         <span className="text-gray-300 text-xs">—</span>
@@ -670,23 +655,14 @@ export function Employees() {
                   <span className="font-mono text-gray-900">{detailUser.codigo_funcionario || "—"}</span>
                 </p>
                 <p className="text-gray-600"><span className="text-gray-400">Taxa:</span> {(Number(detailUser.taxa_comissao) * 100).toFixed(1).replace(".0", "")}%</p>
-                <p className="text-gray-600"><span className="text-gray-400">Meta:</span> R$ {Number(detailUser.meta_vendas || 20000).toLocaleString("pt-BR")}</p>
+                <p className="text-gray-600"><span className="text-gray-400">Meta:</span> {detailUser.meta_vendas ? `R$ ${Number(detailUser.meta_vendas).toLocaleString("pt-BR")}` : "—"}</p>
                 <p className="text-gray-600">
                   <span className="text-gray-400">Bônus:</span>{" "}
                   <span className="text-gray-400">Módulo em Desenvolvimento</span>
                 </p>
-                <div className="pt-2 border-t border-gray-100">
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Total vendido:</span>{" "}
-                    R$ {getEmployeeTotal(detailUser.cpf).toLocaleString("pt-BR")}
-                  </p>
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Progresso da meta:</span>{" "}
-                    {detailUser.meta_vendas
-                      ? `${Math.min(100, Math.round((getEmployeeTotal(detailUser.cpf) / Number(detailUser.meta_vendas)) * 100))}%`
-                      : "—"}
-                  </p>
-                </div>
+                <p className="pt-2 border-t border-gray-100 text-gray-500 text-xs">
+                  Vendas e progresso de meta dependem da integração do ranking de funcionários.
+                </p>
               </div>
             )}
           </div>

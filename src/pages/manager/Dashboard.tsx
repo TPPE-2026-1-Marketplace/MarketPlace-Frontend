@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -23,8 +23,9 @@ import {
   Download,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { PRODUCTS, MOCK_ORDERS } from "../../data/products";
-import { MOCK_EMPLOYEE_SALES } from "../../data/employees";
+import { useProducts } from "@/hooks/useProducts";
+import { getDisplayVariant } from "@/lib/catalog";
+import { fetchManagementOrders, type ApiOrder } from "@/lib/management";
 import { Inventory } from "./Inventory";
 import { Orders } from "./Orders";
 import { Reports } from "./Reports";
@@ -44,6 +45,14 @@ export function ManagerDashboard() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moduleSwitcherOpen, setModuleSwitcherOpen] = useState(false);
+  const { products: catalogProducts } = useProducts({ page: 1, limit: 100 });
+  const [managementOrders, setManagementOrders] = useState<ApiOrder[]>([]);
+
+  useEffect(() => {
+    void fetchManagementOrders()
+      .then((response) => setManagementOrders(response.data))
+      .catch((loadError) => console.error("Erro ao carregar pedidos do dashboard", loadError));
+  }, []);
 
   if (!isInternalUser) {
     return (
@@ -70,18 +79,23 @@ export function ManagerDashboard() {
     navigate("/");
   };
 
-  const totalRevenue = MOCK_ORDERS.filter((o) => o.status !== "cancelado").reduce(
-    (sum, o) => sum + o.total,
+  const totalRevenue = managementOrders.filter((order) => order.status !== "cancelled").reduce(
+    (sum, order) => sum + Number(order.valorTotal),
     0
   );
-  const lowStockProducts = PRODUCTS.filter(
-    (p) => p.stockEcommerce + p.stockPhysical <= 5
+  const dashboardProducts = catalogProducts.map((product) => ({
+    id: product.idProduto,
+    name: product.titulo,
+    image: getDisplayVariant(product)?.images[0]?.url ?? "/hero-dress.png",
+    stockEcommerce: product.variants.reduce((sum, variant) => sum + variant.stock.qtdOnline, 0),
+    stockPhysical: product.variants.reduce((sum, variant) => sum + variant.stock.qtdLojaFisica, 0),
+  }));
+  const lowStockProducts = dashboardProducts.filter(
+    (product) => product.stockEcommerce + product.stockPhysical <= 5
   );
-  const pendingOrders = MOCK_ORDERS.filter((o) => o.status === "pendente").length;
-  const totalEcommerceStock = PRODUCTS.reduce((sum, p) => sum + p.stockEcommerce, 0);
-  const totalPhysicalStock = PRODUCTS.reduce((sum, p) => sum + p.stockPhysical, 0);
-
-  const totalCommissions = MOCK_EMPLOYEE_SALES.reduce((sum, s) => sum + s.commission, 0);
+  const pendingOrders = managementOrders.filter((order) => order.status === "pending").length;
+  const totalEcommerceStock = dashboardProducts.reduce((sum, product) => sum + product.stockEcommerce, 0);
+  const totalPhysicalStock = dashboardProducts.reduce((sum, product) => sum + product.stockPhysical, 0);
 
   const navItems: { key: Tab; label: string; icon: React.ReactNode; requiresPermission?: () => boolean }[] = [
     { key: "dashboard", label: "Visão Geral", icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -364,28 +378,28 @@ export function ManagerDashboard() {
                     </button>
                   </div>
                   <div className="space-y-3">
-                    {MOCK_ORDERS.slice(0, 4).map((order) => (
-                      <div key={order.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                    {managementOrders.slice(0, 4).map((order) => (
+                      <div key={order.idPedido} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
                         <div className={`w-2 h-2 shrink-0 ${
-                          order.status === "entregue" ? "bg-green-500" :
-                          order.status === "enviado" ? "bg-blue-500" :
-                          order.status === "confirmado" ? "bg-gray-600" :
-                          order.status === "pendente" ? "bg-amber-500" : "bg-red-500"
+                          order.status === "delivered" ? "bg-green-500" :
+                          order.status === "shipped" ? "bg-blue-500" :
+                          order.status === "paid" ? "bg-gray-600" :
+                          order.status === "pending" ? "bg-amber-500" : "bg-red-500"
                         }`} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 truncate">{order.customer}</p>
-                          <p className="text-xs text-gray-400">{order.id}</p>
+                          <p className="text-sm text-gray-800 truncate">{order.idUsuario ?? "Cliente não identificado"}</p>
+                          <p className="text-xs text-gray-400">Pedido #{order.idPedido}</p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm text-gray-800">
-                            R$ {order.total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            R$ {Number(order.valorTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                           </p>
                           <span className={`text-xs px-2 py-0.5 ${
-                            order.type === "online"
+                            order.tipoRetirada === "entrega"
                               ? "bg-gray-100 text-gray-600"
                               : "bg-gray-200 text-gray-700"
                           }`}>
-                            {order.type === "online" ? "Online" : "Loja"}
+                            {order.tipoRetirada === "entrega" ? "Online" : "Loja"}
                           </span>
                         </div>
                       </div>
@@ -405,13 +419,13 @@ export function ManagerDashboard() {
                     </button>
                   </div>
                   <div className="space-y-3">
-                    {PRODUCTS.slice(0, 5).map((product) => {
+                    {dashboardProducts.slice(0, 5).map((product) => {
                       const total = product.stockEcommerce + product.stockPhysical;
                       const isLow = total <= 5;
                       return (
                         <div key={product.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
                           <img
-                            src={product.images[0]}
+                            src={product.image}
                             alt={product.name}
                             className="w-10 h-12 object-cover object-top shrink-0"
                           />
@@ -445,23 +459,8 @@ export function ManagerDashboard() {
                     Ver detalhes <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div className="border border-gray-100 p-4">
-                    <p className="text-xs text-gray-400 mb-1">Total Vendas (Equipe)</p>
-                    <p className="text-gray-900">
-                      R$ {MOCK_EMPLOYEE_SALES.reduce((s, e) => s + e.amount, 0).toLocaleString("pt-BR")}
-                    </p>
-                  </div>
-                  <div className="border border-gray-100 p-4">
-                    <p className="text-xs text-gray-400 mb-1">Total Comissões</p>
-                    <p className="text-gray-900">
-                      R$ {totalCommissions.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <div className="border border-gray-100 p-4">
-                    <p className="text-xs text-gray-400 mb-1">Funcionários Ativos</p>
-                    <p className="text-gray-900">3 funcionários</p>
-                  </div>
+                <div className="border border-gray-100 p-4 text-sm text-gray-500">
+                  As métricas de comissão dependem do endpoint de consolidação de vendas por funcionário.
                 </div>
               </div>
 
