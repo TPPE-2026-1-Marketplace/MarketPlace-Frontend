@@ -708,8 +708,14 @@ export default function CheckoutPage() {
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-500">
                     <span>Subtotal</span>
-                    <span>{formatCurrency(cart.total)}</span>
+                    <span>{formatCurrency(cart.subtotal)}</span>
                   </div>
+                  {cart.desconto > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Desconto {cart.cupom ? `(${cart.cupom})` : ""}</span>
+                      <span>-{formatCurrency(cart.desconto)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-gray-500">
                     <span>Frete</span>
                     {shippingLoading ? (

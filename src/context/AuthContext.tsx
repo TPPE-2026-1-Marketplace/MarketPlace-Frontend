@@ -323,6 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem("dk_token");
     localStorage.removeItem("dk_user");
+    window.dispatchEvent(new Event("clear-cart"));
   };
 
   const addUser = (userData: Omit<ManagedUser, "id" | "createdAt">) => {

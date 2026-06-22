@@ -201,18 +201,22 @@ export function Orders() {
               <button type="button" onClick={() => setSelectedOrder(null)} className="p-1 text-gray-500 hover:text-gray-900"><X className="w-5 h-5" /></button>
             </div>
             
-            <div className="mb-4">
-              <label className="block text-xs text-gray-500 mb-1">Status do Pedido</label>
-              <select 
-                value={selectedOrder.status}
-                onChange={(e) => void updateOrderStatus(e.target.value)}
-                className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-gray-900"
-              >
-                {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
+            {selectedOrder.tipoRetirada === "entrega" && (
+              <div className="mb-4">
+                <label className="block text-xs text-gray-500 mb-1">Status do Pedido</label>
+                <select 
+                  value={selectedOrder.status}
+                  onChange={(e) => void updateOrderStatus(e.target.value)}
+                  className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-gray-900"
+                >
+                  {Object.entries(ORDER_STATUS_LABELS)
+                    .filter(([value]) => value !== 'paid')
+                    .map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="space-y-2 text-sm">
               {selectedOrder.items.map((item) => (

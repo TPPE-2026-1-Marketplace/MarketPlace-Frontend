@@ -21,6 +21,8 @@ export interface Cart {
   items: CartItem[];
   frete?: number;
   cupom?: string | null;
+  cupomPercentual?: number;
+  cupomFixo?: number;
 }
 
 interface CartContextType {
@@ -29,6 +31,7 @@ interface CartContextType {
   updateQuantity: (codigoSku: string, quantity: number) => void;
   removeItem: (codigoSku: string) => void;
   clear: () => void;
+  applyCoupon: (numero: string | null, descontoPercentual?: number, descontoFixo?: number) => void;
   itemCount: number;
 }
 
@@ -40,18 +43,29 @@ const EMPTY_CART: Cart = {
   desconto: 0,
   cupom: null,
   total: 0,
+  cupomPercentual: 0,
+  cupomFixo: 0,
 };
 
-function calculateCart(cart: Cart): Cart {
+function calculateCart(cart: Cart & { cupomPercentual?: number; cupomFixo?: number }): Cart {
   const subtotal = cart.items.reduce(
     (sum, item) =>
       sum + (item.variant.precoVariante ?? item.variant.produto.precoBase) * item.quantity,
     0,
   );
+  
+  let desconto = 0;
+  if (cart.cupomPercentual) {
+    desconto = subtotal * (cart.cupomPercentual / 100);
+  } else if (cart.cupomFixo) {
+    desconto = Math.min(cart.cupomFixo, subtotal);
+  }
+
   return {
     ...cart,
     subtotal,
-    total: subtotal + (cart.frete || 0) - (cart.desconto || 0)
+    desconto,
+    total: Math.max(0, subtotal + (cart.frete || 0) - desconto)
   };
 }
 
@@ -110,10 +124,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCart(EMPTY_CART);
   }, []);
 
+  useEffect(() => {
+    const handleClearCart = () => clear();
+    window.addEventListener("clear-cart", handleClearCart);
+    return () => window.removeEventListener("clear-cart", handleClearCart);
+  }, [clear]);
+
+  const applyCoupon = useCallback((numero: string | null, percentual: number = 0, fixo: number = 0) => {
+    setCart(prev => {
+      const updated = { ...prev, cupom: numero, cupomPercentual: percentual, cupomFixo: fixo };
+      return calculateCart(updated as any);
+    });
+  }, []);
+
   const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addItem, updateQuantity, removeItem, clear, itemCount }}>
+    <CartContext.Provider value={{ cart, addItem, updateQuantity, removeItem, clear, applyCoupon, itemCount }}>
       {children}
     </CartContext.Provider>
   );

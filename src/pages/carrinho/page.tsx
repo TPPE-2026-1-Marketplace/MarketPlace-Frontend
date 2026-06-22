@@ -8,12 +8,16 @@ import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
 
 export default function CarrinhoPage() {
-  const { cart, updateQuantity, removeItem, clear } = useCart();
+  const { cart, updateQuantity, removeItem, clear, applyCoupon } = useCart();
   const navigate = useNavigate();
   const [cep, setCep] = useState("");
   const [shippingMsg, setShippingMsg] = useState<string | null>(null);
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [shippingLoading, setShippingLoading] = useState(false);
+  
+  const [couponInput, setCouponInput] = useState("");
+  const [couponMsg, setCouponMsg] = useState<{ text: string; error: boolean } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const handleShipCalc = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +45,38 @@ export default function CarrinhoPage() {
       setShippingMsg("Erro ao calcular frete. Tente novamente.");
     } finally {
       setShippingLoading(false);
+    }
+  };
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponInput.trim()) return;
+
+    setCouponLoading(true);
+    setCouponMsg(null);
+    try {
+      const productIds = Array.from(new Set(cart.items.map(i => i.variant.produto.idProduto))).join(",");
+      const res = await api.get<{ valid: boolean, reason?: string, tipoCupom?: string, valorDesconto?: number }>(`/coupons/validate/${couponInput.trim()}?productIds=${productIds}`);
+      
+      if (res.valid) {
+        setCouponMsg({ text: "Cupom aplicado com sucesso!", error: false });
+        if (res.tipoCupom === "porcentagem") {
+          applyCoupon(couponInput.trim(), res.valorDesconto, 0);
+        } else {
+          applyCoupon(couponInput.trim(), 0, res.valorDesconto);
+        }
+      } else {
+        const errorText = res.reason === "expired" ? "Cupom expirado." :
+                          res.reason === "limit_reached" ? "Limite de uso atingido." :
+                          res.reason === "ineligible_products" ? "Cupom não aplicável a estes produtos." : "Cupom inválido.";
+        setCouponMsg({ text: errorText, error: true });
+        applyCoupon(null, 0, 0);
+      }
+    } catch {
+      setCouponMsg({ text: "Erro ao validar cupom.", error: true });
+      applyCoupon(null, 0, 0);
+    } finally {
+      setCouponLoading(false);
     }
   };
 
@@ -233,6 +269,32 @@ export default function CarrinhoPage() {
           {/* Summary */}
           <div className="lg:w-80 shrink-0">
             <div className="bg-white p-6 border border-gray-100 sticky top-24">
+              
+              {/* Cupom */}
+              <div className="mb-6 pb-6 border-b border-gray-100">
+                <p className="text-sm text-gray-700 mb-3 font-medium">Cupom de Desconto</p>
+                <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value)}
+                    placeholder="Código do cupom"
+                    className="flex-1 border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a] uppercase"
+                  />
+                  <button type="submit" disabled={couponLoading} className="bt-principal px-4 py-2 text-sm disabled:opacity-50">
+                    Aplicar
+                  </button>
+                </form>
+                {couponMsg && (
+                  <p className={`text-xs mt-2 ${couponMsg.error ? "text-red-600" : "text-green-600"}`}>
+                    {couponMsg.text}
+                  </p>
+                )}
+                {cart.cupom && !couponMsg && (
+                  <p className="text-xs mt-2 text-green-600">Cupom {cart.cupom} aplicado.</p>
+                )}
+              </div>
+
               <h2 className="text-gray-900 mb-5 font-serif text-xl">Resumo do Pedido</h2>
 
               <div className="space-y-3 mb-5">

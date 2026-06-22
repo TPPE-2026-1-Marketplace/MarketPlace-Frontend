@@ -68,6 +68,7 @@ export default function ProductDetailPage() {
   const [showSizeModal, setShowSizeModal] = useState(false);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     async function loadData() {
       try {
         const [loadedProduct, relatedResponse] = await Promise.all([
