@@ -14,6 +14,8 @@ export interface ApiOrder {
   idPedido: number;
   idUsuario: string | null;
   clienteNomeAvulso?: string | null;
+  clienteCpfAvulso?: string | null;
+  idFuncionario?: string | null;
   user?: {
     nome: string;
   };
