@@ -51,7 +51,10 @@ export function Orders() {
       const matchesSearch =
         !term ||
         String(order.idPedido).includes(term) ||
-        order.idUsuario?.toLocaleLowerCase("pt-BR").includes(term) ||
+        (order.clienteNomeAvulso?.toLocaleLowerCase("pt-BR") || "").includes(term) ||
+        (order.user?.nome?.toLocaleLowerCase("pt-BR") || "").includes(term) ||
+        (order.clienteCpfAvulso || "").includes(term) ||
+        (order.idUsuario?.toLocaleLowerCase("pt-BR") || "").includes(term) ||
         order.items.some((item) => item.idVariante.toLocaleLowerCase("pt-BR").includes(term));
       return (
         matchesSearch &&
@@ -72,6 +75,18 @@ export function Orders() {
     } catch (updateError) {
       console.error(updateError);
       setError("Não foi possível atualizar o rastreamento deste pedido.");
+    }
+  };
+
+  const updateOrderStatus = async (newStatus: string) => {
+    if (!selectedOrder) return;
+    try {
+      await api.patch(`/orders/${selectedOrder.idPedido}/status`, { status: newStatus });
+      setSelectedOrder({ ...selectedOrder, status: newStatus as ApiOrderStatus });
+      await loadOrders();
+    } catch (updateError) {
+      console.error(updateError);
+      setError("Não foi possível atualizar o status deste pedido.");
     }
   };
 
@@ -147,7 +162,7 @@ export function Orders() {
               {filteredOrders.map((order) => (
                 <tr key={order.idPedido} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono">#{order.idPedido}</td>
-                  <td className="px-4 py-3">{order.idUsuario ?? "Não identificado"}</td>
+                  <td className="px-4 py-3">{order.clienteNomeAvulso || order.user?.nome || order.clienteCpfAvulso || order.idUsuario || "Não identificado"}</td>
                   <td className="px-4 py-3 text-gray-600">{new Date(order.dataPedido).toLocaleDateString("pt-BR")}</td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1 text-gray-600">
@@ -185,6 +200,20 @@ export function Orders() {
               <h3 className="text-lg text-gray-900">Pedido #{selectedOrder.idPedido}</h3>
               <button type="button" onClick={() => setSelectedOrder(null)} className="p-1 text-gray-500 hover:text-gray-900"><X className="w-5 h-5" /></button>
             </div>
+            
+            <div className="mb-4">
+              <label className="block text-xs text-gray-500 mb-1">Status do Pedido</label>
+              <select 
+                value={selectedOrder.status}
+                onChange={(e) => void updateOrderStatus(e.target.value)}
+                className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-gray-900"
+              >
+                {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-2 text-sm">
               {selectedOrder.items.map((item) => (
                 <div key={item.idItemPedido} className="border border-gray-100 p-3 flex justify-between gap-3">

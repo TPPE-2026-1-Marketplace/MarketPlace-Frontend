@@ -127,7 +127,7 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     nome: user?.name || "",
     email: user?.email || "",
-    cpf: "",
+    cpf: user?.id || "",
     telefone: "",
     cep: "",
     rua: "",

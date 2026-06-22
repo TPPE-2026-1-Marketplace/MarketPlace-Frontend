@@ -190,14 +190,16 @@ export function ManagerDashboard() {
           <p className="text-xs text-gray-600 uppercase tracking-widest px-3 py-2">Módulos</p>
           <Link
             to="/"
-            className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-colors"
+            style={{ color: '#6b7280' }}
           >
             <ShoppingBag className="w-5 h-5" />
             Loja Online
           </Link>
           <Link
             to="/pdv"
-            className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-colors"
+            style={{ color: '#6b7280' }}
           >
             <Store className="w-5 h-5" />
             PDV - Vendas
