@@ -10,7 +10,7 @@ interface POSContextType {
   updateQuantity: (index: number, quantity: number) => void;
   clearSale: () => void;
   completeSale: (
-    paymentMethod: "pix" | "card",
+    paymentMethod: "pix" | "card" | "dinheiro",
     sellerCode: string,
     customerName?: string,
     customerCpf?: string,
@@ -60,7 +60,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   };
 
   const completeSale = async (
-    paymentMethod: "pix" | "card",
+    paymentMethod: "pix" | "card" | "dinheiro",
     sellerCode: string,
     customerName?: string,
     customerCpf?: string,

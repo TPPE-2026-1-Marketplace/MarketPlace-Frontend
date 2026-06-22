@@ -17,6 +17,7 @@ import {
   AlertCircle,
   X,
   Loader2,
+  Banknote,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePOS } from "../../context/POSContext";
@@ -42,7 +43,7 @@ export function Cashier() {
   const [customerCpf, setCustomerCpf] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("card");
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "pix" | "dinheiro">("card");
   
   const [showCheckout, setShowCheckout] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -497,7 +498,7 @@ export function Cashier() {
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">
                   Forma de Pagamento *
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setPaymentMethod("card")}
                     className={`flex items-center justify-center gap-2 p-3 border transition-all ${
@@ -519,6 +520,17 @@ export function Cashier() {
                   >
                     <QrCode className="w-5 h-5" />
                     <span className="text-sm">PIX</span>
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod("dinheiro")}
+                    className={`flex items-center justify-center gap-2 p-3 border transition-all ${
+                      paymentMethod === "dinheiro"
+                        ? "border-[#1a1a1a] bg-gray-50"
+                        : "border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    <Banknote className="w-5 h-5" />
+                    <span className="text-sm">Dinheiro</span>
                   </button>
                 </div>
               </div>

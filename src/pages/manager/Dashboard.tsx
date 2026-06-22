@@ -127,16 +127,13 @@ export function ManagerDashboard() {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0 lg:static lg:z-auto`}
       >
-        {/* Logo */}
         <div className="p-4 border-b border-white/10">
-          <div className="h-10 w-24 overflow-hidden">
-            <img
-              src={logoImage}
-              alt="DK Fashion"
-              className="h-full w-full object-contain"
-            />
-          </div>
-          <p className="text-gray-500 text-xs mt-2 tracking-wider">PAINEL GERENCIAL</p>
+          <img
+            src={logoImage}
+            alt="DK Fashion"
+            className="w-24 h-auto object-contain"
+          />
+          <p className="text-gray-500 text-xs mt-3 tracking-wider">PAINEL GERENCIAL</p>
         </div>
 
         {/* User info */}
@@ -296,12 +293,7 @@ export function ManagerDashboard() {
               )}
             </div>
 
-            <button className="relative p-2 text-gray-400 hover:text-gray-700">
-              <Bell className="w-5 h-5" />
-              {pendingOrders > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-              )}
-            </button>
+
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400">
               {isSuperAdmin && <Shield className="w-3.5 h-3.5" />}
               <span>{roleLabel} · DK Fashion</span>

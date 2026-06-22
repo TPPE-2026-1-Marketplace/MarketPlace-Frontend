@@ -51,7 +51,7 @@ export interface POSSale {
   items: POSSaleItem[];
   subtotal: number;
   total: number;
-  paymentMethod: "pix" | "card";
+  paymentMethod: "pix" | "card" | "dinheiro";
   sellerId: string;
   sellerName: string;
   customerName?: string;
