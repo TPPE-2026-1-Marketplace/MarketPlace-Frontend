@@ -70,16 +70,21 @@ export default function Footer() {
             </p>
             <div className="flex gap-3 mt-5">
               <a
-                href="#"
+                href="https://www.instagram.com/dkvestidos/?hl=pt-br"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-9 h-9 border border-gray-700 flex items-center justify-center hover:border-gray-400 hover:text-gray-200 transition-colors"
               >
                 <InstagramIcon className="w-4 h-4" />
               </a>
               <a
-                href="#"
+                href="https://www.google.com/maps/place/DK+FASHION+MODA+FESTA/@-15.8428578,-48.1760582,12z/data=!4m6!3m5!1s0x935a33e68a9b97e5:0x3b9c4ddb95bd806c!8m2!3d-15.8428578!4d-48.0442223!15sCgpESyBGQVNISU9OWgwiCmRrIGZhc2hpb26SAQ5jbG90aGluZ19zdG9yZeABAA?shorturl=1"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-9 h-9 border border-gray-700 flex items-center justify-center hover:border-gray-400 hover:text-gray-200 transition-colors"
+                title="Localização da Loja"
               >
-                <FacebookIcon className="w-4 h-4" />
+                <MapPin className="w-4 h-4" />
               </a>
             </div>
           </div>
@@ -159,13 +164,13 @@ export default function Footer() {
               </li>
               <li>
                 <a
-                  href="https://wa.me/5561999999999"
+                  href="https://api.whatsapp.com/send/?phone=5561996856892&text=Eu+gostaria+de+saber+mais+informa%C3%A7%C3%B5es+sobre&type=phone_number&app_absent=0"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2.5 text-gray-500 hover:text-[#25D366] transition-colors"
                 >
                   <WhatsAppIcon className="w-4 h-4 shrink-0" />
-                  <span>(61) 9 9999-9999</span>
+                  <span>(61) 9 9685-6892</span>
                 </a>
               </li>
               <li className="flex items-center gap-2.5">
@@ -198,7 +203,7 @@ export default function Footer() {
 
       {/* WhatsApp floating button (mobile) */}
       <a
-        href="https://wa.me/5561999999999"
+        href="https://api.whatsapp.com/send/?phone=5561996856892&text=Eu+gostaria+de+saber+mais+informa%C3%A7%C3%B5es+sobre&type=phone_number&app_absent=0"
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 right-6 z-50 lg:hidden w-14 h-14 bg-[#25D366] text-white rounded-full shadow-lg flex items-center justify-center hover:bg-[#20bf5a] transition-colors"
