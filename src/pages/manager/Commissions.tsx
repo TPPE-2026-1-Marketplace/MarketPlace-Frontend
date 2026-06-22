@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   DollarSign,
   TrendingUp,
   Target,
   Award,
   Users,
-  ArrowUpRight,
   ChevronDown,
   ChevronUp,
   Edit2,
@@ -14,11 +13,33 @@ import {
   Check,
   AlertTriangle,
 } from "lucide-react";
-import { useAuth, ManagedUser } from "../../context/AuthContext";
-import { MOCK_EMPLOYEE_SALES } from "../../data/employees";
+import { useAuth } from "../../context/AuthContext";
+import { api } from "../../lib/api";
+
+interface CommissionReport {
+  total_vendas: number;
+  comissao: number;
+  meta_batida: boolean;
+  pedidos: any[];
+  meta_vendas: number;
+  valor_bonus: number;
+}
+
+interface EmployeeData {
+  cpf: string;
+  name: string;
+  email: string;
+  taxa_comissao: number;
+  meta_vendas: number | null;
+  role: string;
+  report?: CommissionReport;
+}
 
 export function Commissions() {
-  const { users, updateUser, isSuperAdmin } = useAuth();
+  const { isSuperAdmin } = useAuth();
+  const [employees, setEmployees] = useState<EmployeeData[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editVals, setEditVals] = useState<{
     commissionRate: string;
@@ -29,54 +50,120 @@ export function Commissions() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<{ id: string; text: string } | null>(null);
 
-  const employees = users.filter((u) => u.role === "employee" && u.active);
+  const fetchCommissions = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<any>('/employees?limit=100');
+      const allEmps = res.data.filter((u: any) => 
+        u.ativo && (u.role_perfil === 'vendedor' || u.role_perfil === 'caixa')
+      );
 
-  const getSalesForEmployee = (employeeId: string) => {
-    return MOCK_EMPLOYEE_SALES.filter((s) => s.employeeId === employeeId);
+      const now = new Date();
+      const mes = now.getMonth() + 1;
+      const ano = now.getFullYear();
+
+      const empsWithReports = await Promise.all(allEmps.map(async (emp: any) => {
+        try {
+          const reportRes = await api.get<CommissionReport>(`/employees/${emp.cpf}/commissions?mes=${mes}&ano=${ano}`);
+          return {
+            cpf: emp.cpf,
+            name: emp.person.nome,
+            email: emp.person.email,
+            taxa_comissao: emp.taxa_comissao,
+            meta_vendas: emp.meta_vendas,
+            role: emp.role_perfil,
+            report: reportRes,
+          };
+        } catch (err) {
+          console.error("Failed to fetch report for", emp.cpf, err);
+          return {
+            cpf: emp.cpf,
+            name: emp.person.nome,
+            email: emp.person.email,
+            taxa_comissao: emp.taxa_comissao,
+            meta_vendas: emp.meta_vendas,
+            role: emp.role_perfil,
+          };
+        }
+      }));
+
+      setEmployees(empsWithReports);
+    } catch (err) {
+      console.error("Failed to fetch commissions data", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getTotalSales = (employeeId: string) =>
-    getSalesForEmployee(employeeId).reduce((sum, s) => sum + s.amount, 0);
+  useEffect(() => {
+    fetchCommissions();
+  }, []);
 
-  const getTotalCommission = (employeeId: string) =>
-    getSalesForEmployee(employeeId).reduce((sum, s) => sum + s.commission, 0);
-
-  const hitTarget = (emp: ManagedUser) => {
-    const total = getTotalSales(emp.id);
-    return emp.salesTarget ? total >= emp.salesTarget : false;
-  };
-
-  const startEdit = (emp: ManagedUser) => {
-    setEditingId(emp.id);
+  const startEdit = (emp: EmployeeData) => {
+    setEditingId(emp.cpf);
+    const taxaPct = emp.taxa_comissao * 100;
+    const bonusVal = emp.report?.valor_bonus || 0;
+    
     setEditVals({
-      commissionRate: String(emp.commissionRate || 5),
-      salesTarget: String(emp.salesTarget || 20000),
-      bonusEnabled: emp.bonusEnabled ?? true,
-      bonusAmount: String(emp.bonusAmount || 500),
+      commissionRate: taxaPct.toString(),
+      salesTarget: (emp.report?.meta_vendas || emp.meta_vendas || 0).toString(),
+      bonusEnabled: bonusVal > 0,
+      bonusAmount: bonusVal.toString(),
     });
   };
 
-  const saveEdit = (emp: ManagedUser) => {
-    updateUser(emp.id, {
-      commissionRate: Number(editVals.commissionRate),
-      salesTarget: Number(editVals.salesTarget),
-      bonusEnabled: editVals.bonusEnabled,
-      bonusAmount: Number(editVals.bonusAmount),
-    });
-    setSaveMsg({ id: emp.id, text: "Salvo!" });
-    setTimeout(() => setSaveMsg(null), 2000);
-    setEditingId(null);
+  const saveEdit = async (emp: EmployeeData) => {
+    try {
+      // Update employee base settings
+      await api.patch(`/employees/${emp.cpf}`, {
+        taxa_comissao: Number(editVals.commissionRate) / 100,
+        meta_vendas: Number(editVals.salesTarget),
+      });
+
+      // Update or create SalesGoal
+      const mes = new Date().getMonth() + 1;
+      const ano = new Date().getFullYear();
+      
+      const salesGoalsRes = await api.get<any[]>(`/sales-goals?mes=${mes}&ano=${ano}`);
+      const existingGoal = salesGoalsRes.find((g: any) => g.cpfFuncionario === emp.cpf);
+      
+      const goalPayload = {
+        cpfFuncionario: emp.cpf,
+        mes,
+        ano,
+        valorMeta: Number(editVals.salesTarget),
+        valorBonus: editVals.bonusEnabled ? Number(editVals.bonusAmount) : 0,
+      };
+
+      if (existingGoal) {
+        await api.patch(`/sales-goals/${existingGoal.idGoal}`, goalPayload);
+      } else {
+        await api.post(`/sales-goals`, goalPayload);
+      }
+
+      setSaveMsg({ id: emp.cpf, text: "Salvo!" });
+      setTimeout(() => setSaveMsg(null), 2000);
+      setEditingId(null);
+      fetchCommissions(); // Refresh data
+    } catch (err) {
+      console.error("Failed to save", err);
+      alert("Erro ao salvar as configurações de comissão");
+    }
   };
 
   const cancelEdit = () => setEditingId(null);
 
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500">Carregando comissões...</div>;
+  }
+
   // Aggregate totals
-  const totalSalesAll = employees.reduce((sum, e) => sum + getTotalSales(e.id), 0);
-  const totalCommissionAll = employees.reduce((sum, e) => sum + getTotalCommission(e.id), 0);
+  const totalSalesAll = employees.reduce((sum, e) => sum + (e.report?.total_vendas || 0), 0);
+  const totalCommissionAll = employees.reduce((sum, e) => sum + (e.report?.comissao || 0), 0);
   const totalBonusAll = employees
-    .filter((e) => e.bonusEnabled && hitTarget(e))
-    .reduce((sum, e) => sum + (e.bonusAmount || 0), 0);
-  const employeesHitTarget = employees.filter((e) => hitTarget(e)).length;
+    .filter((e) => e.report?.meta_batida)
+    .reduce((sum, e) => sum + (e.report?.valor_bonus || 0), 0);
+  const employeesHitTarget = employees.filter((e) => e.report?.meta_batida).length;
 
   return (
     <div className="space-y-6">
@@ -139,18 +226,19 @@ export function Commissions() {
       {/* Employee commission cards */}
       <div className="space-y-3">
         {employees.map((emp) => {
-          const sales = getSalesForEmployee(emp.id);
-          const totalSales = getTotalSales(emp.id);
-          const totalComm = getTotalCommission(emp.id);
-          const target = emp.salesTarget || 0;
+          const sales = emp.report?.pedidos || [];
+          const totalSales = emp.report?.total_vendas || 0;
+          const totalComm = emp.report?.comissao || 0;
+          const target = emp.report?.meta_vendas || emp.meta_vendas || 0;
           const progress = target > 0 ? Math.min(100, (totalSales / target) * 100) : 0;
-          const achieved = hitTarget(emp);
-          const isEditing = editingId === emp.id;
-          const isExpanded = expandedId === emp.id;
-          const bonusActive = emp.bonusEnabled && achieved;
+          const achieved = emp.report?.meta_batida || false;
+          const bonusVal = emp.report?.valor_bonus || 0;
+          const bonusActive = achieved && bonusVal > 0;
+          const isEditing = editingId === emp.cpf;
+          const isExpanded = expandedId === emp.cpf;
 
           return (
-            <div key={emp.id} className="bg-white border border-gray-100">
+            <div key={emp.cpf} className="bg-white border border-gray-100">
               {/* Main row */}
               <div className="p-5">
                 <div className="flex items-start gap-4">
@@ -210,7 +298,7 @@ export function Commissions() {
                           </>
                         )}
                         <button
-                          onClick={() => setExpandedId(isExpanded ? null : emp.id)}
+                          onClick={() => setExpandedId(isExpanded ? null : emp.cpf)}
                           className="p-1.5 bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
                         >
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -230,12 +318,12 @@ export function Commissions() {
                               value={editVals.commissionRate}
                               onChange={(e) => setEditVals({ ...editVals, commissionRate: e.target.value })}
                               className="w-full border border-gray-200 px-2 py-1 text-sm focus:outline-none focus:border-[#1a1a1a] pr-6"
-                              min="0" max="30" step="0.5"
+                              min="0" max="100" step="0.5"
                             />
                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
                           </div>
                         ) : (
-                          <p className="text-gray-900 text-sm">{emp.commissionRate}%</p>
+                          <p className="text-gray-900 text-sm">{emp.taxa_comissao * 100}%</p>
                         )}
                       </div>
 
@@ -279,11 +367,11 @@ export function Commissions() {
                           </div>
                         ) : (
                           <div>
-                            <p className={`text-sm ${emp.bonusEnabled ? "text-gray-900" : "text-gray-400"}`}>
-                              R$ {(emp.bonusAmount || 0).toLocaleString("pt-BR")}
+                            <p className={`text-sm ${bonusVal > 0 ? "text-gray-900" : "text-gray-400"}`}>
+                              R$ {bonusVal.toLocaleString("pt-BR")}
                             </p>
-                            <span className={`text-xs ${emp.bonusEnabled ? "text-green-600" : "text-gray-400"}`}>
-                              {emp.bonusEnabled ? "Ativo" : "Inativo"}
+                            <span className={`text-xs ${bonusVal > 0 ? "text-green-600" : "text-gray-400"}`}>
+                              {bonusVal > 0 ? "Ativo" : "Inativo"}
                             </span>
                           </div>
                         )}
@@ -297,7 +385,7 @@ export function Commissions() {
                         </p>
                         {bonusActive && (
                           <p className="text-amber-600 text-xs">
-                            + R$ {(emp.bonusAmount || 0).toLocaleString("pt-BR")} bônus
+                            + R$ {bonusVal.toLocaleString("pt-BR")} bônus
                           </p>
                         )}
                       </div>
@@ -317,7 +405,7 @@ export function Commissions() {
                       </div>
                     </div>
 
-                    {saveMsg?.id === emp.id && (
+                    {saveMsg?.id === emp.cpf && (
                       <p className="text-green-600 text-xs mt-2">{saveMsg.text}</p>
                     )}
                   </div>
@@ -346,19 +434,19 @@ export function Commissions() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {sales.map((sale) => (
-                            <tr key={sale.id} className="hover:bg-gray-50">
+                          {sales.map((sale: any) => (
+                            <tr key={sale.idPedido} className="hover:bg-gray-50">
                               <td className="py-2 pr-4 text-gray-500">
-                                {new Date(sale.date).toLocaleDateString("pt-BR")}
+                                {new Date(sale.dataPedido).toLocaleDateString("pt-BR")}
                               </td>
-                              <td className="py-2 pr-4 text-gray-600 font-mono">{sale.orderId}</td>
-                              <td className="py-2 pr-4 text-gray-600 hidden sm:table-cell">{sale.customer}</td>
-                              <td className="py-2 pr-4 text-gray-600 hidden md:table-cell max-w-xs truncate">{sale.product}</td>
+                              <td className="py-2 pr-4 text-gray-600 font-mono">{sale.idPedido}</td>
+                              <td className="py-2 pr-4 text-gray-600 hidden sm:table-cell">{sale.cliente ? sale.cliente.person?.nome : 'Venda Avulsa'}</td>
+                              <td className="py-2 pr-4 text-gray-600 hidden md:table-cell max-w-xs truncate">{sale.itens ? sale.itens.length + ' item(ns)' : '-'}</td>
                               <td className="py-2 pr-4 text-right text-gray-700">
-                                R$ {sale.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                R$ {Number(sale.valorTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                               </td>
                               <td className="py-2 text-right text-green-700">
-                                R$ {sale.commission.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                R$ {(Number(sale.valorTotal) * emp.taxa_comissao).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                               </td>
                             </tr>
                           ))}
@@ -370,7 +458,7 @@ export function Commissions() {
                               R$ {totalSales.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                             </td>
                             <td className="py-2 text-right text-green-700">
-                              R$ {totalComm.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                              R$ {(totalComm - (bonusActive ? bonusVal : 0)).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
                         </tfoot>
