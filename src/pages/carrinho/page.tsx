@@ -12,6 +12,10 @@ export default function CarrinhoPage() {
   const navigate = useNavigate();
   const [cep, setCep] = useState("");
   const [shippingMsg, setShippingMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [shippingLoading, setShippingLoading] = useState(false);
   
