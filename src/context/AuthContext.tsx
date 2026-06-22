@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 
-export type UserRole = "customer" | "manager" | "superadmin" | "employee";
+export type UserRole = "customer" | "manager" | "superadmin" | "employee" | "cashier";
 
 export interface ManagedUser {
   id: string;
@@ -63,11 +63,13 @@ const mapRole = (backendRole: string): UserRole => {
   // Backend usa papéis em português
   if (backendRole === "administrador") return "superadmin";
   if (backendRole === "gerente") return "manager";
-  if (backendRole === "caixa" || backendRole === "vendedor") return "employee";
+  if (backendRole === "caixa") return "cashier";
+  if (backendRole === "vendedor") return "employee";
   if (backendRole === "cliente") return "customer";
   // Compatibilidade com papéis em inglês (legado)
   if (backendRole === "superadmin") return "superadmin";
   if (backendRole === "manager") return "manager";
+  if (backendRole === "cashier") return "cashier";
   if (backendRole === "employee") return "employee";
   return "customer";
 };

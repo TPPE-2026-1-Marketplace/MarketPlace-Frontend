@@ -36,6 +36,7 @@ export interface ApiEmployee {
 export const mapRoleToFrontend = (role: string): UserRole => {
   if (role === "administrador") return "superadmin";
   if (role === "gerente") return "manager";
+  if (role === "caixa") return "cashier";
   if (role === "cliente") return "customer";
   return "employee";
 };
@@ -43,6 +44,7 @@ export const mapRoleToFrontend = (role: string): UserRole => {
 export const mapFrontendToRole = (role: UserRole): string => {
   if (role === "superadmin") return "administrador";
   if (role === "manager") return "gerente";
+  if (role === "cashier") return "caixa";
   if (role === "customer") return "cliente";
   return "vendedor";
 };
@@ -52,6 +54,7 @@ type Tab = "list" | "add" | "edit";
 const ROLE_LABELS: Record<UserRole, string> = {
   superadmin: "Super Admin",
   manager: "Gerente",
+  cashier: "Caixa",
   employee: "Funcionário",
   customer: "Cliente",
 };
@@ -59,6 +62,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 const ROLE_COLORS: Record<UserRole, string> = {
   superadmin: "bg-gray-900 text-white",
   manager: "bg-gray-700 text-white",
+  cashier: "bg-blue-100 text-blue-700",
   employee: "bg-gray-200 text-gray-800",
   customer: "bg-gray-100 text-gray-600",
 };
@@ -130,8 +134,8 @@ export function Employees() {
   });
 
   const availableRoles: UserRole[] = canManageManagers
-    ? ["superadmin", "manager", "employee"]
-    : ["employee"];
+    ? ["superadmin", "manager", "employee", "cashier"]
+    : ["employee", "cashier"];
 
   const resetForm = () => {
     setForm({
