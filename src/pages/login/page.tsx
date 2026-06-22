@@ -48,7 +48,7 @@ export default function LoginPage() {
         if (retorno === "checkout") {
           navigate("/checkout");
         } else {
-          const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee";
+          const isInternalUser = user?.role === "manager" || user?.role === "superadmin" || user?.role === "employee" || user?.role === "cashier";
           navigate(isInternalUser ? "/selecionar-modulo" : "/conta");
         }
     }

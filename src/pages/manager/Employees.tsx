@@ -449,8 +449,10 @@ export function Employees() {
   );
 
   const staffUsers = filteredUsers;
-  const employeeCount = employees.filter((u) => mapRoleToFrontend(u.role_perfil) === "employee").length;
-  const managerCount = employees.filter((u) => mapRoleToFrontend(u.role_perfil) === "manager").length;
+  const employeeCount = employees.filter((u) => u.ativo && mapRoleToFrontend(u.role_perfil) === "employee").length;
+  const managerCount = employees.filter((u) => u.ativo && mapRoleToFrontend(u.role_perfil) === "manager").length;
+  const cashierCount = employees.filter((u) => u.ativo && mapRoleToFrontend(u.role_perfil) === "cashier").length;
+  const totalActiveStaff = staffUsers.filter(u => u.ativo).length;
 
   return (
     <div className="space-y-5">
@@ -459,7 +461,7 @@ export function Employees() {
         <div>
           <h2 className="text-gray-900">Gestão de Usuários</h2>
           <p className="text-gray-500 text-sm">
-            {employeeCount} funcionário(s) · {managerCount} gerente(s)
+            {employeeCount} funcionário(s) · {managerCount} gerente(s) · {cashierCount} caixa(s)
           </p>
         </div>
         <button
@@ -471,11 +473,12 @@ export function Employees() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Funcionários", value: employeeCount, icon: <Users className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
           { label: "Gerentes", value: managerCount, icon: <Shield className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
-          { label: "Total", value: staffUsers.length, icon: <User className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
+          { label: "Caixas", value: cashierCount, icon: <Users className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
+          { label: "Total", value: totalActiveStaff, icon: <User className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
         ].map((stat) => (
           <div key={stat.label} className="bg-white border border-gray-100 p-4 flex items-center gap-3">
             <div className={`w-9 h-9 ${stat.color} flex items-center justify-center shrink-0`}>

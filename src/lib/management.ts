@@ -13,6 +13,10 @@ export interface ApiOrderItem {
 export interface ApiOrder {
   idPedido: number;
   idUsuario: string | null;
+  clienteNomeAvulso?: string | null;
+  user?: {
+    nome: string;
+  };
   dataPedido: string;
   status: ApiOrderStatus;
   subtotal: number | string;

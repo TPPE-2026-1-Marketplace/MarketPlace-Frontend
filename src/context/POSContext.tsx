@@ -11,9 +11,9 @@ interface POSContextType {
   clearSale: () => void;
   completeSale: (
     paymentMethod: "pix" | "card",
-    sellerId: string,
-    sellerName: string,
+    sellerCode: string,
     customerName?: string,
+    customerCpf?: string,
     customerPhone?: string,
     customerEmail?: string
   ) => Promise<{ success: boolean; message?: string; saleId?: string }>;
@@ -61,9 +61,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const completeSale = async (
     paymentMethod: "pix" | "card",
-    sellerId: string,
-    sellerName: string,
+    sellerCode: string,
     customerName?: string,
+    customerCpf?: string,
     customerPhone?: string,
     customerEmail?: string
   ): Promise<{ success: boolean; message?: string; saleId?: string }> => {
@@ -73,8 +73,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     try {
       const payload = {
-        idFuncionario: sellerId,
-        idUsuario: null, // we don't have CPF directly in Cashier customer fields yet, so we send null to be safe or if there's a CPF field, we map it
+        codigoVendedor: sellerCode,
+        idUsuario: customerCpf ? customerCpf.replace(/\D/g, "") : null,
+        clienteNomeAvulso: customerName || null,
         items: currentSale.map((item) => ({
           variantSku: item.variantSku,
           quantidade: item.quantity,
@@ -95,8 +96,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
         subtotal,
         total: subtotal,
         paymentMethod,
-        sellerId,
-        sellerName,
+        sellerId: sellerCode,
+        sellerName: "Vendedor",
         customerName,
         customerPhone,
         customerEmail,

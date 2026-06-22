@@ -55,7 +55,7 @@ export function Commissions() {
     try {
       const res = await api.get<any>('/employees?limit=100');
       const allEmps = res.data.filter((u: any) => 
-        u.ativo && (u.role_perfil === 'vendedor' || u.role_perfil === 'caixa')
+        u.ativo && u.role_perfil === 'vendedor'
       );
 
       const now = new Date();

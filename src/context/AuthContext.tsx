@@ -83,6 +83,7 @@ interface AuthContextType {
   isManager: boolean;
   isSuperAdmin: boolean;
   isEmployee: boolean;
+  isCashier: boolean;
   isInternalUser: boolean;
   isAuthenticated: boolean;
   canEditProducts: boolean;
@@ -355,7 +356,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isManager = user?.role === "manager" || user?.role === "superadmin";
   const isSuperAdmin = user?.role === "superadmin";
   const isEmployee = user?.role === "employee";
-  const isInternalUser = isManager || isEmployee;
+  const isCashier = user?.role === "cashier";
+  const isInternalUser = isManager || isEmployee || isCashier;
 
   // Permission controls
   const canEditProducts = isManager;
@@ -376,6 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isManager,
         isSuperAdmin,
         isEmployee,
+        isCashier,
         isInternalUser,
         isAuthenticated: !!user,
         canEditProducts,
