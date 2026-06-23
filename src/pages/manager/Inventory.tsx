@@ -763,7 +763,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
           image: variant.images[0]?.url || "/hero-dress.png",
           category: product.categories[0]?.nome || "Sem categoria",
           isOrphan: false,
-        }))
+        } as InventoryVariantRow))
       : [
           {
             product,
@@ -778,7 +778,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
             image: "/hero-dress.png",
             category: product.categories[0]?.nome || "Sem categoria",
             isOrphan: true,
-          },
+          } as InventoryVariantRow,
         ]
   );
 
@@ -1133,7 +1133,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
                             <button onClick={() => startStockEdit(row)} className="p-1.5 bg-gray-100" title="Editar estoque">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            {(user?.role === "manager" || user?.role === "superadmin" || user?.role === "admin") && (
+                            {(user?.role === "manager" || user?.role === "superadmin") && (
                               <button onClick={() => handleDeleteVariant(row)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-100 transition-colors" title={row.isOrphan ? "Excluir produto" : "Excluir variante"}>
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
