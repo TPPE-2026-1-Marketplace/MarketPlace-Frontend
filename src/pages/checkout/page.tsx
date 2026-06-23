@@ -8,6 +8,7 @@ import {
   AlertCircle,
   User,
   ShoppingBag,
+  ExternalLink,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/context/AuthContext";
@@ -19,6 +20,13 @@ type Step = "dados" | "entrega" | "pagamento" | "confirmado";
 type ShippingQuote = {
   valor: number;
   prazo_dias: number;
+};
+
+type CheckoutTotals = {
+  subtotal: number;
+  desconto: number;
+  total: number;
+  cupom: string | null;
 };
 
 function GuestCheckoutModal({
@@ -121,6 +129,8 @@ export default function CheckoutPage() {
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [confirmedOrderId, setConfirmedOrderId] = useState<number | null>(null);
+  const [paymentRedirectUrl, setPaymentRedirectUrl] = useState<string | null>(null);
+  const [checkoutTotals, setCheckoutTotals] = useState<CheckoutTotals | null>(null);
 
   const [form, setForm] = useState({
     nome: user?.name || "",
@@ -140,7 +150,11 @@ export default function CheckoutPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const shipping = shippingQuote?.valor ?? 0;
-  const finalTotal = cart.total + shipping;
+  const currentTotal = cart.total + shipping;
+  const summarySubtotal = checkoutTotals?.subtotal ?? cart.subtotal;
+  const summaryDiscount = checkoutTotals?.desconto ?? cart.desconto;
+  const summaryCoupon = checkoutTotals?.cupom ?? cart.cupom;
+  const finalTotal = checkoutTotals?.total ?? currentTotal;
 
   useEffect(() => {
     const cleanCep = form.cep.replace(/\D/g, "");
@@ -223,7 +237,7 @@ export default function CheckoutPage() {
   const steps: { key: Step; label: string }[] = [
     { key: "dados", label: "Dados Pessoais" },
     { key: "entrega", label: "Entrega" },
-    { key: "confirmado", label: "Confirmado" },
+    { key: "pagamento", label: "Pagamento" },
   ];
   const stepIndex = steps.findIndex((s) => s.key === step);
 
@@ -256,7 +270,14 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     setSubmitError(null);
-    setStep("pagamento"); // mostra tela de redirecionamento
+    setPaymentRedirectUrl(null);
+    setCheckoutTotals({
+      subtotal: cart.subtotal,
+      desconto: cart.desconto,
+      total: currentTotal,
+      cupom: cart.cupom ?? null,
+    });
+    setStep("pagamento");
 
     // 1. Cria o pedido.
     //    - Se logado: usa endpoint autenticado (/orders)
@@ -311,8 +332,8 @@ export default function CheckoutPage() {
       }
     }
 
-    // 2. Aciona o pagamento do pedido. Mapeia a forma escolhida para o método do
-    //    gateway; crédito permite parcelar, débito e PIX são sempre à vista.
+    // 2. Aciona o pagamento do pedido. O checkout da InfinitePay continua
+    //    hospedado, mas registramos a tentativa como PIX para este fluxo.
     try {
       const paymentsEndpoint = user ? "/payments" : "/payments/guest";
       const paymentResult = await api.post<{
@@ -320,17 +341,19 @@ export default function CheckoutPage() {
         redirectUrl?: string | null;
       }>(paymentsEndpoint, {
         idPedido: orderId,
-        captureMethod: "credit_card",
+        captureMethod: "pix",
         installments: 1,
       });
 
-      // Só redireciona se o pagamento ainda não está aprovado e o gateway
-      // devolveu um link hospedado (ex.: InfinitePay). Pagamento já aprovado
-      // (ex.: gateway mock) segue direto para a tela de confirmação.
+      // A InfinitePay documenta geração de link hospedado. Em vez de mandar
+      // o cliente automaticamente para fora da loja, mostramos o link para
+      // ele abrir o pagamento quando estiver pronto.
       if (paymentResult.status !== "paid" && paymentResult.redirectUrl) {
         localStorage.setItem("dk_pending_order", String(orderId));
         clear();
-        window.location.href = paymentResult.redirectUrl;
+        setPaymentRedirectUrl(paymentResult.redirectUrl);
+        setSubmitting(false);
+        setStep("pagamento");
         return;
       }
     } catch (err) {
@@ -415,7 +438,7 @@ export default function CheckoutPage() {
               </p>
             )}
             <div className="flex items-center gap-2 font-sans">
-              {steps.slice(0, 2).map((s, i) => (
+              {steps.map((s, i) => (
                 <React.Fragment key={s.key}>
                   <div
                     className={`flex items-center gap-2 ${
@@ -435,7 +458,7 @@ export default function CheckoutPage() {
                     </div>
                     <span className="text-sm hidden sm:block">{s.label}</span>
                   </div>
-                  {i < 2 && <ChevronRight className="w-4 h-4 text-gray-600" />}
+                  {i < steps.length - 1 && <ChevronRight className="w-4 h-4 text-gray-600" />}
                 </React.Fragment>
               ))}
             </div>
@@ -584,7 +607,7 @@ export default function CheckoutPage() {
                       disabled={submitting || !shippingQuote || shippingLoading}
                       className="bt-principal flex-1 py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
                     >
-                      {submitting ? "Redirecionando..." : "Finalizar Pedido"} <ChevronRight className="w-4 h-4" />
+                      {submitting ? "Gerando pagamento..." : "Finalizar Pedido"} <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -595,10 +618,44 @@ export default function CheckoutPage() {
                   {submitting ? (
                     <div className="animate-pulse py-8">
                       <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <h2 className="text-gray-900 mb-2 font-serif text-xl">Redirecionando...</h2>
+                      <h2 className="text-gray-900 mb-2 font-serif text-xl">Gerando pagamento...</h2>
                       <p className="text-gray-500 text-sm">
-                        Criando pedido e redirecionando ao ambiente seguro...
+                        Criando pedido e preparando o checkout seguro.
                       </p>
+                    </div>
+                  ) : paymentRedirectUrl ? (
+                    <div className="py-8">
+                      <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                      <h2 className="text-gray-900 mb-2 font-serif text-xl">Pedido registrado</h2>
+                      <p className="text-gray-500 text-sm mb-6">
+                        O pedido #{confirmedOrderId ?? "--"} foi criado. Abra o checkout seguro
+                        para concluir o pagamento por Pix ou cartão.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <a
+                          href={paymentRedirectUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="bt-principal px-6 py-3 text-sm inline-flex items-center justify-center gap-2"
+                        >
+                          Abrir pagamento
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                        {user && confirmedOrderId && (
+                          <button
+                            onClick={() => navigate(`/pedido/${confirmedOrderId}`)}
+                            className="border border-gray-300 text-gray-700 px-6 py-3 hover:border-[#1a1a1a] hover:text-[#1a1a1a] transition-colors text-sm"
+                          >
+                            Ver status
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => navigate("/")}
+                        className="mt-4 text-gray-500 hover:text-gray-900 text-sm transition-colors"
+                      >
+                        Voltar à loja
+                      </button>
                     </div>
                   ) : (
                     <div className="py-8">
@@ -652,12 +709,12 @@ export default function CheckoutPage() {
                 <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
                   <div className="flex justify-between text-gray-500">
                     <span>Subtotal</span>
-                    <span>{formatCurrency(cart.subtotal)}</span>
+                    <span>{formatCurrency(summarySubtotal)}</span>
                   </div>
-                  {cart.desconto > 0 && (
+                  {summaryDiscount > 0 && (
                     <div className="flex justify-between text-green-600">
-                      <span>Desconto {cart.cupom ? `(${cart.cupom})` : ""}</span>
-                      <span>-{formatCurrency(cart.desconto)}</span>
+                      <span>Desconto {summaryCoupon ? `(${summaryCoupon})` : ""}</span>
+                      <span>-{formatCurrency(summaryDiscount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-gray-500">
