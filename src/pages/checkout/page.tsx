@@ -112,7 +112,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>("dados");
-  const [payment, setPayment] = useState<"cartao" | "pix">("cartao");
+  const [payment, setPayment] = useState<"credito" | "debito" | "pix">("credito");
   const [installments, setInstallments] = useState(1);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; cpf?: string }>({});
@@ -294,20 +294,25 @@ export default function CheckoutPage() {
       }
     }
 
-    // 2. Aciona o pagamento do pedido. "cartao" (UI) → credit_card; PIX força 1 parcela.
+    // 2. Aciona o pagamento do pedido. Mapeia a forma escolhida para o método do
+    //    gateway; crédito permite parcelar, débito e PIX são sempre à vista.
     try {
-      const captureMethod = payment === "pix" ? "pix" : "credit_card";
+      const captureMethod =
+        payment === "pix" ? "pix" : payment === "debito" ? "debit_card" : "credit_card";
       const paymentResult = await api.post<{
         status: string;
         redirectUrl?: string | null;
       }>("/payments", {
         idPedido: orderId,
         captureMethod,
-        installments: payment === "pix" ? 1 : installments,
+        installments: payment === "credito" ? installments : 1,
       });
 
-      // Gateway hospedado (InfinitePay) devolve um link de checkout: redireciona.
-      if (paymentResult.redirectUrl) {
+      // Só redireciona se o pagamento ainda não está aprovado e o gateway
+      // devolveu um link hospedado (ex.: InfinitePay). Pagamento já aprovado
+      // (ex.: gateway mock) segue direto para a tela de confirmação.
+      if (paymentResult.status !== "paid" && paymentResult.redirectUrl) {
+        localStorage.setItem("dk_pending_order", String(orderId));
         clear();
         window.location.href = paymentResult.redirectUrl;
         return;
@@ -575,8 +580,13 @@ export default function CheckoutPage() {
                   <div className="space-y-3 mb-6">
                     {[
                       {
-                        key: "cartao",
-                        label: "Cartão de Crédito/Débito",
+                        key: "credito",
+                        label: "Cartão de Crédito",
+                        icon: <CreditCard className="w-5 h-5" />,
+                      },
+                      {
+                        key: "debito",
+                        label: "Cartão de Débito",
                         icon: <CreditCard className="w-5 h-5" />,
                       },
                       {
@@ -609,7 +619,7 @@ export default function CheckoutPage() {
                     ))}
                   </div>
 
-                  {payment === "cartao" && (
+                  {(payment === "credito" || payment === "debito") && (
                     <div className="space-y-4 p-4 bg-gray-50">
                       <div>
                         <label className="block text-sm text-gray-600 mb-1">
@@ -653,23 +663,25 @@ export default function CheckoutPage() {
                           className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-1">
-                          Parcelas
-                        </label>
-                        <select
-                          value={installments}
-                          onChange={(e) => setInstallments(Number(e.target.value))}
-                          className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
-                        >
-                          {[1, 2, 3, 4, 6, 8, 10, 12].map((p) => (
-                            <option key={p} value={p}>
-                              {p}x de {formatCurrency(finalTotal / p)}
-                              {p === 1 ? " à vista" : " sem juros"}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {payment === "credito" && (
+                        <div>
+                          <label className="block text-sm text-gray-600 mb-1">
+                            Parcelas
+                          </label>
+                          <select
+                            value={installments}
+                            onChange={(e) => setInstallments(Number(e.target.value))}
+                            className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
+                          >
+                            {[1, 2, 3, 4, 6, 8, 10, 12].map((p) => (
+                              <option key={p} value={p}>
+                                {p}x de {formatCurrency(finalTotal / p)}
+                                {p === 1 ? " à vista" : " sem juros"}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   )}
 
