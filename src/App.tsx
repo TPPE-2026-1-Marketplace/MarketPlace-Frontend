@@ -1,19 +1,60 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+import { Outlet } from 'react-router-dom';
+
+// Layout
+import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
+
+// Pages
+import HomePage from './pages/page';
+import ProdutosPage from './pages/produtos/page';
+import ProdutoDetailsPage from './pages/produtos/[id]/page';
+import LoginPage from './pages/login/page';
+import ContaPage from './pages/conta/page';
+import PoliticasPage from './pages/politicas/page';
+import CarrinhoPage from './pages/carrinho/page';
+import CheckoutPage from './pages/checkout/page';
+import FavoritesPage from './pages/favorites/page';
+
+// New Pages
+import { ModuleSelection } from './pages/ModuleSelection';
+import { ManagerDashboard } from './pages/manager/Dashboard';
+import { Cashier } from './pages/pos/Cashier';
+
+function ShopLayout() {
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <main className="flex-1">
+        <Outlet />
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 export default function App() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="mb-2 border border-white/20 px-5 py-3">
-          <span className="text-2xl font-bold tracking-[0.4em] text-white">
-            DK FASHION
-          </span>
-        </div>
-        <h1 className="text-4xl font-light tracking-widest text-white sm:text-5xl">
-          Hello, World
-        </h1>
-        <p className="mt-2 text-sm tracking-[0.2em] text-white/50 uppercase">
-          Em breve, sua nova loja de vestidos
-        </p>
-      </div>
-    </main>
-  )
+    <BrowserRouter>
+      <Routes>
+        <Route element={<ShopLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/produtos" element={<ProdutosPage />} />
+          <Route path="/produtos/:id" element={<ProdutoDetailsPage />} />
+          <Route path="/carrinho" element={<CarrinhoPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/conta" element={<ContaPage />} />
+          <Route path="/politicas" element={<PoliticasPage />} />
+          <Route path="/favoritos" element={<FavoritesPage />} />
+        </Route>
+        
+        <Route path="/selecionar-modulo" element={<ModuleSelection />} />
+        <Route path="/painel/*" element={<ManagerDashboard />} />
+        <Route path="/pdv" element={<Cashier />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
