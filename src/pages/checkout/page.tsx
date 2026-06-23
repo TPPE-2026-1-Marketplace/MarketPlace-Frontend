@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Check,
   CreditCard,
-  QrCode,
   ChevronRight,
   AlertCircle,
   User,
@@ -15,7 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
 
-type Step = "dados" | "entrega" | "confirmado";
+type Step = "dados" | "entrega" | "pagamento" | "confirmado";
 
 type ShippingQuote = {
   valor: number;
@@ -112,8 +111,6 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>("dados");
-  const [payment, setPayment] = useState<"credito" | "debito" | "pix">("credito");
-  const [installments, setInstallments] = useState(1);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; cpf?: string }>({});
   const [submitting, setSubmitting] = useState(false);
