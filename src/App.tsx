@@ -17,6 +17,7 @@ import PoliticasPage from './pages/politicas/page';
 import CarrinhoPage from './pages/carrinho/page';
 import CheckoutPage from './pages/checkout/page';
 import FavoritesPage from './pages/favorites/page';
+import PedidoStatusPage from './pages/pedido/[id]/page';
 
 // New Pages
 import { ModuleSelection } from './pages/ModuleSelection';
@@ -45,6 +46,8 @@ export default function App() {
           <Route path="/produtos/:id" element={<ProdutoDetailsPage />} />
           <Route path="/carrinho" element={<CarrinhoPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/pedido" element={<PedidoStatusPage />} />
+          <Route path="/pedido/:idPedido" element={<PedidoStatusPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/conta" element={<ContaPage />} />
           <Route path="/politicas" element={<PoliticasPage />} />
