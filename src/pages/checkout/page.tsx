@@ -15,7 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
 
-type Step = "dados" | "entrega" | "pagamento" | "confirmado";
+type Step = "dados" | "entrega" | "confirmado";
 
 type ShippingQuote = {
   valor: number;
@@ -37,11 +37,11 @@ function GuestCheckoutModal({
         </div>
         <h3 className="text-gray-900 text-center mb-2 font-serif text-xl">Finalizar compra</h3>
         <p className="text-gray-500 text-sm text-center leading-relaxed mb-1 font-sans">
-          Você pode continuar preenchendo os dados, mas para concluir o pedido será
-          necessário entrar no sistema.
+          Você pode continuar como convidado — seu CPF e e-mail serão usados para
+          registrar o pedido, sem necessidade de criar uma conta.
         </p>
         <p className="text-gray-400 text-xs text-center mb-6 font-sans">
-          Pedidos reais são registrados apenas para usuários autenticados.
+          Se preferir, entre para vincular o pedido à sua conta.
         </p>
 
         <div className="space-y-3 font-sans">
@@ -50,19 +50,19 @@ function GuestCheckoutModal({
             className="bt-principal w-full py-3 text-sm tracking-wide flex items-center justify-center gap-2"
           >
             <ShoppingBag className="w-4 h-4" />
-            Continuar
+            Continuar como Convidado
           </button>
           <button
             onClick={onLogin}
             className="w-full border border-gray-300 text-gray-700 py-3 hover:border-[#1a1a1a] hover:text-[#1a1a1a] transition-colors text-sm flex items-center justify-center gap-2"
           >
             <User className="w-4 h-4" />
-            Entrar para finalizar
+            Entrar
           </button>
         </div>
 
         <p className="text-gray-400 text-xs text-center mt-4 leading-relaxed font-sans">
-          Ao entrar, o pedido poderá ser concluído e ficará disponível na sua conta.
+          Ao entrar, o pedido ficará disponível no seu histórico.
         </p>
       </div>
     </div>
@@ -226,7 +226,6 @@ export default function CheckoutPage() {
   const steps: { key: Step; label: string }[] = [
     { key: "dados", label: "Dados Pessoais" },
     { key: "entrega", label: "Entrega" },
-    { key: "pagamento", label: "Pagamento" },
     { key: "confirmado", label: "Confirmado" },
   ];
   const stepIndex = steps.findIndex((s) => s.key === step);
@@ -253,11 +252,6 @@ export default function CheckoutPage() {
   };
 
   const handleConfirm = async () => {
-    if (!user) {
-      setSubmitError("É necessário entrar no sistema para finalizar o pedido.");
-      return;
-    }
-
     if (!shippingQuote) {
       setSubmitError("Informe um CEP válido para calcular o frete.");
       return;
@@ -265,13 +259,25 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     setSubmitError(null);
+    setStep("pagamento"); // mostra tela de redirecionamento
 
-    // 1. Cria o pedido (uma única vez — em re-tentativas após falha de
-    //    pagamento, reutiliza o pedido já criado para não duplicar).
+    // 1. Cria o pedido.
+    //    - Se logado: usa endpoint autenticado (/orders)
+    //    - Se convidado: usa endpoint público (/orders/guest) com CPF, e-mail e nome
     let orderId = confirmedOrderId;
     if (orderId == null) {
       try {
-        const response = await api.post<{ idPedido: number }>("/orders", {
+        const addressPayload = {
+          enderecoCep: form.cep.trim() || null,
+          enderecoRua: form.rua.trim() || null,
+          enderecoNumero: form.numero.trim() || null,
+          enderecoComplemento: form.complemento.trim() || null,
+          enderecoBairro: form.bairro.trim() || null,
+          enderecoCidade: form.cidade.trim() || null,
+          enderecoEstado: form.estado.trim().toUpperCase().slice(0, 2) || null,
+        };
+
+        const orderPayload: Record<string, unknown> = {
           items: cart.items.map((i) => ({
             variantSku: i.variant.codigoSku,
             quantidade: i.quantity,
@@ -279,8 +285,22 @@ export default function CheckoutPage() {
           couponNumero: cart.cupom ?? null,
           valorFrete: shippingQuote.valor,
           tipoRetirada: "entrega",
-        });
-        orderId = response.idPedido;
+          ...addressPayload,
+        };
+
+        if (user) {
+          const response = await api.post<{ idPedido: number }>("/orders", orderPayload);
+          orderId = response.idPedido;
+        } else {
+          const response = await api.post<{ idPedido: number }>("/orders/guest", {
+            ...orderPayload,
+            clienteCpfAvulso: form.cpf.replace(/\D/g, ""),
+            clienteEmailAvulso: form.email.trim(),
+            clienteNomeAvulso: form.nome.trim() || null,
+            clienteTelefone: form.telefone.trim() || null,
+          });
+          orderId = response.idPedido;
+        }
         setConfirmedOrderId(orderId);
       } catch (err) {
         console.error("Erro ao criar pedido:", err);
@@ -297,15 +317,14 @@ export default function CheckoutPage() {
     // 2. Aciona o pagamento do pedido. Mapeia a forma escolhida para o método do
     //    gateway; crédito permite parcelar, débito e PIX são sempre à vista.
     try {
-      const captureMethod =
-        payment === "pix" ? "pix" : payment === "debito" ? "debit_card" : "credit_card";
+      const paymentsEndpoint = user ? "/payments" : "/payments/guest";
       const paymentResult = await api.post<{
         status: string;
         redirectUrl?: string | null;
-      }>("/payments", {
+      }>(paymentsEndpoint, {
         idPedido: orderId,
-        captureMethod,
-        installments: payment === "credito" ? installments : 1,
+        captureMethod: "credit_card",
+        installments: 1,
       });
 
       // Só redireciona se o pagamento ainda não está aprovado e o gateway
@@ -399,7 +418,7 @@ export default function CheckoutPage() {
               </p>
             )}
             <div className="flex items-center gap-2 font-sans">
-              {steps.slice(0, 3).map((s, i) => (
+              {steps.slice(0, 2).map((s, i) => (
                 <React.Fragment key={s.key}>
                   <div
                     className={`flex items-center gap-2 ${
@@ -500,9 +519,8 @@ export default function CheckoutPage() {
                     <div className="mt-4 flex items-start gap-2 p-3 bg-gray-50 border border-gray-100 text-xs text-gray-500">
                       <AlertCircle className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
                       <span>
-                        Você não está logado. Ao continuar, será perguntado se
-                        deseja <strong>entrar</strong> (para vincular o pedido à
-                        sua conta) ou <strong>comprar como convidado</strong>.
+                        Você está comprando como <strong>convidado</strong>. Seu
+                        CPF e e-mail serão usados para registrar o pedido.
                       </span>
                     </div>
                   )}
@@ -565,166 +583,41 @@ export default function CheckoutPage() {
                       Voltar
                     </button>
                     <button
-                      onClick={() => setStep("pagamento")}
+                      onClick={handleConfirm}
+                      disabled={submitting || !shippingQuote || shippingLoading}
                       className="bt-principal flex-1 py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
                     >
-                      Continuar <ChevronRight className="w-4 h-4" />
+                      {submitting ? "Redirecionando..." : "Finalizar Pedido"} <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               )}
 
               {step === "pagamento" && (
-                <div className="bg-white p-6 border border-gray-100">
-                  <h2 className="text-gray-900 mb-5 font-serif text-xl">Forma de Pagamento</h2>
-                  <div className="space-y-3 mb-6">
-                    {[
-                      {
-                        key: "credito",
-                        label: "Cartão de Crédito",
-                        icon: <CreditCard className="w-5 h-5" />,
-                      },
-                      {
-                        key: "debito",
-                        label: "Cartão de Débito",
-                        icon: <CreditCard className="w-5 h-5" />,
-                      },
-                      {
-                        key: "pix",
-                        label: "PIX",
-                        icon: <QrCode className="w-5 h-5" />,
-                      },
-                    ].map((p) => (
+                <div className="bg-white p-6 border border-gray-100 text-center">
+                  {submitting ? (
+                    <div className="animate-pulse py-8">
+                      <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <h2 className="text-gray-900 mb-2 font-serif text-xl">Redirecionando...</h2>
+                      <p className="text-gray-500 text-sm">
+                        Criando pedido e redirecionando ao ambiente seguro...
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="py-8">
+                      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+                      <h2 className="text-gray-900 mb-2 font-serif text-xl">Ops!</h2>
+                      <p className="text-red-600 text-sm mb-6">
+                        {submitError || "Não foi possível processar o pedido."}
+                      </p>
                       <button
-                        key={p.key}
-                        onClick={() => setPayment(p.key as typeof payment)}
-                        className={`w-full flex items-center gap-3 p-4 border text-left transition-colors ${
-                          payment === p.key
-                            ? "border-[#1a1a1a] bg-gray-50 text-[#1a1a1a]"
-                            : "border-gray-200 text-gray-700 hover:border-gray-400"
-                        }`}
+                        onClick={() => setStep("entrega")}
+                        className="bt-principal px-6 py-3 text-sm"
                       >
-                        <span
-                          className={
-                            payment === p.key ? "text-[#1a1a1a]" : "text-gray-400"
-                          }
-                        >
-                          {p.icon}
-                        </span>
-                        <span className="text-sm">{p.label}</span>
-                        {payment === p.key && (
-                          <Check className="w-4 h-4 ml-auto" />
-                        )}
+                        Tentar Novamente
                       </button>
-                    ))}
-                  </div>
-
-                  {(payment === "credito" || payment === "debito") && (
-                    <div className="space-y-4 p-4 bg-gray-50">
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-1">
-                          Número do Cartão
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="0000 0000 0000 0000"
-                          className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">
-                            Validade
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="MM/AA"
-                            className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">
-                            CVV
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="000"
-                            className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-1">
-                          Nome no Cartão
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Nome como no cartão"
-                          className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
-                        />
-                      </div>
-                      {payment === "credito" && (
-                        <div>
-                          <label className="block text-sm text-gray-600 mb-1">
-                            Parcelas
-                          </label>
-                          <select
-                            value={installments}
-                            onChange={(e) => setInstallments(Number(e.target.value))}
-                            className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
-                          >
-                            {[1, 2, 3, 4, 6, 8, 10, 12].map((p) => (
-                              <option key={p} value={p}>
-                                {p}x de {formatCurrency(finalTotal / p)}
-                                {p === 1 ? " à vista" : " sem juros"}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
                     </div>
                   )}
-
-                  {payment === "pix" && (
-                    <div className="p-4 bg-green-50 text-center border border-green-100">
-                      <QrCode className="w-16 h-16 text-green-600 mx-auto mb-2" />
-                      <p className="text-green-700 text-sm font-medium">
-                        Após confirmar, você receberá o QR Code para pagamento.
-                      </p>
-                      <p className="text-green-600 text-xs mt-1">
-                        O valor do PIX é o mesmo dos demais meios de pagamento.
-                      </p>
-                    </div>
-                  )}
-
-                  {submitError && (
-                    <p className="flex items-center gap-1 text-red-500 text-xs mt-4">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      {submitError}
-                    </p>
-                  )}
-                  {!user && (
-                    <p className="text-xs text-amber-600 mt-4">
-                      Entre no sistema para habilitar a finalização do pedido.
-                    </p>
-                  )}
-
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={() => setStep("entrega")}
-                      disabled={submitting}
-                      className="flex-1 border border-gray-200 text-gray-600 py-3 hover:border-gray-400 transition-colors text-sm disabled:opacity-50"
-                    >
-                      Voltar
-                    </button>
-                    <button
-                      onClick={handleConfirm}
-                      disabled={submitting || !user || !shippingQuote || shippingLoading}
-                      className="flex-1 bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide disabled:opacity-60"
-                    >
-                      {submitting ? "Processando..." : "Confirmar Pedido"}
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
