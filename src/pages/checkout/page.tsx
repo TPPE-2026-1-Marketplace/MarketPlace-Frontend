@@ -113,6 +113,7 @@ export default function CheckoutPage() {
 
   const [step, setStep] = useState<Step>("dados");
   const [payment, setPayment] = useState<"cartao" | "pix">("cartao");
+  const [installments, setInstallments] = useState(1);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; cpf?: string }>({});
   const [submitting, setSubmitting] = useState(false);
@@ -264,27 +265,64 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     setSubmitError(null);
+
+    // 1. Cria o pedido (uma única vez — em re-tentativas após falha de
+    //    pagamento, reutiliza o pedido já criado para não duplicar).
+    let orderId = confirmedOrderId;
+    if (orderId == null) {
+      try {
+        const response = await api.post<{ idPedido: number }>("/orders", {
+          items: cart.items.map((i) => ({
+            variantSku: i.variant.codigoSku,
+            quantidade: i.quantity,
+          })),
+          couponNumero: cart.cupom ?? null,
+          valorFrete: shippingQuote.valor,
+          tipoRetirada: "entrega",
+        });
+        orderId = response.idPedido;
+        setConfirmedOrderId(orderId);
+      } catch (err) {
+        console.error("Erro ao criar pedido:", err);
+        setSubmitError(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível concluir o pedido. Tente novamente.",
+        );
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // 2. Aciona o pagamento do pedido. "cartao" (UI) → credit_card; PIX força 1 parcela.
     try {
-      const response = await api.post<{ idPedido: number }>("/orders", {
-        items: cart.items.map((i) => ({
-          variantSku: i.variant.codigoSku,
-          quantidade: i.quantity,
-        })),
-        couponNumero: cart.cupom ?? null,
-        valorFrete: shippingQuote.valor,
-        tipoRetirada: "entrega",
+      const captureMethod = payment === "pix" ? "pix" : "credit_card";
+      const paymentResult = await api.post<{
+        status: string;
+        redirectUrl?: string | null;
+      }>("/payments", {
+        idPedido: orderId,
+        captureMethod,
+        installments: payment === "pix" ? 1 : installments,
       });
-      setConfirmedOrderId(response.idPedido);
+
+      // Gateway hospedado (InfinitePay) devolve um link de checkout: redireciona.
+      if (paymentResult.redirectUrl) {
+        clear();
+        window.location.href = paymentResult.redirectUrl;
+        return;
+      }
     } catch (err) {
-      console.error("Erro ao criar pedido:", err);
+      console.error("Erro ao processar pagamento:", err);
       setSubmitError(
         err instanceof Error
           ? err.message
-          : "Não foi possível concluir o pedido. Tente novamente.",
+          : "Pedido criado, mas o pagamento falhou. Tente novamente.",
       );
       setSubmitting(false);
       return;
     }
+
     clear();
     setSubmitting(false);
     setStep("confirmado");
@@ -619,7 +657,11 @@ export default function CheckoutPage() {
                         <label className="block text-sm text-gray-600 mb-1">
                           Parcelas
                         </label>
-                        <select className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white">
+                        <select
+                          value={installments}
+                          onChange={(e) => setInstallments(Number(e.target.value))}
+                          className="w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] bg-white"
+                        >
                           {[1, 2, 3, 4, 6, 8, 10, 12].map((p) => (
                             <option key={p} value={p}>
                               {p}x de {formatCurrency(finalTotal / p)}

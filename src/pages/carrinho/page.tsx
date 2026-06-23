@@ -16,7 +16,10 @@ export default function CarrinhoPage() {
   React.useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
-  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [shippingQuote, setShippingQuote] = useState<{
+    valor: number;
+    prazo_dias: number;
+  } | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   
   const [couponInput, setCouponInput] = useState("");
@@ -28,23 +31,20 @@ export default function CarrinhoPage() {
     const cleanCep = cep.replace(/\D/g, "");
     if (cleanCep.length !== 8) {
       setShippingMsg("CEP inválido. Use 8 dígitos.");
-      setShippingOptions([]);
+      setShippingQuote(null);
       return;
     }
 
     setShippingLoading(true);
     setShippingMsg(null);
-    setShippingOptions([]);
+    setShippingQuote(null);
 
     try {
-      const options = await api.post<any[]>("/shipping/calculate", {
-        cep_destino: cleanCep,
-        valor_declarado: cart.subtotal,
-      });
-      setShippingOptions(options);
-      if (options.length === 0) {
-        setShippingMsg("Não atendemos essa região no momento.");
-      }
+      const quote = await api.post<{ valor: number; prazo_dias: number }>(
+        "/shipping/calculate",
+        { cep_destino: cleanCep },
+      );
+      setShippingQuote(quote);
     } catch {
       setShippingMsg("Erro ao calcular frete. Tente novamente.");
     } finally {
@@ -243,28 +243,24 @@ export default function CarrinhoPage() {
               {shippingLoading && (
                 <p className="text-sm text-gray-500 mt-2">Calculando...</p>
               )}
-              {shippingOptions.length > 0 && (
+              {shippingQuote && (
                 <div className="mt-3 space-y-2">
-                  {shippingOptions.map((opt) => (
-                    <div
-                      key={opt.id}
-                      className="flex items-center justify-between p-3 border border-gray-100 bg-gray-50"
-                    >
-                      <div>
-                        <p className="text-sm text-gray-800">{opt.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {opt.company?.name} · {opt.delivery_time} dia{opt.delivery_time !== 1 ? "s" : ""}
-                          {opt.delivery_range && ` (${opt.delivery_range.min}-${opt.delivery_range.max} dias)`}
-                        </p>
-                      </div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {opt.price === 0 ? "Grátis" : formatCurrency(opt.price)}
+                  <div className="flex items-center justify-between p-3 border border-gray-100 bg-gray-50">
+                    <div>
+                      <p className="text-sm text-gray-800">Entrega</p>
+                      <p className="text-xs text-gray-500">
+                        Prazo estimado: {shippingQuote.prazo_dias} dia
+                        {shippingQuote.prazo_dias !== 1 ? "s" : ""} útil
+                        {shippingQuote.prazo_dias !== 1 ? "eis" : ""}
                       </p>
                     </div>
-                  ))}
+                    <p className="text-sm font-medium text-gray-900">
+                      {shippingQuote.valor === 0 ? "Grátis" : formatCurrency(shippingQuote.valor)}
+                    </p>
+                  </div>
                 </div>
               )}
-              {shippingMsg && !shippingLoading && shippingOptions.length === 0 && (
+              {shippingMsg && !shippingLoading && !shippingQuote && (
                 <p className="text-sm text-gray-600 mt-2">{shippingMsg}</p>
               )}
             </div>
