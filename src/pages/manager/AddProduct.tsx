@@ -51,13 +51,26 @@ interface ColorVariant {
 }
 
 interface VariantRow {
-  id: string;
+  codigoSku: string;
   color: string;
   size: string;
   stockOnline: number;
   stockPhysical: number;
   price: number;
 }
+
+const normalizeSkuPart = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "")
+    .toUpperCase();
+
+const createVariantSku = (baseSku: string, color: string, size: string) =>
+  [baseSku, color, size].map(normalizeSkuPart).filter(Boolean).join("-");
+
+const createLocalId = (prefix: string) =>
+  `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
 
 interface FormData {
   title: string;
@@ -71,7 +84,6 @@ interface FormData {
   colors: ColorVariant[];
   sizes: string[];
   basePrice: number;
-  originalPrice: number;
   featured: boolean;
 }
 
@@ -103,78 +115,28 @@ const CAT_TREE: Record<string, Record<string, string[]>> = {
 };
 
 const CAT_ATTRS: Record<string, { label: string; options: string[] }[]> = {
-  Vestidos: [
+  default: [
     {
       label: "Material",
       options: [
-        "Tule",
-        "Seda",
-        "Organza",
-        "Renda",
-        "Cetim",
-        "Crepe",
-        "Veludo",
-        "Chiffon",
-        "Paetê",
+        "Tule", "Seda", "Organza", "Renda", "Cetim", "Crepe", "Veludo", "Chiffon", "Paetê",
+        "Couro Sintético", "Couro Natural", "Tecido", "Sintético", "Misto", "Metal"
       ],
     },
     {
       label: "Composição",
       options: [
-        "100% Poliéster",
-        "50% Poliéster / 50% Elastano",
-        "100% Seda Natural",
-        "Misto Sintético",
-        "88% Nylon / 12% Elastano",
+        "100% Poliéster", "50% Poliéster / 50% Elastano", "100% Seda Natural", "Misto Sintético",
+        "88% Nylon / 12% Elastano", "100% Algodão"
       ],
-    },
-    {
-      label: "Comprimento",
-      options: ["Mini (acima do joelho)", "Midi (na panturrilha)", "Longo (no tornozelo)", "Maxi"],
     },
     {
       label: "Silhueta",
       options: ["Princesa", "Sereia", "A-Line", "Reto", "Evasê", "Tubo", "Mullet"],
     },
-  ],
-  Bolsas: [
     {
-      label: "Material",
-      options: ["Couro Sintético", "Couro Natural", "Tecido", "Strass", "Metálico"],
-    },
-    {
-      label: "Fechamento",
-      options: ["Fivela", "Zíper", "Ímã", "Botão", "Sem Fechamento"],
-    },
-  ],
-  Bijuterias: [
-    {
-      label: "Material",
-      options: ["Metal Dourado", "Metal Prateado", "Acrílico", "Strass", "Pérola", "Resina"],
-    },
-    {
-      label: "Tom",
-      options: ["Dourado", "Prateado", "Rosé Gold", "Antigo", "Cobre"],
-    },
-  ],
-  Calçados: [
-    {
-      label: "Material",
-      options: ["Couro Sintético", "Verniz", "Tecido Glitter", "Couro Natural", "Renda"],
-    },
-    {
-      label: "Tipo de Salto",
-      options: ["Baixo (até 4cm)", "Médio (5-7cm)", "Alto (8-10cm)", "Meia-pata", "Anabela", "Sem Salto"],
-    },
-  ],
-  default: [
-    {
-      label: "Material",
-      options: ["Tecido", "Sintético", "Natural", "Misto"],
-    },
-    {
-      label: "Composição",
-      options: ["100% Algodão", "Misto Poliéster", "Elastano", "Sintético"],
+      label: "Qual Medida",
+      options: ["Mini", "Midi", "Longo", "Maxi", "Pequeno", "Médio", "Grande", "Único"],
     },
   ],
 };
@@ -570,7 +532,7 @@ function ColorImageGrid({
                 />
               </div>
               {color.coverIdx === imgIdx && (
-                <div className="absolute top-0.5 left-0.5 bg-[#1a1a1a] text-white text-xs px-1 py-0.5 flex items-center gap-0.5">
+                <div className="absolute top-0.5 left-0.5 bg-black text-white text-xs px-1 py-0.5 flex items-center gap-0.5">
                   <Star className="w-2 h-2" />
                   <span style={{ fontSize: "9px" }}>Capa</span>
                 </div>
@@ -625,7 +587,7 @@ export function AddProduct({
   onSave,
 }: {
   onBack: () => void;
-  onSave: (product: Partial<Product>) => void;
+  onSave: (product: Partial<Product>, payload?: { form: any, variants: any[] }) => void;
 }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormData>({
@@ -640,7 +602,6 @@ export function AddProduct({
     colors: [],
     sizes: [],
     basePrice: 0,
-    originalPrice: 0,
     featured: false,
   });
   const [tagInput, setTagInput] = useState("");
@@ -683,7 +644,7 @@ export function AddProduct({
         );
         rows.push(
           existing || {
-            id: `${size}__${color}`,
+            codigoSku: createVariantSku(form.sku, color, size),
             color,
             size,
             stockOnline: 0,
@@ -696,9 +657,9 @@ export function AddProduct({
     setVariants(rows);
   };
 
-  const updateVariant = (id: string, field: keyof VariantRow, value: number) => {
+  const updateVariant = (codigoSku: string, field: keyof VariantRow, value: number) => {
     setVariants((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, [field]: value } : v))
+      prev.map((v) => (v.codigoSku === codigoSku ? { ...v, [field]: value } : v))
     );
   };
 
@@ -760,15 +721,25 @@ export function AddProduct({
   };
 
   const addColor = () => {
-    if (!newColor.name.trim()) return;
+    const name = newColor.name.trim();
+    if (!name) {
+      setErrors((prev) => ({ ...prev, color: "Informe um nome para a cor." }));
+      return;
+    }
+    const normalizedName = name.toLocaleLowerCase("pt-BR");
+    if (form.colors.some((color) => color.name.toLocaleLowerCase("pt-BR") === normalizedName)) {
+      setErrors((prev) => ({ ...prev, color: "Esta cor já foi adicionada." }));
+      return;
+    }
     const color: ColorVariant = {
-      id: `color-${Date.now()}`,
-      name: newColor.name.trim(),
+      id: createLocalId("color"),
+      name,
       hex: newColor.hex,
       images: [],
       coverIdx: 0,
     };
     setForm((prev) => ({ ...prev, colors: [...prev.colors, color] }));
+    setErrors((prev) => ({ ...prev, color: "" }));
     setNewColor({ name: "", hex: "#1a1a1a" });
     setAddColorMode(false);
   };
@@ -845,12 +816,11 @@ export function AddProduct({
     });
 
     const product: Partial<Product> = {
-      id: Date.now().toString(),
+      id: createLocalId("product"),
       sku: form.sku,
       name: form.title,
       description: form.description,
       price: form.basePrice,
-      originalPrice: form.originalPrice > 0 ? form.originalPrice : undefined,
       category: (
         (form.catL3 || form.catL2 || "festa")
           .toLowerCase()
@@ -868,9 +838,8 @@ export function AddProduct({
       stockPhysical: totalPhysical,
       featured: form.featured,
       tags: form.tags,
-      brand: "DK Fashion",
     };
-    onSave(product);
+    onSave(product, { form, variants });
   };
 
   const stepDone = (s: number): boolean => {
@@ -896,16 +865,6 @@ export function AddProduct({
           onClose={() => setCropModal(null)}
         />
       )}
-
-      {/* Global penalty warning */}
-      <div className="bg-red-50 border-b border-red-200 px-6 py-2.5 flex items-start gap-2.5 shrink-0">
-        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-        <p className="text-red-600 text-xs leading-relaxed">
-          <strong>Atenção:</strong> Pode ser aplicada penalidade pelo preenchimento
-          incorreto das informações do produto. Certifique-se de que todos os campos
-          estejam precisos e dentro das normas da plataforma antes de publicar.
-        </p>
-      </div>
 
       <div className="flex flex-1 min-h-0">
         {/* ── Left: Publication Assistant Stepper ── */}
@@ -938,7 +897,7 @@ export function AddProduct({
                     disabled={!isAccessible}
                     className={`w-full text-left px-3 py-3 transition-all ${
                       isCurrent
-                        ? "bg-[#1a1a1a] text-white"
+                        ? "bg-black text-white"
                         : isDone
                         ? "bg-green-50 text-gray-700 hover:bg-green-100 cursor-pointer"
                         : isAccessible
@@ -1116,7 +1075,7 @@ export function AddProduct({
                         setForm((p) => ({ ...p, featured: !p.featured }))
                       }
                       className={`relative w-11 h-6 transition-colors duration-200 ${
-                        form.featured ? "bg-[#1a1a1a]" : "bg-gray-200"
+                        form.featured ? "bg-black" : "bg-gray-200"
                       }`}
                     >
                       <span
@@ -1451,57 +1410,18 @@ export function AddProduct({
                           step={0.01}
                         />
                       </div>
+                      {errors.color && (
+                        <p className="text-xs text-red-600" role="alert">
+                          {errors.color}
+                        </p>
+                      )}
                       {errors.basePrice && (
                         <p className="text-red-500 text-xs mt-1">
                           {errors.basePrice}
                         </p>
                       )}
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Preço Original (De)
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                          R$
-                        </span>
-                        <input
-                          type="number"
-                          value={form.originalPrice || ""}
-                          onChange={(e) =>
-                            setForm((p) => ({
-                              ...p,
-                              originalPrice: Number(e.target.value),
-                            }))
-                          }
-                          className="w-full border border-gray-200 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-gray-900"
-                          placeholder="0,00 (opcional)"
-                          min={0}
-                          step={0.01}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Deixe em branco se não houver desconto
-                      </p>
-                    </div>
                   </div>
-                  {form.basePrice > 0 && form.originalPrice > form.basePrice && (
-                    <div className="flex items-center gap-2 bg-green-50 border border-green-100 px-3 py-2">
-                      <Check className="w-3.5 h-3.5 text-green-600" />
-                      <p className="text-green-700 text-xs">
-                        Desconto de{" "}
-                        <strong>
-                          {Math.round(
-                            ((form.originalPrice - form.basePrice) /
-                              form.originalPrice) *
-                              100
-                          )}
-                          %
-                        </strong>{" "}
-                        será exibido no produto.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Sizes */}
@@ -1521,7 +1441,7 @@ export function AddProduct({
                         onClick={() => toggleSize(size)}
                         className={`h-9 px-3 border text-xs transition-all ${
                           form.sizes.includes(size)
-                            ? "bg-[#1a1a1a] text-white border-[#1a1a1a]"
+                            ? "bg-black text-white border-[#1a1a1a]"
                             : "border-gray-200 text-gray-600 hover:border-gray-400 hover:text-gray-900"
                         }`}
                       >
@@ -1604,7 +1524,7 @@ export function AddProduct({
                       <div className="flex gap-2">
                         <button
                           onClick={addColor}
-                          className="px-3 py-1.5 bg-[#1a1a1a] text-white text-xs hover:bg-[#333] transition-colors"
+                          className="px-3 py-1.5 bg-black text-white text-xs hover:bg-[#333] transition-colors"
                         >
                           Confirmar Cor
                         </button>
@@ -1918,7 +1838,7 @@ export function AddProduct({
                             );
                             return (
                               <tr
-                                key={v.id}
+                                key={v.codigoSku}
                                 className="hover:bg-gray-50/60 transition-colors"
                               >
                                 {/* Variant label */}
@@ -1947,7 +1867,7 @@ export function AddProduct({
                                     value={v.stockOnline}
                                     onChange={(e) =>
                                       updateVariant(
-                                        v.id,
+                                        v.codigoSku,
                                         "stockOnline",
                                         Math.max(0, Number(e.target.value))
                                       )
@@ -1963,7 +1883,7 @@ export function AddProduct({
                                     value={v.stockPhysical}
                                     onChange={(e) =>
                                       updateVariant(
-                                        v.id,
+                                        v.codigoSku,
                                         "stockPhysical",
                                         Math.max(0, Number(e.target.value))
                                       )
@@ -2002,7 +1922,7 @@ export function AddProduct({
                                       value={v.price}
                                       onChange={(e) =>
                                         updateVariant(
-                                          v.id,
+                                          v.codigoSku,
                                           "price",
                                           Number(e.target.value)
                                         )
@@ -2101,7 +2021,7 @@ export function AddProduct({
               {step < 4 ? (
                 <button
                   onClick={handleNext}
-                  className="flex items-center gap-2 px-5 py-2 bg-[#1a1a1a] text-white text-sm hover:bg-[#333333] transition-colors"
+                  className="flex items-center gap-2 px-5 py-2 bg-black text-white text-sm hover:bg-gray-800 transition-colors"
                 >
                   Avançar
                   <ChevronRight className="w-4 h-4" />

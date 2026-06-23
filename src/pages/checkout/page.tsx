@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Check,
@@ -17,6 +17,11 @@ import { api } from "@/lib/api";
 
 type Step = "dados" | "entrega" | "pagamento" | "confirmado";
 
+type ShippingQuote = {
+  valor: number;
+  prazo_dias: number;
+};
+
 function GuestCheckoutModal({
   onContinueAsGuest,
   onLogin,
@@ -32,11 +37,11 @@ function GuestCheckoutModal({
         </div>
         <h3 className="text-gray-900 text-center mb-2 font-serif text-xl">Finalizar compra</h3>
         <p className="text-gray-500 text-sm text-center leading-relaxed mb-1 font-sans">
-          Você pode concluir seu pedido <strong>sem criar uma conta</strong>.
+          Você pode continuar preenchendo os dados, mas para concluir o pedido será
+          necessário entrar no sistema.
         </p>
         <p className="text-gray-400 text-xs text-center mb-6 font-sans">
-          Compras como convidado <strong>não ficam vinculadas</strong> a nenhum
-          perfil e não aparecem no histórico de pedidos.
+          Pedidos reais são registrados apenas para usuários autenticados.
         </p>
 
         <div className="space-y-3 font-sans">
@@ -45,19 +50,19 @@ function GuestCheckoutModal({
             className="bt-principal w-full py-3 text-sm tracking-wide flex items-center justify-center gap-2"
           >
             <ShoppingBag className="w-4 h-4" />
-            Continuar sem conta
+            Continuar
           </button>
           <button
             onClick={onLogin}
             className="w-full border border-gray-300 text-gray-700 py-3 hover:border-[#1a1a1a] hover:text-[#1a1a1a] transition-colors text-sm flex items-center justify-center gap-2"
           >
             <User className="w-4 h-4" />
-            Entrar para vincular ao meu perfil
+            Entrar para finalizar
           </button>
         </div>
 
         <p className="text-gray-400 text-xs text-center mt-4 leading-relaxed font-sans">
-          Ao entrar, este pedido será registrado na sua conta para consulta futura.
+          Ao entrar, o pedido poderá ser concluído e ficará disponível na sua conta.
         </p>
       </div>
     </div>
@@ -102,7 +107,7 @@ const inputErrorClass =
   "w-full border border-red-400 px-4 py-2.5 text-sm focus:outline-none focus:border-red-500 transition-colors font-sans";
 
 export default function CheckoutPage() {
-  const { cart, clear, setShipping } = useCart();
+  const { cart, clear } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -112,16 +117,17 @@ export default function CheckoutPage() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; cpf?: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Shipping calculator state
-  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
-  const [shippingMsg, setShippingMsg] = useState<string | null>(null);
+  const [shippingError, setShippingError] = useState<string | null>(null);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [confirmedOrderId, setConfirmedOrderId] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     nome: user?.name || "",
     email: user?.email || "",
-    cpf: "",
+    cpf: user?.id || "",
     telefone: "",
     cep: "",
     rua: "",
@@ -135,12 +141,86 @@ export default function CheckoutPage() {
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  // Usa o frete selecionado no carrinho/checkout; sem seleção = ainda não calculado
-  const shippingSelected = !!cart.selectedShipping;
-  const shipping = cart.selectedShipping ? cart.selectedShipping.price : 0;
-  // PIX discount applies to the merchandise only, never to shipping
-  const pixDiscount = payment === "pix" ? cart.subtotal * 0.05 : 0;
-  const finalTotal = cart.subtotal - pixDiscount + shipping;
+  const shipping = shippingQuote?.valor ?? 0;
+  const finalTotal = cart.total + shipping;
+
+  useEffect(() => {
+    const cleanCep = form.cep.replace(/\D/g, "");
+
+    if (cleanCep.length !== 8) {
+      setShippingQuote(null);
+      setShippingError(null);
+      setAddressError(null);
+      setShippingLoading(false);
+      setAddressLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setShippingLoading(true);
+      setAddressLoading(true);
+      setShippingError(null);
+      setAddressError(null);
+
+      try {
+        const quote = await api.post<ShippingQuote>("/shipping/calculate", {
+          cep_destino: cleanCep,
+        });
+        if (!cancelled) {
+          setShippingQuote(quote);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setShippingQuote(null);
+          setShippingError(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível calcular o frete para este CEP.",
+          );
+        }
+      }
+
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        const data = (await response.json()) as {
+          erro?: boolean;
+          logradouro?: string;
+          bairro?: string;
+          localidade?: string;
+          uf?: string;
+        };
+
+        if (!cancelled) {
+          if (data.erro) {
+            setAddressError("CEP não encontrado.");
+          } else {
+            setForm((prev) => ({
+              ...prev,
+              rua: prev.rua || data.logradouro || "",
+              bairro: prev.bairro || data.bairro || "",
+              cidade: prev.cidade || data.localidade || "",
+              estado: prev.estado || data.uf || "",
+            }));
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setAddressError("Não foi possível consultar o CEP.");
+        }
+      } finally {
+        if (!cancelled) {
+          setShippingLoading(false);
+          setAddressLoading(false);
+        }
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [form.cep]);
 
   const steps: { key: Step; label: string }[] = [
     { key: "dados", label: "Dados Pessoais" },
@@ -172,40 +252,29 @@ export default function CheckoutPage() {
   };
 
   const handleConfirm = async () => {
+    if (!user) {
+      setSubmitError("É necessário entrar no sistema para finalizar o pedido.");
+      return;
+    }
+
+    if (!shippingQuote) {
+      setSubmitError("Informe um CEP válido para calcular o frete.");
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await api.post("/orders", {
+      const response = await api.post<{ idPedido: number }>("/orders", {
         items: cart.items.map((i) => ({
-          productId: i.variant.produto.id,
-          variantId: i.variant.id,
-          titulo: i.variant.produto.titulo,
-          tamanho: i.variant.tamanho,
-          cor: i.variant.cor,
+          variantSku: i.variant.codigoSku,
           quantidade: i.quantity,
-          preco_unitario: i.variant.preco_variante || i.variant.produto.preco_base,
         })),
-        subtotal: cart.subtotal,
-        frete: shipping,
-        desconto: pixDiscount,
-        total: finalTotal,
-        paymentMethod: payment,
-        endereco: {
-          cep: form.cep,
-          rua: form.rua,
-          numero: form.numero,
-          complemento: form.complemento,
-          bairro: form.bairro,
-          cidade: form.cidade,
-          estado: form.estado,
-        },
-        cliente: {
-          nome: form.nome || undefined,
-          email: form.email,
-          cpf: form.cpf,
-          telefone: form.telefone || undefined,
-        },
+        couponNumero: cart.cupom ?? null,
+        valorFrete: shippingQuote.valor,
+        tipoRetirada: "entrega",
       });
+      setConfirmedOrderId(response.idPedido);
     } catch (err) {
       console.error("Erro ao criar pedido:", err);
       setSubmitError(
@@ -240,7 +309,7 @@ export default function CheckoutPage() {
           <div className="bg-gray-50 border border-gray-100 p-4 mb-6 text-sm text-left">
             <p className="text-gray-500">Número do pedido:</p>
             <p className="text-gray-900 font-medium mb-2">
-              #PED-2026-{Math.floor(Math.random() * 900 + 100)}
+              {confirmedOrderId ? `#${confirmedOrderId}` : "#--"}
             </p>
             <p className="text-gray-500">Total pago:</p>
             <p className="text-gray-900 font-medium">
@@ -290,16 +359,18 @@ export default function CheckoutPage() {
               {steps.slice(0, 3).map((s, i) => (
                 <React.Fragment key={s.key}>
                   <div
-                    className={`flex items-center gap-2 ${i <= stepIndex ? "text-white" : "text-gray-500"
-                      }`}
+                    className={`flex items-center gap-2 ${
+                      i <= stepIndex ? "text-white" : "text-gray-500"
+                    }`}
                   >
                     <div
-                      className={`w-6 h-6 flex items-center justify-center text-xs border rounded-full ${i < stepIndex
+                      className={`w-6 h-6 flex items-center justify-center text-xs border rounded-full ${
+                        i < stepIndex
                           ? "bg-white text-[#1a1a1a] border-white"
                           : i === stepIndex
-                            ? "border-white text-white"
-                            : "border-gray-600 text-gray-600"
-                        }`}
+                          ? "border-white text-white"
+                          : "border-gray-600 text-gray-600"
+                      }`}
                     >
                       {i < stepIndex ? <Check className="w-3 h-3" /> : i + 1}
                     </div>
@@ -406,146 +477,43 @@ export default function CheckoutPage() {
                 <div className="bg-white p-6 border border-gray-100">
                   <h2 className="text-gray-900 mb-5 font-serif text-xl">Endereço de Entrega</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* CEP field with auto-lookup */}
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">CEP</label>
-                      <input
-                        type="text"
-                        value={form.cep}
-                        maxLength={9}
-                        onChange={async (e) => {
-                          const raw = e.target.value;
-                          set("cep", raw);
-                          const clean = raw.replace(/\D/g, "");
-                          if (clean.length === 8) {
-                            // Auto-fill address via ViaCEP
-                            try {
-                              const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
-                              const data = await res.json();
-                              if (!data.erro) {
-                                setForm(prev => ({
-                                  ...prev,
-                                  cep: raw,
-                                  rua: data.logradouro || prev.rua,
-                                  bairro: data.bairro || prev.bairro,
-                                  cidade: data.localidade || prev.cidade,
-                                  estado: data.uf || prev.estado,
-                                }));
-                              }
-                            } catch {
-                              // ViaCEP offline — user fills manually
-                            }
-                            // Auto-calculate shipping
-                            setShippingLoading(true);
-                            setShippingMsg(null);
-                            setShippingOptions([]);
-                            try {
-                              const options = await api.post<any[]>("/shipping/calculate", {
-                                cep_destino: clean,
-                                valor_declarado: cart.subtotal,
-                              });
-                              setShippingOptions(options);
-                              if (options.length === 0) {
-                                setShippingMsg("Não atendemos essa região no momento.");
-                              } else {
-                                // Auto-select cheapest option
-                                const cheapest = options.reduce((min: any, o: any) => o.price < min.price ? o : min, options[0]);
-                                setShipping({ id: cheapest.id, name: cheapest.name, price: cheapest.price, delivery_time: cheapest.delivery_time });
-                              }
-                            } catch {
-                              setShippingMsg("Erro ao calcular frete. Tente novamente.");
-                            } finally {
-                              setShippingLoading(false);
-                            }
+                    {[
+                      { key: "cep", label: "CEP", type: "text" },
+                      { key: "estado", label: "Estado", type: "text" },
+                      { key: "rua", label: "Rua", type: "text", full: true },
+                      { key: "numero", label: "Número", type: "text" },
+                      { key: "complemento", label: "Complemento", type: "text" },
+                      { key: "bairro", label: "Bairro", type: "text" },
+                      { key: "cidade", label: "Cidade", type: "text" },
+                    ].map((f) => (
+                      <div key={f.key} className={f.full ? "sm:col-span-2" : ""}>
+                        <label className="block text-sm text-gray-600 mb-1">
+                          {f.label}
+                        </label>
+                        <input
+                          type={f.type}
+                          value={form[f.key as keyof typeof form]}
+                          onChange={(e) =>
+                            set(f.key as keyof typeof form, e.target.value)
                           }
-                        }}
-                        className={inputClass}
-                        placeholder="00000-000"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Estado</label>
-                      <input type="text" value={form.estado} onChange={(e) => set("estado", e.target.value)} className={inputClass} placeholder="Estado" />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm text-gray-600 mb-1">Rua</label>
-                      <input type="text" value={form.rua} onChange={(e) => set("rua", e.target.value)} className={inputClass} placeholder="Rua" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Número</label>
-                      <input type="text" value={form.numero} onChange={(e) => set("numero", e.target.value)} className={inputClass} placeholder="Número" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Complemento</label>
-                      <input type="text" value={form.complemento} onChange={(e) => set("complemento", e.target.value)} className={inputClass} placeholder="Complemento" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Bairro</label>
-                      <input type="text" value={form.bairro} onChange={(e) => set("bairro", e.target.value)} className={inputClass} placeholder="Bairro" />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-1">Cidade</label>
-                      <input type="text" value={form.cidade} onChange={(e) => set("cidade", e.target.value)} className={inputClass} placeholder="Cidade" />
-                    </div>
+                          className={inputClass}
+                          placeholder={f.label}
+                        />
+                      </div>
+                    ))}
                   </div>
-
-                  {/* Shipping options (auto-loaded when CEP is filled) */}
-                  {shippingLoading && (
-                    <p className="text-sm text-gray-500 mt-4">Calculando frete...</p>
-                  )}
-
-                  {shippingOptions.length > 0 && (
-                    <div className="mt-5 border-t border-gray-100 pt-4">
-                      <h3 className="text-gray-900 text-sm font-medium mb-3">Opções de Frete</h3>
-                      <div className="space-y-2">
-                        {shippingOptions.map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => setShipping({ id: opt.id, name: opt.name, price: opt.price, delivery_time: opt.delivery_time })}
-                            className={`w-full flex items-center justify-between p-3 border text-left transition-colors ${
-                              cart.selectedShipping?.id === opt.id
-                                ? "border-[#1a1a1a] bg-gray-100"
-                                : "border-gray-100 bg-gray-50 hover:border-gray-300"
-                            }`}
-                          >
-                            <div>
-                              <p className="text-sm text-gray-800">{opt.name}</p>
-                              <p className="text-xs text-gray-500">
-                                {opt.company?.name} · {opt.delivery_time} dia{opt.delivery_time !== 1 ? "s" : ""}
-                                {opt.delivery_range && ` (${opt.delivery_range.min}-${opt.delivery_range.max} dias)`}
-                              </p>
-                            </div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {opt.price === 0 ? "Grátis" : formatCurrency(opt.price)}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
+                  {(shippingError || addressError || shippingLoading || addressLoading) && (
+                    <div className="mt-4 space-y-1 text-xs">
+                      {shippingLoading && (
+                        <p className="text-gray-500">Calculando frete pelo CEP informado...</p>
+                      )}
+                      {addressLoading && (
+                        <p className="text-gray-500">Consultando endereço do CEP...</p>
+                      )}
+                      {shippingError && <p className="text-red-600">{shippingError}</p>}
+                      {addressError && <p className="text-amber-600">{addressError}</p>}
                     </div>
                   )}
-
-                  {shippingMsg && !shippingLoading && shippingOptions.length === 0 && (
-                    <p className="text-sm text-gray-600 mt-4">{shippingMsg}</p>
-                  )}
-
-                  {cart.selectedShipping && shippingOptions.length === 0 && !shippingLoading && (
-                    <div className="mt-5 border-t border-gray-100 pt-4">
-                      <h3 className="text-gray-900 text-sm font-medium mb-3">Frete Selecionado</h3>
-                      <div className="p-3 border border-[#1a1a1a] bg-gray-100 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-800">{cart.selectedShipping.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {cart.selectedShipping.delivery_time} dia{cart.selectedShipping.delivery_time !== 1 ? "s" : ""} úteis
-                          </p>
-                        </div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {cart.selectedShipping.price === 0 ? "Grátis" : formatCurrency(cart.selectedShipping.price)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex gap-3 mt-6">
                     <button
                       onClick={() => setStep("dados")}
@@ -575,17 +543,18 @@ export default function CheckoutPage() {
                       },
                       {
                         key: "pix",
-                        label: "PIX (5% de desconto)",
+                        label: "PIX",
                         icon: <QrCode className="w-5 h-5" />,
                       },
                     ].map((p) => (
                       <button
                         key={p.key}
                         onClick={() => setPayment(p.key as typeof payment)}
-                        className={`w-full flex items-center gap-3 p-4 border text-left transition-colors ${payment === p.key
+                        className={`w-full flex items-center gap-3 p-4 border text-left transition-colors ${
+                          payment === p.key
                             ? "border-[#1a1a1a] bg-gray-50 text-[#1a1a1a]"
                             : "border-gray-200 text-gray-700 hover:border-gray-400"
-                          }`}
+                        }`}
                       >
                         <span
                           className={
@@ -669,7 +638,7 @@ export default function CheckoutPage() {
                         Após confirmar, você receberá o QR Code para pagamento.
                       </p>
                       <p className="text-green-600 text-xs mt-1">
-                        Você economizará {formatCurrency(pixDiscount)}!
+                        O valor do PIX é o mesmo dos demais meios de pagamento.
                       </p>
                     </div>
                   )}
@@ -678,6 +647,11 @@ export default function CheckoutPage() {
                     <p className="flex items-center gap-1 text-red-500 text-xs mt-4">
                       <AlertCircle className="w-3 h-3 shrink-0" />
                       {submitError}
+                    </p>
+                  )}
+                  {!user && (
+                    <p className="text-xs text-amber-600 mt-4">
+                      Entre no sistema para habilitar a finalização do pedido.
                     </p>
                   )}
 
@@ -691,7 +665,7 @@ export default function CheckoutPage() {
                     </button>
                     <button
                       onClick={handleConfirm}
-                      disabled={submitting}
+                      disabled={submitting || !user || !shippingQuote || shippingLoading}
                       className="flex-1 bg-[#1a1a1a] text-white py-3 hover:bg-[#333333] transition-colors text-sm tracking-wide disabled:opacity-60"
                     >
                       {submitting ? "Processando..." : "Confirmar Pedido"}
@@ -707,12 +681,12 @@ export default function CheckoutPage() {
                 <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pr-2">
                   {cart.items.map((item) => (
                     <div
-                      key={item.variant.id}
+                      key={item.variant.codigoSku}
                       className="flex gap-2"
                     >
                       <div className="w-12 h-14 relative shrink-0">
                         <img
-                          src={item.variant.images?.[0]?.image.url || "/hero-dress.png"}
+                          src={item.variant.images?.[0]?.url || "/hero-dress.png"}
                           alt={item.variant.produto.titulo}
                           className="object-cover object-top"
                         />
@@ -725,7 +699,7 @@ export default function CheckoutPage() {
                           {item.variant.tamanho} · {item.variant.cor} · x{item.quantity}
                         </p>
                         <p className="text-xs text-gray-800 font-medium">
-                          {formatCurrency((item.variant.preco_variante || item.variant.produto.preco_base) * item.quantity)}
+                          {formatCurrency((item.variant.precoVariante ?? item.variant.produto.precoBase) * item.quantity)}
                         </p>
                       </div>
                     </div>
@@ -736,21 +710,27 @@ export default function CheckoutPage() {
                     <span>Subtotal</span>
                     <span>{formatCurrency(cart.subtotal)}</span>
                   </div>
+                  {cart.desconto > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Desconto {cart.cupom ? `(${cart.cupom})` : ""}</span>
+                      <span>-{formatCurrency(cart.desconto)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-gray-500">
-                    <span>Frete{cart.selectedShipping ? ` (${cart.selectedShipping.name})` : ""}</span>
-                    {!shippingSelected ? (
-                      <span className="text-amber-500 text-xs">A calcular</span>
-                    ) : shipping === 0 ? (
-                      <span className="text-green-600">Grátis</span>
+                    <span>Frete</span>
+                    {shippingLoading ? (
+                      <span>Calculando...</span>
+                    ) : shippingQuote ? (
+                      <span>{formatCurrency(shippingQuote.valor)}</span>
                     ) : (
-                      <span>{formatCurrency(shipping)}</span>
+                      <span>Informe um CEP válido</span>
                     )}
                   </div>
-                  {payment === "pix" && (
-                    <div className="flex justify-between text-green-600 text-xs font-medium">
-                      <span>Desconto PIX (5%)</span>
-                      <span>-{formatCurrency(pixDiscount)}</span>
-                    </div>
+                  {shippingQuote && (
+                    <p className="text-xs text-gray-400">
+                      Prazo estimado: {shippingQuote.prazo_dias} dia
+                      {shippingQuote.prazo_dias !== 1 ? "s" : ""} útil
+                    </p>
                   )}
                 </div>
                 <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">

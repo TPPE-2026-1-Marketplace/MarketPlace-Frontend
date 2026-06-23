@@ -5,6 +5,29 @@ export interface ApiVariant {
   tamanho: string | null;
 }
 
+export interface ApiOrder {
+  idPedido: number;
+  idUsuario: string | null;
+  idFuncionario?: string;
+  clienteNomeAvulso?: string;
+  user?: {
+    cpf: string;
+    nome: string;
+    email: string;
+  };
+  employee?: {
+    cpf: string;
+    person?: {
+      nome: string;
+    };
+  };
+  valorTotal: string;
+  status: string;
+  tipoRetirada: "entrega" | "loja";
+  dataPedido: string;
+  items: any[];
+}
+
 export interface ApiProduct {
   idProduto: number;
   titulo: string;
@@ -28,7 +51,7 @@ export interface POSSale {
   items: POSSaleItem[];
   subtotal: number;
   total: number;
-  paymentMethod: "pix" | "card";
+  paymentMethod: "pix" | "card" | "dinheiro";
   sellerId: string;
   sellerName: string;
   customerName?: string;

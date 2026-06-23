@@ -1,18 +1,35 @@
 
 import React, { useState } from "react";
 import { MapPin, Check } from "lucide-react";
+import { api } from "@/lib/api";
 
 export default function ShippingCalculator() {
   const [cep, setCep] = useState("");
-  const [cepResult, setCepResult] = useState<null | "ok" | "erro">(null);
+  const [quote, setQuote] = useState<{ valor: number; prazo_dias: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleShippingCheck = (e: React.FormEvent) => {
+  const handleShippingCheck = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCep = cep.replace(/\D/g, "");
-    if (cleanCep.length === 8) {
-      // Mock check — DF CEPs começam com 70 até 73
-      const num = parseInt(cleanCep.slice(0, 2), 10);
-      setCepResult(num >= 70 && num <= 73 ? "ok" : "erro");
+    if (cleanCep.length !== 8) {
+      setQuote(null);
+      setError("CEP inválido. Use 8 dígitos.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post<{ valor: number; prazo_dias: number }>("/shipping/calculate", {
+        cep_destino: cleanCep,
+      });
+      setQuote(response);
+    } catch (requestError) {
+      setQuote(null);
+      setError(requestError instanceof Error ? requestError.message : "Erro ao calcular frete.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,7 +45,8 @@ export default function ShippingCalculator() {
           value={cep}
           onChange={(e) => {
             setCep(e.target.value);
-            setCepResult(null);
+            setQuote(null);
+            setError(null);
           }}
           placeholder="Digite seu CEP"
           maxLength={9}
@@ -41,20 +59,27 @@ export default function ShippingCalculator() {
           OK
         </button>
       </form>
-      
-      {cepResult === "ok" && (
+
+      {loading && (
+        <p className="mt-3 text-xs text-[var(--foreground-muted)]">Calculando frete...</p>
+      )}
+
+      {quote && !loading && (
         <div className="mt-3 p-3 rounded bg-[var(--color-success)]/10 border border-[var(--color-success)]/20">
           <p className="text-[var(--color-success)] text-xs flex items-start gap-1.5 font-medium leading-relaxed">
             <Check size={14} className="shrink-0 mt-0.5" />
-            Entregamos no seu endereço! Prazo estimado: 3 a 7 dias úteis via correios.
+            Frete {quote.valor.toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })} · prazo de {quote.prazo_dias} dia{quote.prazo_dias !== 1 ? "s" : ""} útil
           </p>
         </div>
       )}
-      
-      {cepResult === "erro" && (
+
+      {error && !loading && (
         <div className="mt-3 p-3 rounded bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
           <p className="text-[var(--color-warning)] text-xs font-medium leading-relaxed">
-            No momento, atendemos entregas padrão apenas para o Distrito Federal. Entre em contato para envios especiais.
+            {error}
           </p>
         </div>
       )}

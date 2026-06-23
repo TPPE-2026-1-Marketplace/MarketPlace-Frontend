@@ -8,12 +8,20 @@ import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
 
 export default function CarrinhoPage() {
-  const { cart, updateQuantity, removeItem, clear, setShipping } = useCart();
+  const { cart, updateQuantity, removeItem, clear, applyCoupon } = useCart();
   const navigate = useNavigate();
   const [cep, setCep] = useState("");
   const [shippingMsg, setShippingMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [shippingLoading, setShippingLoading] = useState(false);
+  
+  const [couponInput, setCouponInput] = useState("");
+  const [couponMsg, setCouponMsg] = useState<{ text: string; error: boolean } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const handleShipCalc = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +49,38 @@ export default function CarrinhoPage() {
       setShippingMsg("Erro ao calcular frete. Tente novamente.");
     } finally {
       setShippingLoading(false);
+    }
+  };
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponInput.trim()) return;
+
+    setCouponLoading(true);
+    setCouponMsg(null);
+    try {
+      const productIds = Array.from(new Set(cart.items.map(i => i.variant.produto.idProduto))).join(",");
+      const res = await api.get<{ valid: boolean, reason?: string, tipoCupom?: string, valorDesconto?: number }>(`/coupons/validate/${couponInput.trim()}?productIds=${productIds}`);
+      
+      if (res.valid) {
+        setCouponMsg({ text: "Cupom aplicado com sucesso!", error: false });
+        if (res.tipoCupom === "porcentagem") {
+          applyCoupon(couponInput.trim(), res.valorDesconto, 0);
+        } else {
+          applyCoupon(couponInput.trim(), 0, res.valorDesconto);
+        }
+      } else {
+        const errorText = res.reason === "expired" ? "Cupom expirado." :
+                          res.reason === "limit_reached" ? "Limite de uso atingido." :
+                          res.reason === "ineligible_products" ? "Cupom não aplicável a estes produtos." : "Cupom inválido.";
+        setCouponMsg({ text: errorText, error: true });
+        applyCoupon(null, 0, 0);
+      }
+    } catch {
+      setCouponMsg({ text: "Erro ao validar cupom.", error: true });
+      applyCoupon(null, 0, 0);
+    } finally {
+      setCouponLoading(false);
     }
   };
 
@@ -98,12 +138,12 @@ export default function CarrinhoPage() {
 
             {cart.items.map((item) => (
               <div
-                key={item.variant.id}
+                key={item.variant.codigoSku}
                 className="bg-white p-4 border border-gray-100 flex gap-4"
               >
-                <Link to={`/produtos/${item.variant.produto.id}`} className="shrink-0 relative w-20 h-24 sm:w-24 sm:h-32">
+                <Link to={`/produtos/${item.variant.produto.idProduto}`} className="shrink-0 relative w-20 h-24 sm:w-24 sm:h-32">
                   <img
-                    src={item.variant.images?.[0]?.image.url || "/hero-dress.png"}
+                    src={item.variant.images?.[0]?.url || "/hero-dress.png"}
                     alt={item.variant.produto.titulo}
                     className="object-cover object-top"
                   />
@@ -112,7 +152,7 @@ export default function CarrinhoPage() {
                   <div className="flex justify-between gap-2">
                     <div>
                       <Link
-                        to={`/produtos/${item.variant.produto.id}`}
+                        to={`/produtos/${item.variant.produto.idProduto}`}
                         className="text-gray-900 hover:text-gray-600 transition-colors line-clamp-1 text-sm font-medium"
                       >
                         {item.variant.produto.titulo}
@@ -130,11 +170,11 @@ export default function CarrinhoPage() {
                         )}
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {item.variant.id}
+                        {item.variant.codigoSku}
                       </p>
                     </div>
                     <button
-                      onClick={() => removeItem(item.variant.id)}
+                      onClick={() => removeItem(item.variant.codigoSku)}
                       className="text-gray-300 hover:text-red-500 transition-colors p-1 shrink-0 h-fit"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -145,7 +185,7 @@ export default function CarrinhoPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() =>
-                          updateQuantity(item.variant.id, item.quantity - 1)
+                          updateQuantity(item.variant.codigoSku, item.quantity - 1)
                         }
                         className="w-7 h-7 border border-gray-200 flex items-center justify-center hover:border-gray-500 transition-colors text-gray-600"
                       >
@@ -156,7 +196,7 @@ export default function CarrinhoPage() {
                       </span>
                       <button
                         onClick={() =>
-                          updateQuantity(item.variant.id, item.quantity + 1)
+                          updateQuantity(item.variant.codigoSku, item.quantity + 1)
                         }
                         className="w-7 h-7 border border-gray-200 flex items-center justify-center hover:border-gray-500 transition-colors text-gray-600"
                       >
@@ -165,11 +205,11 @@ export default function CarrinhoPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-gray-900 text-sm font-medium">
-                        {formatCurrency((item.variant.preco_variante || item.variant.produto.preco_base) * item.quantity)}
+                        {formatCurrency((item.variant.precoVariante ?? item.variant.produto.precoBase) * item.quantity)}
                       </p>
                       {item.quantity > 1 && (
                         <p className="text-xs text-gray-400">
-                          {formatCurrency(item.variant.preco_variante || item.variant.produto.preco_base)} cada
+                          {formatCurrency(item.variant.precoVariante ?? item.variant.produto.precoBase)} cada
                         </p>
                       )}
                     </div>
@@ -206,15 +246,9 @@ export default function CarrinhoPage() {
               {shippingOptions.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {shippingOptions.map((opt) => (
-                    <button
+                    <div
                       key={opt.id}
-                      type="button"
-                      onClick={() => setShipping({ id: opt.id, name: opt.name, price: opt.price, delivery_time: opt.delivery_time })}
-                      className={`w-full flex items-center justify-between p-3 border text-left transition-colors ${
-                        cart.selectedShipping?.id === opt.id
-                          ? "border-[#1a1a1a] bg-gray-100"
-                          : "border-gray-100 bg-gray-50 hover:border-gray-300"
-                      }`}
+                      className="flex items-center justify-between p-3 border border-gray-100 bg-gray-50"
                     >
                       <div>
                         <p className="text-sm text-gray-800">{opt.name}</p>
@@ -226,7 +260,7 @@ export default function CarrinhoPage() {
                       <p className="text-sm font-medium text-gray-900">
                         {opt.price === 0 ? "Grátis" : formatCurrency(opt.price)}
                       </p>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -239,6 +273,32 @@ export default function CarrinhoPage() {
           {/* Summary */}
           <div className="lg:w-80 shrink-0">
             <div className="bg-white p-6 border border-gray-100 sticky top-24">
+              
+              {/* Cupom */}
+              <div className="mb-6 pb-6 border-b border-gray-100">
+                <p className="text-sm text-gray-700 mb-3 font-medium">Cupom de Desconto</p>
+                <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value)}
+                    placeholder="Código do cupom"
+                    className="flex-1 border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a] uppercase"
+                  />
+                  <button type="submit" disabled={couponLoading} className="bt-principal px-4 py-2 text-sm disabled:opacity-50">
+                    Aplicar
+                  </button>
+                </form>
+                {couponMsg && (
+                  <p className={`text-xs mt-2 ${couponMsg.error ? "text-red-600" : "text-green-600"}`}>
+                    {couponMsg.text}
+                  </p>
+                )}
+                {cart.cupom && !couponMsg && (
+                  <p className="text-xs mt-2 text-green-600">Cupom {cart.cupom} aplicado.</p>
+                )}
+              </div>
+
               <h2 className="text-gray-900 mb-5 font-serif text-xl">Resumo do Pedido</h2>
 
               <div className="space-y-3 mb-5">
@@ -248,11 +308,7 @@ export default function CarrinhoPage() {
                 </div>
                 <div className="flex justify-between text-sm text-gray-400">
                   <span>Frete</span>
-                  <span>
-                    {cart.selectedShipping
-                      ? (cart.selectedShipping.price === 0 ? "Grátis" : formatCurrency(cart.selectedShipping.price))
-                      : "Selecione acima"}
-                  </span>
+                  <span>Calculado no checkout</span>
                 </div>
                 {cart.desconto > 0 && (
                   <div className="flex justify-between text-sm text-green-600">

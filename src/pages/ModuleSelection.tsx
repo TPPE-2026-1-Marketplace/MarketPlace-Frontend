@@ -47,7 +47,7 @@ export function ModuleSelection() {
         <div className="grid md:grid-cols-2 gap-6">
           {canAccessManagement && (
             <button
-              onClick={() => navigate("/gerente")}
+              onClick={() => navigate("/painel")}
               className="group bg-white border border-gray-100 p-8 hover:shadow-lg transition-all text-left"
             >
               <div className="w-14 h-14 bg-[#1a1a1a] flex items-center justify-center mb-4 group-hover:bg-[#333333] transition-colors">

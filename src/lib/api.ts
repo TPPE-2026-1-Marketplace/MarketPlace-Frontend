@@ -39,10 +39,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   const token = getAuthToken();
 
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(!isFormData && { "Content-Type": "application/json" }),
     ...customHeaders as Record<string, string>,
   };
+
+  // Se for FormData, o fetch calcula o boundary sozinho.
+  if (isFormData && headers["Content-Type"] === "multipart/form-data") {
+    delete headers["Content-Type"];
+  }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -53,7 +59,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const response = await fetch(url, {
     ...rest,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: isFormData ? (body as FormData) : body ? JSON.stringify(body) : undefined,
   });
 
   if (!response.ok) {
@@ -101,8 +107,8 @@ export const api = {
     return request<T>(path, { method: "GET", params });
   },
 
-  post<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>(path, { method: "POST", body });
+  post<T>(path: string, body?: unknown, options?: Omit<RequestOptions, "body">): Promise<T> {
+    return request<T>(path, { method: "POST", body, ...options });
   },
 
   patch<T>(path: string, body?: unknown): Promise<T> {

@@ -15,7 +15,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useAuth, UserRole } from "../../context/AuthContext";
-import { MOCK_EMPLOYEE_SALES } from "../../data/employees";
 import { api, ApiError } from "../../lib/api";
 
 export interface ApiEmployee {
@@ -37,6 +36,7 @@ export interface ApiEmployee {
 export const mapRoleToFrontend = (role: string): UserRole => {
   if (role === "administrador") return "superadmin";
   if (role === "gerente") return "manager";
+  if (role === "caixa") return "cashier";
   if (role === "cliente") return "customer";
   return "employee";
 };
@@ -44,6 +44,7 @@ export const mapRoleToFrontend = (role: string): UserRole => {
 export const mapFrontendToRole = (role: UserRole): string => {
   if (role === "superadmin") return "administrador";
   if (role === "manager") return "gerente";
+  if (role === "cashier") return "caixa";
   if (role === "customer") return "cliente";
   return "vendedor";
 };
@@ -53,6 +54,7 @@ type Tab = "list" | "add" | "edit";
 const ROLE_LABELS: Record<UserRole, string> = {
   superadmin: "Super Admin",
   manager: "Gerente",
+  cashier: "Caixa",
   employee: "Funcionário",
   customer: "Cliente",
 };
@@ -60,6 +62,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 const ROLE_COLORS: Record<UserRole, string> = {
   superadmin: "bg-gray-900 text-white",
   manager: "bg-gray-700 text-white",
+  cashier: "bg-blue-100 text-blue-700",
   employee: "bg-gray-200 text-gray-800",
   customer: "bg-gray-100 text-gray-600",
 };
@@ -80,7 +83,7 @@ export function Employees() {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const res = await api.get<{ data: ApiEmployee[] }>("/employees?limit=1000");
+      const res = await api.get<{ data: ApiEmployee[] }>("/employees?limit=100");
       setEmployees(res.data);
     } catch (err) {
       console.error(err);
@@ -131,8 +134,8 @@ export function Employees() {
   });
 
   const availableRoles: UserRole[] = canManageManagers
-    ? ["superadmin", "manager", "employee"]
-    : ["employee"];
+    ? ["superadmin", "manager", "employee", "cashier"]
+    : ["employee", "cashier"];
 
   const resetForm = () => {
     setForm({
@@ -233,15 +236,7 @@ export function Employees() {
     }
   };
 
-  const getSalesForEmployee = (employeeId: string) => {
-    return MOCK_EMPLOYEE_SALES.filter((s) => s.employeeId === employeeId);
-  };
-
-  const getEmployeeTotal = (employeeId: string) => {
-    return getSalesForEmployee(employeeId).reduce((sum, s) => sum + s.amount, 0);
-  };
-
-  const FormSection = () => (
+  const renderFormSection = () => (
     <div className="bg-white border border-gray-100 p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-gray-900">
@@ -454,8 +449,10 @@ export function Employees() {
   );
 
   const staffUsers = filteredUsers;
-  const employeeCount = employees.filter((u) => mapRoleToFrontend(u.role_perfil) === "employee").length;
-  const managerCount = employees.filter((u) => mapRoleToFrontend(u.role_perfil) === "manager").length;
+  const employeeCount = employees.filter((u) => u.ativo && mapRoleToFrontend(u.role_perfil) === "employee").length;
+  const managerCount = employees.filter((u) => u.ativo && mapRoleToFrontend(u.role_perfil) === "manager").length;
+  const cashierCount = employees.filter((u) => u.ativo && mapRoleToFrontend(u.role_perfil) === "cashier").length;
+  const totalActiveStaff = staffUsers.filter(u => u.ativo).length;
 
   return (
     <div className="space-y-5">
@@ -464,7 +461,7 @@ export function Employees() {
         <div>
           <h2 className="text-gray-900">Gestão de Usuários</h2>
           <p className="text-gray-500 text-sm">
-            {employeeCount} funcionário(s) · {managerCount} gerente(s)
+            {employeeCount} funcionário(s) · {managerCount} gerente(s) · {cashierCount} caixa(s)
           </p>
         </div>
         <button
@@ -476,11 +473,12 @@ export function Employees() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Funcionários", value: employeeCount, icon: <Users className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
           { label: "Gerentes", value: managerCount, icon: <Shield className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
-          { label: "Total", value: staffUsers.length, icon: <User className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
+          { label: "Caixas", value: cashierCount, icon: <Users className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
+          { label: "Total", value: totalActiveStaff, icon: <User className="w-4 h-4" />, color: "text-gray-700 bg-gray-100" },
         ].map((stat) => (
           <div key={stat.label} className="bg-white border border-gray-100 p-4 flex items-center gap-3">
             <div className={`w-9 h-9 ${stat.color} flex items-center justify-center shrink-0`}>
@@ -514,7 +512,7 @@ export function Employees() {
       </div>
 
       {/* Add / Edit form */}
-      {(activeTab === "add" || activeTab === "edit") && <FormSection />}
+      {(activeTab === "add" || activeTab === "edit") && renderFormSection()}
 
       {msg && activeTab === "list" && (
         <div className={`p-3 text-sm ${msg.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
@@ -539,7 +537,6 @@ export function Employees() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {staffUsers.map((u) => {
-                const totalSales = getEmployeeTotal(u.cpf);
                 const isCurrent = u.cpf === currentUser?.id;
                 const frontendRole = mapRoleToFrontend(u.role_perfil);
                 return (
@@ -590,11 +587,6 @@ export function Employees() {
                       {frontendRole === "employee" ? (
                         <div>
                           <p className="text-gray-700 text-xs">{(Number(u.taxa_comissao) * 100).toFixed(1).replace(".0", "")}%</p>
-                          {totalSales > 0 && (
-                            <p className="text-gray-400 text-xs">
-                              R$ {totalSales.toLocaleString("pt-BR")} em vendas
-                            </p>
-                          )}
                         </div>
                       ) : (
                         <span className="text-gray-300 text-xs">—</span>
@@ -670,23 +662,14 @@ export function Employees() {
                   <span className="font-mono text-gray-900">{detailUser.codigo_funcionario || "—"}</span>
                 </p>
                 <p className="text-gray-600"><span className="text-gray-400">Taxa:</span> {(Number(detailUser.taxa_comissao) * 100).toFixed(1).replace(".0", "")}%</p>
-                <p className="text-gray-600"><span className="text-gray-400">Meta:</span> R$ {Number(detailUser.meta_vendas || 20000).toLocaleString("pt-BR")}</p>
+                <p className="text-gray-600"><span className="text-gray-400">Meta:</span> {detailUser.meta_vendas ? `R$ ${Number(detailUser.meta_vendas).toLocaleString("pt-BR")}` : "—"}</p>
                 <p className="text-gray-600">
                   <span className="text-gray-400">Bônus:</span>{" "}
                   <span className="text-gray-400">Módulo em Desenvolvimento</span>
                 </p>
-                <div className="pt-2 border-t border-gray-100">
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Total vendido:</span>{" "}
-                    R$ {getEmployeeTotal(detailUser.cpf).toLocaleString("pt-BR")}
-                  </p>
-                  <p className="text-gray-600">
-                    <span className="text-gray-400">Progresso da meta:</span>{" "}
-                    {detailUser.meta_vendas
-                      ? `${Math.min(100, Math.round((getEmployeeTotal(detailUser.cpf) / Number(detailUser.meta_vendas)) * 100))}%`
-                      : "—"}
-                  </p>
-                </div>
+                <p className="pt-2 border-t border-gray-100 text-gray-500 text-xs">
+                  Vendas e progresso de meta dependem da integração do ranking de funcionários.
+                </p>
               </div>
             )}
           </div>

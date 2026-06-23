@@ -17,6 +17,7 @@ import {
   AlertCircle,
   X,
   Loader2,
+  Banknote,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePOS } from "../../context/POSContext";
@@ -39,9 +40,10 @@ export function Cashier() {
 
   const [sellerCode, setSellerCode] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerCpf, setCustomerCpf] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("card");
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "pix" | "dinheiro">("card");
   
   const [showCheckout, setShowCheckout] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -59,7 +61,7 @@ export function Cashier() {
     try {
       setLoading(true);
       setError("");
-      const response = await api.get<{ data: ApiProduct[] }>("/products?limit=500");
+      const response = await api.get<{ data: ApiProduct[] }>("/products?limit=100");
       setProducts(response.data);
     } catch (err: any) {
       setError("Erro ao carregar produtos. Verifique a conexão.");
@@ -113,7 +115,7 @@ export function Cashier() {
       setMessage({ type: "error", text: "Adicione produtos à venda." });
       return;
     }
-    // Auto-fill seller if it's an employee
+    // Auto-fill seller if it's an employee or manager
     if (user?.role === "employee" || user?.role === "manager") {
       setSellerCode(user.id);
     }
@@ -129,12 +131,17 @@ export function Cashier() {
       return;
     }
 
+    if (!customerName.trim()) {
+      setMessage({ type: "error", text: "O nome do cliente é obrigatório." });
+      return;
+    }
+
     setIsCompleting(true);
     const result = await completeSale(
       paymentMethod,
       finalSellerId,
-      finalSellerId, // sellerName is not validated by backend
       customerName || undefined,
+      customerCpf || undefined,
       customerPhone || undefined,
       customerEmail || undefined
     );
@@ -145,6 +152,7 @@ export function Cashier() {
       setShowCheckout(false);
       setSellerCode("");
       setCustomerName("");
+      setCustomerCpf("");
       setCustomerPhone("");
       setCustomerEmail("");
       setTimeout(() => setMessage(null), 3000);
@@ -156,6 +164,7 @@ export function Cashier() {
   const handleCancelCheckout = () => {
     setShowCheckout(false);
     setCustomerName("");
+    setCustomerCpf("");
     setCustomerPhone("");
     setCustomerEmail("");
   };
@@ -176,7 +185,7 @@ export function Cashier() {
             <div>
               <h1 className="text-gray-900 text-xl">PDV - Ponto de Venda</h1>
               <p className="text-gray-500 text-xs">
-                {user.name} • {user.role === "manager" ? "Gerente" : user.role === "superadmin" ? "Admin" : "Vendedor"}
+                {user.name} • {user.role === "manager" ? "Gerente" : user.role === "superadmin" ? "Admin" : user.role === "cashier" ? "Caixa" : "Vendedor"}
               </p>
             </div>
           </div>
@@ -436,7 +445,7 @@ export function Cashier() {
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-xs text-gray-500 mb-1.5">
-                  CPF do Vendedor *
+                  Código ou CPF do Vendedor *
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -444,8 +453,7 @@ export function Cashier() {
                     type="text"
                     value={user?.role === "employee" || user?.role === "manager" ? user.id : sellerCode}
                     onChange={(e) => setSellerCode(e.target.value)}
-                    placeholder="Somente os 11 dígitos"
-                    maxLength={11}
+                    placeholder="Ex: VEND01 ou CPF"
                     disabled={user?.role === "employee" || user?.role === "manager"}
                     className="w-full border border-gray-200 pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#1a1a1a] disabled:bg-gray-100 disabled:text-gray-500"
                   />
@@ -454,18 +462,34 @@ export function Cashier() {
 
               <div className="border-t border-gray-100 pt-4">
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">
-                  Dados do Cliente (Opcional)
+                  Dados do Cliente
                 </p>
                 <div className="space-y-3">
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Nome completo (ignorado na API temporariamente)"
-                      className="w-full border border-gray-200 pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
-                    />
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1.5">Nome do Cliente *</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="Nome completo do cliente"
+                        className="w-full border border-gray-200 pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1.5">CPF do Cliente (Opcional)</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={customerCpf}
+                        onChange={(e) => setCustomerCpf(e.target.value)}
+                        placeholder="CPF do cliente"
+                        className="w-full border border-gray-200 pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -474,7 +498,7 @@ export function Cashier() {
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-3">
                   Forma de Pagamento *
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setPaymentMethod("card")}
                     className={`flex items-center justify-center gap-2 p-3 border transition-all ${
@@ -496,6 +520,17 @@ export function Cashier() {
                   >
                     <QrCode className="w-5 h-5" />
                     <span className="text-sm">PIX</span>
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod("dinheiro")}
+                    className={`flex items-center justify-center gap-2 p-3 border transition-all ${
+                      paymentMethod === "dinheiro"
+                        ? "border-[#1a1a1a] bg-gray-50"
+                        : "border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    <Banknote className="w-5 h-5" />
+                    <span className="text-sm">Dinheiro</span>
                   </button>
                 </div>
               </div>

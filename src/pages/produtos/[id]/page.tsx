@@ -21,7 +21,15 @@ import {
   X,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
+import {
+  fetchProduct,
+  fetchProducts,
+  findVariant,
+  getDisplayVariant,
+  type Product,
+} from "@/lib/catalog";
 import { api } from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
 import ProductCard from "@/components/ui/ProductCard";
 
 const SIZE_TABLE: [string, string, string, string, string][] = [
@@ -43,8 +51,8 @@ export default function ProductDetailPage() {
   const navigate = useNavigate();
   const { addItem } = useCart();
   
-  const [product, setProduct] = useState<AnyModel | null>(null);
-  const [related, setRelated] = useState<AnyModel[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [related, setRelated] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedSize, setSelectedSize] = useState("");
@@ -54,70 +62,31 @@ export default function ProductDetailPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [tab, setTab] = useState<"descricao" | "tamanhos" | "info">("descricao");
   const [cep, setCep] = useState("");
-  const [cepResult, setCepResult] = useState<null | "ok" | "erro">(null);
+  const [shippingQuote, setShippingQuote] = useState<{ valor: number; prazo_dias: number } | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
   const [showSizeModal, setShowSizeModal] = useState(false);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     async function loadData() {
       try {
-        const data = await api.get<AnyModel>(`/products/${Number(id)}`);
-
-        // Normalise: the backend may return a flat entity without variants/categories
-        const normalised = { ...data };
-        if (!normalised.categories || normalised.categories.length === 0) {
-          normalised.categories = normalised.categoria
-            ? [{ nome: normalised.categoria }]
-            : [];
-        }
-        if (!normalised.variants || normalised.variants.length === 0) {
-          normalised.variants = [
-            {
-              id: normalised.id_produto,
-              preco_variante: normalised.preco_base,
-              cor: null,
-              tamanho: null,
-              images: normalised.imagem_url
-                ? [{ image: { id: normalised.id_produto, url: normalised.imagem_url } }]
-                : [],
-            },
-          ];
-        }
-
-        setProduct(normalised);
-        
-        // Load related products
-        const catName = normalised.categories?.[0]?.nome;
-        if (catName) {
-          try {
-            const res = await api.get<AnyModel>("/products", { categoria: catName, limit: 4 });
-            const relatedProducts = (res.data || [])
-              .filter((p: any) => p.id_produto !== normalised.id_produto)
-              .map((p: any) => {
-                // Normalise related products too
-                if (!p.categories || p.categories.length === 0) {
-                  p.categories = p.categoria ? [{ nome: p.categoria }] : [];
-                }
-                if (!p.variants || p.variants.length === 0) {
-                  p.variants = [
-                    {
-                      id: p.id_produto,
-                      preco_variante: p.preco_base,
-                      images: p.imagem_url
-                        ? [{ image: { id: p.id_produto, url: p.imagem_url } }]
-                        : [],
-                    },
-                  ];
-                }
-                return p;
-              });
-            setRelated(relatedProducts);
-          } catch {
-            // If related products fail, it's not critical
-            setRelated([]);
-          }
-        }
-      } catch (err) {
-        console.error(err);
+        const [loadedProduct, relatedResponse] = await Promise.all([
+          fetchProduct(Number(id)),
+          fetchProducts({ page: 1, limit: 4 }),
+        ]);
+        const initialVariant = getDisplayVariant(loadedProduct);
+        setProduct(loadedProduct);
+        setSelectedColor(initialVariant?.cor ?? "");
+        setSelectedSize(initialVariant?.tamanho ?? "");
+        setActiveImage(0);
+        setRelated(
+          relatedResponse.data.filter(
+            (relatedProduct) => relatedProduct.idProduto !== loadedProduct.idProduto,
+          ),
+        );
+      } catch (loadError) {
+        console.error(loadError);
       } finally {
         setLoading(false);
       }
@@ -146,74 +115,111 @@ export default function ProductDetailPage() {
     );
   }
 
-  // Extract unique colors and sizes from variants
-  const colors = Array.from(new Set(product.variants?.map((v: any) => v.cor).filter(Boolean))) as string[];
-  const sizes = Array.from(new Set(product.variants?.map((v: any) => v.tamanho).filter(Boolean))) as string[];
-  
-  const allImages = product.variants?.flatMap((v: any) => v.images?.map((img: any) => img.image.url) || []) || [];
-  const gallery = allImages.length > 0 ? Array.from(new Set(allImages)) : ["/hero-dress.png"];
+  const selectableVariants = product.variants.filter((variant) => variant.ativo);
+  const colors = Array.from(
+    new Set(selectableVariants.map((variant) => variant.cor).filter(Boolean)),
+  ) as string[];
+  const sizes = Array.from(
+    new Set(
+      selectableVariants
+        .filter((variant) => !selectedColor || variant.cor === selectedColor)
+        .map((variant) => variant.tamanho)
+        .filter(Boolean),
+    ),
+  ) as string[];
+  const activeVariant =
+    findVariant(product, selectedColor || undefined, selectedSize || undefined) ??
+    findVariant(product, selectedColor || undefined) ??
+    getDisplayVariant(product);
+  const gallery = activeVariant?.images.length
+    ? activeVariant.images
+    : [{ idImagem: 0, url: "/hero-dress.png", ordem: 0, descricao: null }];
 
-  // Default to first variant's price or base price
-  const baseVariant = product.variants?.[0];
-  const price = baseVariant?.preco_variante ?? product.preco_base;
-  const originalPrice = product.preco_base > price ? product.preco_base : null;
+  const price = activeVariant?.precoVariante ?? product.precoBase;
+  const originalPrice = product.precoBase > price ? product.precoBase : null;
   const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : null;
-  const stockEcommerce = baseVariant?.estoque_ecommerce ?? 0;
-  const totalStock = (baseVariant?.estoque_ecommerce ?? 0) + (baseVariant?.estoque_fisico ?? 0);
+  const stockEcommerce = activeVariant?.stock.qtdOnline ?? 0;
+  const totalStock =
+    (activeVariant?.stock.qtdOnline ?? 0) + (activeVariant?.stock.qtdLojaFisica ?? 0);
   const isLowStock = totalStock > 0 && totalStock <= 3;
-  
-  const categoryName = product.categories?.[0]?.nome || "Vestido";
-  const firstVariantSku = baseVariant?.id || `SKU-${product.id_produto}`;
 
-  // Builds the cart-variant shape useCart expects (enriches the variant with its parent product)
-  const buildCartVariant = (variant: any) => ({
-    id: variant.id,
+  const categoryName = product.categories[0]?.nome || "Vestido";
+  const activeVariantSku = activeVariant?.codigoSku || product.sku;
+
+  const selectColor = (color: string) => {
+    const variant =
+      findVariant(product, color, selectedSize || undefined) ?? findVariant(product, color);
+    setSelectedColor(color);
+    setSelectedSize(variant?.tamanho ?? "");
+    setQuantity(1);
+    setActiveImage(0);
+  };
+
+  const selectSize = (size: string) => {
+    const variant =
+      findVariant(product, selectedColor || undefined, size) ?? findVariant(product, undefined, size);
+    setSelectedSize(size);
+    setSelectedColor(variant?.cor ?? selectedColor);
+    setQuantity(1);
+    setActiveImage(0);
+  };
+
+  const buildCartVariant = (variant: Product["variants"][number]) => ({
+    codigoSku: variant.codigoSku,
     produto: {
-      id: product.id_produto,
+      idProduto: product.idProduto,
       titulo: product.titulo,
-      preco_base: product.preco_base,
+      precoBase: product.precoBase,
     },
-    preco_variante: variant.preco_variante,
+    precoVariante: variant.precoVariante,
     cor: variant.cor,
     tamanho: variant.tamanho,
     images: variant.images,
   });
 
   const handleAddToCart = () => {
-    if (!selectedSize || !selectedColor) {
+    if (!activeVariant) {
       alert("Por favor, selecione o tamanho e a cor antes de adicionar ao carrinho.");
       return;
     }
 
     // Find the variant
-    const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
-    if (!variant) {
-      alert("Variante não encontrada.");
-      return;
-    }
-
-    addItem(buildCartVariant(variant), quantity);
+    addItem(buildCartVariant(activeVariant), quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
 
   const handleBuyNow = () => {
-    if (!selectedSize || !selectedColor) {
+    if (!activeVariant) {
       alert("Por favor, selecione o tamanho e a cor antes de continuar.");
       return;
     }
-    const variant = product.variants?.find((v: any) => v.cor === selectedColor && v.tamanho === selectedSize);
-    if (!variant) return;
-
-    addItem(buildCartVariant(variant), quantity);
+    addItem(buildCartVariant(activeVariant), quantity);
     navigate("/carrinho");
   };
 
-  const handleShippingCheck = (e: React.FormEvent) => {
+  const handleShippingCheck = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cep.replace(/\D/g, "").length === 8) {
-      const num = parseInt(cep.replace(/\D/g, "").slice(0, 2));
-      setCepResult(num >= 70 && num <= 73 ? "ok" : "erro");
+    const cleanCep = cep.replace(/\D/g, "");
+    if (cleanCep.length !== 8) {
+      setShippingQuote(null);
+      setShippingError("CEP inválido. Use 8 dígitos.");
+      return;
+    }
+
+    setShippingLoading(true);
+    setShippingError(null);
+
+    try {
+      const quote = await api.post<{ valor: number; prazo_dias: number }>("/shipping/calculate", {
+        cep_destino: cleanCep,
+      });
+      setShippingQuote(quote);
+    } catch (err) {
+      setShippingQuote(null);
+      setShippingError(err instanceof Error ? err.message : "Erro ao calcular frete.");
+    } finally {
+      setShippingLoading(false);
     }
   };
 
@@ -251,9 +257,9 @@ export default function ProductDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-16">
           <div className="flex gap-3">
             <div className="hidden lg:flex flex-col gap-2 w-16 shrink-0">
-              {gallery.map((img, idx) => (
+              {gallery.map((image, idx) => (
                 <button
-                  key={idx}
+                  key={`${activeVariantSku}-${image.idImagem}`}
                   onClick={() => setActiveImage(idx)}
                   className={`relative w-16 h-20 overflow-hidden border-2 transition-all shrink-0 ${
                     activeImage === idx
@@ -262,7 +268,7 @@ export default function ProductDetailPage() {
                   }`}
                 >
                   <img
-                    src={img as string}
+                    src={image.url}
                     alt={`${product.titulo} ${idx + 1}`}
                     className="object-cover object-top"
                   />
@@ -273,7 +279,7 @@ export default function ProductDetailPage() {
             <div className="flex-1 relative">
               <div className="relative aspect-[3/4] overflow-hidden bg-gray-50">
                 <img
-                  src={gallery[activeImage] as string}
+                  src={gallery[activeImage]?.url ?? gallery[0].url}
                   alt={product.titulo}
                   className="object-cover object-top"
                 />
@@ -313,9 +319,9 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="lg:hidden flex gap-2 mt-3 overflow-x-auto pb-1">
-                {gallery.map((img, idx) => (
+                {gallery.map((image, idx) => (
                   <button
-                    key={idx}
+                    key={`${activeVariantSku}-mobile-${image.idImagem}`}
                     onClick={() => setActiveImage(idx)}
                     className={`relative w-14 shrink-0 overflow-hidden border-2 transition-all ${
                       activeImage === idx ? "border-[#1a1a1a]" : "border-gray-200"
@@ -323,7 +329,7 @@ export default function ProductDetailPage() {
                     style={{ height: "4.5rem" }}
                   >
                     <img
-                      src={img as string}
+                      src={image.url}
                       alt={`${product.titulo} ${idx + 1}`}
                       className="object-cover object-top"
                     />
@@ -338,7 +344,7 @@ export default function ProductDetailPage() {
               <span className="bg-gray-100 text-gray-600 text-xs px-3 py-1 uppercase tracking-widest">
                 {categoryName}
               </span>
-              <span className="text-gray-400 text-xs">{firstVariantSku}</span>
+              <span className="text-gray-400 text-xs">{activeVariantSku}</span>
             </div>
 
             <h1
@@ -392,12 +398,6 @@ export default function ProductDetailPage() {
                 })}{" "}
                 sem juros
               </p>
-              <p className="text-green-700 text-xs mt-1">
-                5% de desconto no PIX: R${" "}
-                {(price * 0.95).toLocaleString("pt-BR", {
-                  minimumFractionDigits: 2,
-                })}
-              </p>
             </div>
 
             <div className="mb-5">
@@ -411,7 +411,8 @@ export default function ProductDetailPage() {
                 {colors.map((color) => (
                   <button
                     key={color}
-                    onClick={() => setSelectedColor(color)}
+                    type="button"
+                    onClick={() => selectColor(color)}
                     className={`px-4 py-1.5 border text-sm transition-colors ${
                       selectedColor === color
                         ? "border-[#1a1a1a] bg-[#1a1a1a] text-white"
@@ -444,7 +445,8 @@ export default function ProductDetailPage() {
                 {sizes.map((size) => (
                   <button
                     key={size}
-                    onClick={() => setSelectedSize(size)}
+                    type="button"
+                    onClick={() => selectSize(size)}
                     className={`w-11 h-11 border text-sm transition-colors ${
                       selectedSize === size
                         ? "border-[#1a1a1a] bg-[#1a1a1a] text-white"
@@ -521,7 +523,8 @@ export default function ProductDetailPage() {
                   value={cep}
                   onChange={(e) => {
                     setCep(e.target.value);
-                    setCepResult(null);
+                    setShippingQuote(null);
+                    setShippingError(null);
                   }}
                   placeholder="Digite seu CEP"
                   maxLength={9}
@@ -534,16 +537,18 @@ export default function ProductDetailPage() {
                   OK
                 </button>
               </form>
-              {cepResult === "ok" && (
+              {shippingLoading && (
+                <p className="text-gray-500 text-xs mt-2">Calculando frete...</p>
+              )}
+              {shippingQuote && !shippingLoading && (
                 <p className="text-green-700 text-xs mt-2 flex items-center gap-1">
                   <Check className="w-3.5 h-3.5" />
-                  Entregamos no seu endereço! Prazo: 3 a 7 dias úteis.
+                  Frete {formatCurrency(shippingQuote.valor)} · prazo de {shippingQuote.prazo_dias} dia
+                  {shippingQuote.prazo_dias !== 1 ? "s" : ""} útil
                 </p>
               )}
-              {cepResult === "erro" && (
-                <p className="text-gray-500 text-xs mt-2">
-                  CEP fora da área de entrega. Atendemos apenas o Distrito Federal.
-                </p>
+              {shippingError && !shippingLoading && (
+                <p className="text-red-600 text-xs mt-2">{shippingError}</p>
               )}
             </div>
 
@@ -654,7 +659,7 @@ export default function ProductDetailPage() {
           {tab === "info" && (
             <div className="space-y-2.5 text-sm text-gray-600">
               {[
-                ["SKU", firstVariantSku],
+                ["SKU", activeVariantSku],
                 ["Categoria", categoryName.charAt(0).toUpperCase() + categoryName.slice(1)],
                 ["Cores disponíveis", colors.join(", ") || "—"],
                 ["Tamanhos disponíveis", sizes.join(", ") || "—"],
@@ -682,15 +687,16 @@ export default function ProductDetailPage() {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {related.map((p) => {
-                const variant = p.variants?.[0];
+                const variant = getDisplayVariant(p);
                 return (
                   <ProductCard
-                    key={p.id_produto}
-                    id={p.id_produto}
+                    key={p.idProduto}
+                    id={p.idProduto}
                     titulo={p.titulo}
-                    preco={variant?.preco_variante ?? p.preco_base}
-                    imagem={variant?.images?.[0]?.image?.url || "/hero-dress.png"}
-                    categoria={p.categories?.[0]?.nome}
+                    preco={variant?.precoVariante ?? p.precoBase}
+                    imagem={variant?.images[0]?.url || "/hero-dress.png"}
+                    categoria={p.categories[0]?.nome}
+                    variant={variant}
                   />
                 );
               })}

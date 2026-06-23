@@ -1,25 +1,36 @@
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useBanners } from "@/context/BannerContext";
+import { categoryToPath } from "@/context/BannerContext";
 
-const SLIDES = [
+const FALLBACK_SLIDES = [
   {
-    id: 1,
+    id: "fallback-1",
     title: "Vestidos que contam histórias inesquecíveis",
     subtitle: "Do baile de debutante à festa mais especial — encontre o seu vestido dos sonhos.",
     image: "/hero-dress.png",
     tag: "DEBUTANTE & FESTA",
     primaryCta: "Festas",
-    primaryCategory: "/produtos?categoria=festa",
+    primaryCategory: "festa",
     secondaryCta: "Debutante",
-    secondaryCategory: "/produtos?categoria=debutante",
+    secondaryCategory: "debutante",
   }
 ];
 
 export default function HeroSection() {
   const [current, setCurrent] = useState(0);
-  const slides = SLIDES;
+  const { activeBanners } = useBanners();
+  const slides = activeBanners.length > 0 ? activeBanners : FALLBACK_SLIDES;
+
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrent((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [slides.length]);
 
   // Render a nice hero layout based on the image provided
   return (
@@ -72,7 +83,7 @@ export default function HeroSection() {
             <div className="flex flex-col sm:flex-row gap-4">
               {slides[current].primaryCta && (
                 <Link
-                  to={slides[current].primaryCategory}
+                  to={categoryToPath(slides[current].primaryCategory)}
                   className="bg-white text-[#1a1a1a] px-8 py-3.5 hover:bg-gray-100 transition-colors text-sm tracking-widest uppercase font-medium text-center"
                 >
                   {slides[current].primaryCta}
@@ -80,7 +91,7 @@ export default function HeroSection() {
               )}
               {slides[current].secondaryCta && (
                 <Link
-                  to={slides[current].secondaryCategory}
+                  to={categoryToPath(slides[current].secondaryCategory)}
                   className="border border-white/40 bg-black/20 backdrop-blur-sm text-white px-8 py-3.5 hover:border-white hover:bg-white/10 transition-colors text-sm tracking-widest uppercase font-medium text-center"
                 >
                   {slides[current].secondaryCta}
@@ -93,22 +104,35 @@ export default function HeroSection() {
       
       {/* Slide dots at bottom */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 items-center z-10">
-        <button className="h-1 rounded-full transition-all duration-300 w-8 bg-white"></button>
-        <button className="h-1 rounded-full transition-all duration-300 w-2 bg-white/40 hover:bg-white/70"></button>
-        <button className="h-1 rounded-full transition-all duration-300 w-2 bg-white/40 hover:bg-white/70"></button>
+        {slides.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(i)}
+            className={`h-1 rounded-full transition-all duration-300 ${i === current ? 'w-8 bg-white' : 'w-2 bg-white/40 hover:bg-white/70'}`}
+          />
+        ))}
       </div>
 
       <div className="absolute top-6 right-6 text-white/60 text-xs tracking-widest z-10 font-sans">
-        01 / 03
+        {String(current + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
       </div>
       
-      {/* Mock arrows for visual match */}
-      <button className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 items-center justify-center transition-colors backdrop-blur-sm z-10">
-        <ChevronLeft className="w-5 h-5 text-white" />
-      </button>
-      <button className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 items-center justify-center transition-colors backdrop-blur-sm z-10">
-        <ChevronRight className="w-5 h-5 text-white" />
-      </button>
+      {slides.length > 1 && (
+        <>
+          <button 
+            onClick={() => setCurrent(prev => prev === 0 ? slides.length - 1 : prev - 1)}
+            className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 items-center justify-center transition-colors backdrop-blur-sm z-10"
+          >
+            <ChevronLeft className="w-5 h-5 text-white" />
+          </button>
+          <button 
+            onClick={() => setCurrent(prev => prev === slides.length - 1 ? 0 : prev + 1)}
+            className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/20 items-center justify-center transition-colors backdrop-blur-sm z-10"
+          >
+            <ChevronRight className="w-5 h-5 text-white" />
+          </button>
+        </>
+      )}
     </section>
   );
 }

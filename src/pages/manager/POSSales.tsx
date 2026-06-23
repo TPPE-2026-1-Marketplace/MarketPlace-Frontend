@@ -1,32 +1,77 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, ShoppingBag, CreditCard, QrCode, User, Calendar, DollarSign } from "lucide-react";
 import { usePOS } from "../../context/POSContext";
-import { useAuth } from "../../context/AuthContext";
+import { api } from "../../lib/api";
+import { fetchManagementOrders, type ApiOrder } from "../../lib/management";
+
+export interface ApiEmployee {
+  cpf: string;
+  ativo: boolean;
+  role_perfil: string;
+  codigo_funcionario: string | null;
+  person: {
+    cpf: string;
+    nome: string;
+  };
+}
 
 export function POSSales() {
-  const { sales } = usePOS();
-  const { users } = useAuth();
   const [search, setSearch] = useState("");
   const [filterSeller, setFilterSeller] = useState("all");
+  const [employees, setEmployees] = useState<ApiEmployee[]>([]);
+  const [posSales, setPosSales] = useState<ApiOrder[]>([]);
 
-  const filtered = sales.filter((sale) => {
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const resEmp = await api.get<{ data: ApiEmployee[] }>("/employees?limit=100");
+        setEmployees(resEmp.data);
+        
+        const resOrders = await fetchManagementOrders();
+        // Filtra apenas vendas de loja física
+        const inStore = resOrders.data.filter(o => o.tipoRetirada === "loja");
+        setPosSales(inStore);
+      } catch (err) {
+        console.error("Erro ao carregar dados", err);
+      }
+    }
+    loadData();
+  }, []);
+
+  const getSellerName = (sellerId: string) => {
+    const emp = employees.find((e) => e.cpf === sellerId || e.codigo_funcionario === sellerId);
+    return emp?.person?.nome || sellerId;
+  };
+
+  const filtered = posSales.filter((sale) => {
+    const sellerId = sale.idFuncionario || "";
+    const sellerName = getSellerName(sellerId) || "";
+    const saleIdStr = String(sale.idPedido || "");
+    const customerNameStr = sale.clienteNomeAvulso || sale.user?.nome || sale.clienteCpfAvulso || sale.idUsuario || "";
+    
     const matchSearch =
-      sale.id.toLowerCase().includes(search.toLowerCase()) ||
-      sale.sellerName.toLowerCase().includes(search.toLowerCase()) ||
-      sale.customerName?.toLowerCase().includes(search.toLowerCase());
-    const matchSeller = filterSeller === "all" || sale.sellerId === filterSeller;
+      saleIdStr.toLowerCase().includes(search.toLowerCase()) ||
+      sellerName.toLowerCase().includes(search.toLowerCase()) ||
+      customerNameStr.toLowerCase().includes(search.toLowerCase());
+      
+    // Verifica se filterSeller bate com CPF ou com codigo_funcionario do vendedor
+    const matchSeller = filterSeller === "all" || sellerId === filterSeller || 
+      (employees.find(e => e.cpf === filterSeller)?.codigo_funcionario === sellerId);
+      
     return matchSearch && matchSeller;
   });
 
-  const totalSales = filtered.reduce((sum, sale) => sum + sale.total, 0);
-  const employees = users.filter((u) => u.role === "employee" || u.role === "manager" || u.role === "superadmin");
+  const totalSales = filtered.reduce((sum, sale) => sum + Number(sale.valorTotal), 0);
+  const activeSellers = employees.filter(
+    (e) => e.role_perfil === "vendedor"
+  );
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-gray-900">Vendas Presenciais (PDV)</h2>
-          <p className="text-gray-500 text-sm">{sales.length} vendas registradas</p>
+          <p className="text-gray-500 text-sm">{posSales.length} vendas registradas</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -46,7 +91,7 @@ export function POSSales() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Total de Vendas</p>
-              <p className="text-gray-900 text-lg">{sales.length}</p>
+              <p className="text-gray-900 text-lg">{posSales.length}</p>
             </div>
           </div>
         </div>
@@ -58,7 +103,7 @@ export function POSSales() {
             <div>
               <p className="text-xs text-gray-500">Receita Total</p>
               <p className="text-gray-900 text-lg">
-                R$ {sales.reduce((s, sale) => s + sale.total, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                R$ {posSales.reduce((s, sale) => s + Number(sale.valorTotal), 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -72,8 +117,8 @@ export function POSSales() {
               <p className="text-xs text-gray-500">Ticket Médio</p>
               <p className="text-gray-900 text-lg">
                 R${" "}
-                {sales.length > 0
-                  ? (sales.reduce((s, sale) => s + sale.total, 0) / sales.length).toLocaleString("pt-BR", {
+                {posSales.length > 0
+                  ? (posSales.reduce((s, sale) => s + Number(sale.valorTotal), 0) / posSales.length).toLocaleString("pt-BR", {
                       minimumFractionDigits: 2,
                     })
                   : "0,00"}
@@ -101,9 +146,9 @@ export function POSSales() {
             className="border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
           >
             <option value="all">Todos os vendedores</option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.name}
+            {activeSellers.map((emp) => (
+              <option key={emp.cpf} value={emp.cpf}>
+                {emp.person?.nome} {emp.codigo_funcionario ? `(${emp.codigo_funcionario})` : ""}
               </option>
             ))}
           </select>
@@ -133,50 +178,41 @@ export function POSSales() {
                 </tr>
               ) : (
                 filtered.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={sale.idPedido} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="text-gray-900 font-mono text-xs">{sale.id}</span>
+                      <span className="text-gray-900 font-mono text-xs">{sale.idPedido}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 text-gray-600">
                         <Calendar className="w-3.5 h-3.5" />
-                        <span className="text-xs">{sale.date}</span>
+                        <span className="text-xs">{new Date(sale.dataPedido).toLocaleDateString("pt-BR")}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-gray-400" />
-                        <span className="text-gray-700 text-xs">{sale.sellerName}</span>
+                        <span className="text-gray-700 text-xs">{getSellerName(sale.idFuncionario || "")}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-gray-600 text-xs">
-                        {sale.customerName || <span className="text-gray-400 italic">Não informado</span>}
+                        {sale.clienteNomeAvulso || sale.user?.nome || sale.clienteCpfAvulso || sale.idUsuario || <span className="text-gray-400 italic">Não informado</span>}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5">
-                        {sale.items.reduce((sum, item) => sum + item.quantity, 0)}
+                        {sale.items.reduce((sum, item) => sum + item.quantidade, 0)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1.5">
-                        {sale.paymentMethod === "pix" ? (
-                          <>
-                            <QrCode className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-xs text-gray-600">PIX</span>
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-xs text-gray-600">Cartão</span>
-                          </>
-                        )}
+                        <CreditCard className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-xs text-gray-600">Cartão</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-gray-900">
-                        R$ {sale.total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R$ {Number(sale.valorTotal).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </span>
                     </td>
                   </tr>
@@ -191,7 +227,7 @@ export function POSSales() {
         <div className="bg-white border border-gray-100 p-4">
           <div className="flex justify-between items-center">
             <p className="text-sm text-gray-500">
-              Mostrando {filtered.length} de {sales.length} vendas
+              Mostrando {filtered.length} de {posSales.length} vendas
             </p>
             <div className="text-right">
               <p className="text-xs text-gray-400">Total Filtrado</p>

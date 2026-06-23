@@ -6,16 +6,14 @@ import { User, Package, Heart, LogOut, ChevronRight, Edit2, Save, X, Loader2 } f
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useProducts } from "@/hooks/useProducts";
+import { getDisplayVariant } from "@/lib/catalog";
 import { api } from "@/lib/api";
 
 interface UserProfile {
-  id: number;
-  name: string;
+  cpf: string;
+  nome: string | null;
   email: string;
   telefone?: string | null;
-  cpf?: string | null;
-  role: string;
-  createdAt: string;
 }
 
 export default function ContaPage() {
@@ -43,11 +41,11 @@ export default function ContaPage() {
   useEffect(() => {
     if (!user?.id) return;
 
-    api.get<UserProfile>(`/users/${user.id}`)
+    api.get<UserProfile>(`/people/${user.id}`)
       .then((data) => {
         setProfile(data);
         setForm({
-          name: data.name || "",
+          name: data.nome || "",
           email: data.email || "",
           telefone: data.telefone || "",
           cpf: data.cpf || "",
@@ -59,7 +57,7 @@ export default function ContaPage() {
           name: user.name || "",
           email: user.email || "",
           telefone: user.phone || "",
-          cpf: "",
+          cpf: user.id || "",
         });
       });
   }, [user]);
@@ -97,7 +95,7 @@ export default function ContaPage() {
     setMessage(null);
     // Reset form to current profile data
     setForm({
-      name: profile?.name || user?.name || "",
+      name: profile?.nome || user?.name || "",
       email: profile?.email || user?.email || "",
       telefone: profile?.telefone || user?.phone || "",
       cpf: profile?.cpf || "",
@@ -124,12 +122,12 @@ export default function ContaPage() {
       const updatePayload: Record<string, string | undefined> = {};
 
       // Only send changed fields
-      const currentName = profile?.name || user?.name || "";
+      const currentName = profile?.nome || user?.name || "";
       const currentEmail = profile?.email || user?.email || "";
       const currentTelefone = profile?.telefone || "";
       const currentCpf = profile?.cpf || "";
 
-      if (form.name !== currentName) updatePayload.name = form.name;
+      if (form.name !== currentName) updatePayload.nome = form.name;
       if (form.email !== currentEmail) updatePayload.email = form.email;
       if (form.telefone !== currentTelefone) updatePayload.telefone = form.telefone || undefined;
       if (form.cpf !== currentCpf) updatePayload.cpf = form.cpf || undefined;
@@ -140,10 +138,10 @@ export default function ContaPage() {
         return;
       }
 
-      const updated = await api.patch<UserProfile>(`/users/${numericId}`, updatePayload);
+      const updated = await api.patch<UserProfile>(`/people/${user.id}`, updatePayload);
       setProfile(updated);
       setForm({
-        name: updated.name || "",
+        name: updated.nome || "",
         email: updated.email || "",
         telefone: updated.telefone || "",
         cpf: updated.cpf || "",
@@ -153,7 +151,7 @@ export default function ContaPage() {
       const storedUser = localStorage.getItem("dk_user");
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
-        parsed.name = updated.name;
+        parsed.name = updated.nome;
         parsed.email = updated.email;
         parsed.phone = updated.telefone || undefined;
         localStorage.setItem("dk_user", JSON.stringify(parsed));
@@ -184,7 +182,7 @@ export default function ContaPage() {
     }
   };
 
-  const displayName = profile?.name || user?.name || "Usuário";
+  const displayName = profile?.nome || user?.name || "Usuário";
   const displayEmail = profile?.email || user?.email || "";
   const displayPhone = profile?.telefone || user?.phone || "";
   const displayCpf = profile?.cpf || "";
@@ -354,8 +352,8 @@ export default function ContaPage() {
               <div className="bg-white p-6 border border-gray-100">
                 <h2 className="text-gray-900 mb-5 font-serif text-xl">Meus Favoritos</h2>
                 {(() => {
-                  const favProducts = products.filter((p: any) =>
-                    favorites.includes(String(p.id_produto ?? p.id))
+                  const favProducts = products.filter((product) =>
+                    favorites.includes(String(product.idProduto))
                   );
                   if (favProducts.length === 0) {
                     return (
@@ -376,12 +374,13 @@ export default function ContaPage() {
                   }
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {favProducts.map((product: any) => {
-                        const price = product.variants?.[0]?.preco_variante ?? product.preco_base ?? product.price;
-                        const image = product.imagens?.[0]?.url ?? product.images?.[0] ?? "";
-                        const nome = product.titulo ?? product.name ?? "";
-                        const cat = product.categoria ?? product.category ?? "Vestido";
-                        const id = product.id_produto ?? product.id;
+                      {favProducts.map((product) => {
+                        const variant = getDisplayVariant(product);
+                        const price = variant?.precoVariante ?? product.precoBase;
+                        const image = variant?.images[0]?.url ?? "/hero-dress.png";
+                        const nome = product.titulo;
+                        const cat = product.categories[0]?.nome ?? "Vestido";
+                        const id = product.idProduto;
                         return (
                           <Link
                             key={id}

@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
 import { useProducts } from "@/hooks/useProducts";
+import { getDisplayVariant } from "@/lib/catalog";
 
 const CATEGORIES = [
   { value: "all", label: "Todas" },
@@ -55,7 +56,6 @@ function ProdutosContent() {
 
   // Hook state
   const [apiFilters, setApiFilters] = useState<ProductFiltersType>({
-    categoria: category !== "all" ? category : undefined,
     busca: search || undefined,
     page: 1,
     limit: 20,
@@ -66,14 +66,13 @@ function ProdutosContent() {
   useEffect(() => {
     setApiFilters((prev: any) => ({
       ...prev,
-      categoria: category !== "all" ? category : undefined,
       busca: search || undefined,
       page: 1,
     }));
   }, [category, search]);
 
   // Apply the sidebar filters/sort on the client (the API only handles categoria/busca)
-  const productPrice = (p: any) => p.variants?.[0]?.preco_variante ?? p.preco_base;
+  const productPrice = (p: any) => getDisplayVariant(p)?.precoVariante ?? p.precoBase;
 
   const displayedProducts = useMemo(() => {
     let list = products.filter((p: any) => {
@@ -98,7 +97,7 @@ function ProdutosContent() {
     } else if (sort === "maior-preco") {
       list = [...list].sort((a, b) => productPrice(b) - productPrice(a));
     } else if (sort === "novidade") {
-      list = [...list].sort((a, b) => b.id_produto - a.id_produto);
+      list = [...list].sort((a, b) => b.idProduto - a.idProduto);
     }
 
     return list;
@@ -322,15 +321,16 @@ function ProdutosContent() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {displayedProducts.map((product: any) => {
-                  const firstVariant = product.variants?.[0];
+                  const firstVariant = getDisplayVariant(product);
                   return (
                     <ProductCard
-                      key={product.id_produto}
-                      id={product.id_produto}
+                      key={product.idProduto}
+                      id={product.idProduto}
                       titulo={product.titulo}
-                      preco={firstVariant?.preco_variante ?? product.preco_base}
-                      imagem={firstVariant?.images?.[0]?.image?.url || "/hero-dress.png"}
+                      preco={firstVariant?.precoVariante ?? product.precoBase}
+                      imagem={firstVariant?.images[0]?.url || "/hero-dress.png"}
                       categoria={product.categories?.[0]?.nome}
+                      variant={firstVariant}
                     />
                   );
                 })}

@@ -5,6 +5,7 @@ import { ShoppingCart, Heart, Check } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useCart } from "@/hooks/useCart";
+import type { ProductVariant } from "@/lib/catalog";
 
 interface ProductCardProps {
   id: number;
@@ -16,6 +17,7 @@ interface ProductCardProps {
   nota?: number;
   className?: string;
   style?: React.CSSProperties;
+  variant?: ProductVariant;
 }
 
 export default function ProductCard({
@@ -28,6 +30,7 @@ export default function ProductCard({
   nota,
   className,
   style,
+  variant,
 }: ProductCardProps) {
   const { toggleFavorite, isFavorite } = useFavorites();
   const { addItem } = useCart();
@@ -38,7 +41,8 @@ export default function ProductCard({
     ? Math.round(((precoOriginal - preco) / precoOriginal) * 100)
     : null;
 
-  const mockSizes = ["38", "40", "42", "44", "46"];
+  const availableSize = variant?.tamanho;
+  const canQuickAdd = Boolean(variant?.ativo && variant.stock.qtdOnline > 0);
 
   return (
     <Link
@@ -84,21 +88,22 @@ export default function ProductCard({
             <button
               onClick={(e) => {
                 e.preventDefault();
-                if (added) return;
+                if (added || !variant || !canQuickAdd) return;
                 setAdded(true);
                 addItem(
                   {
-                    id: Date.now() + Math.random(),
-                    preco_variante: preco,
-                    tamanho: mockSizes[0],
-                    cor: "Padrão",
-                    produto: { id, titulo, preco_base: preco },
-                    images: [{ image: { url: imagem } }],
+                    codigoSku: variant.codigoSku,
+                    precoVariante: variant.precoVariante,
+                    tamanho: variant.tamanho,
+                    cor: variant.cor,
+                    produto: { idProduto: id, titulo, precoBase: preco },
+                    images: variant.images,
                   },
                   1
                 );
                 setTimeout(() => setAdded(false), 1500);
               }}
+              disabled={!canQuickAdd}
               className="bt-principal w-full py-2.5 flex items-center justify-center gap-2 text-xs tracking-wide"
             >
               {added ? (
@@ -109,7 +114,7 @@ export default function ProductCard({
               ) : (
                 <>
                   <ShoppingCart className="w-4 h-4" />
-                  Adicionar ao Carrinho
+                  {canQuickAdd ? "Adicionar ao Carrinho" : "Indisponível"}
                 </>
               )}
             </button>
@@ -138,16 +143,16 @@ export default function ProductCard({
             12x de {formatCurrency(preco / 12)}
           </p>
           {/* Sizes preview */}
-          <div className="flex gap-1 mt-2 flex-wrap">
-            {mockSizes.map((s) => (
+          {availableSize && (
+            <div className="flex gap-1 mt-2 flex-wrap">
               <span
-                key={s}
+                key={`${variant?.codigoSku}-${availableSize}`}
                 className="text-xs border border-gray-200 px-1.5 py-0.5 text-gray-500 hover:border-gray-800 transition-colors"
               >
-                {s}
+                {availableSize}
               </span>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </Link>

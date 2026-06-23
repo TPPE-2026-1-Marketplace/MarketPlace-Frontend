@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { api, ApiError } from "@/lib/api";
 
-export type UserRole = "customer" | "manager" | "superadmin" | "employee";
+export type UserRole = "customer" | "manager" | "superadmin" | "employee" | "cashier";
 
 export interface ManagedUser {
   id: string;
@@ -32,31 +32,45 @@ export interface User {
   bonusAmount?: number;
 }
 
-/** Usuário seguro (sem senha) retornado pelo backend. */
-interface ApiSafeUser {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  cpf?: string | null;
-  telefone?: string | null;
-}
-
 /** Shape returned by POST /api/auth/login */
 interface LoginApiResponse {
   access_token: string;
-  user: ApiSafeUser;
 }
 
+/**
+ * Decodifica o payload de um JWT sem validar assinatura.
+ * Usado apenas para extrair dados do token após login bem-sucedido.
+ */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
+const decodeJwt = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(window.atob(base64));
+  } catch {
+    return {};
+  }
+};
+
 const mapRole = (backendRole: string): UserRole => {
-  // Papéis já em inglês (formato atual do backend).
-  if (backendRole === "superadmin") return "superadmin";
-  if (backendRole === "manager") return "manager";
-  if (backendRole === "employee") return "employee";
-  // Compatibilidade com papéis em português, caso existam.
+  // Backend usa papéis em português
   if (backendRole === "administrador") return "superadmin";
   if (backendRole === "gerente") return "manager";
-  if (backendRole === "vendedor" || backendRole === "caixa") return "employee";
+  if (backendRole === "caixa") return "cashier";
+  if (backendRole === "vendedor") return "employee";
+  if (backendRole === "cliente") return "customer";
+  // Compatibilidade com papéis em inglês (legado)
+  if (backendRole === "superadmin") return "superadmin";
+  if (backendRole === "manager") return "manager";
+  if (backendRole === "cashier") return "cashier";
+  if (backendRole === "employee") return "employee";
   return "customer";
 };
 
@@ -69,6 +83,7 @@ interface AuthContextType {
   isManager: boolean;
   isSuperAdmin: boolean;
   isEmployee: boolean;
+  isCashier: boolean;
   isInternalUser: boolean;
   isAuthenticated: boolean;
   canEditProducts: boolean;
@@ -181,23 +196,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     try {
-      const response = await api.post<LoginApiResponse>("/auth/login", { email, password });
+      const response = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
 
       localStorage.setItem("dk_token", response.access_token);
 
+      // Decode JWT to get user info (sub=cpf, email, role)
+      const payload = decodeJwtPayload(response.access_token);
+      const cpf = (payload?.sub as string) ?? '';
+      const role = (payload?.role as string) ?? 'cliente';
+      const tokenEmail = (payload?.email as string) ?? email;
+
+      let userName = tokenEmail;
+      let userPhone: string | undefined;
+
+      // Fetch full profile from people endpoint
+      if (cpf) {
+        try {
+          const profile = await api.get<{ nome?: string; email?: string; telefone?: string | null }>(`/people/${cpf}`);
+          userName = profile.nome ?? tokenEmail;
+          userPhone = profile.telefone ?? undefined;
+        } catch {
+          // Profile fetch failed — use token data
+        }
+      }
+
       const apiUser: User = {
-        id: String(response.user.id),
-        name: response.user.name,
-        email: response.user.email,
-        role: mapRole(response.user.role),
-        phone: response.user.telefone ?? undefined,
+        id: cpf,
+        name: userName,
+        email: tokenEmail,
+        role: mapRole(role),
+        phone: userPhone,
       };
 
       setUser(apiUser);
       return { success: true, message: "Login realizado com sucesso!" };
     } catch (err) {
       const isApiError = err instanceof ApiError;
-      const isUnauthorized = isApiError && err.status === 401;
       const isNetworkError = !isApiError;
 
       if (isNetworkError) {
@@ -227,24 +261,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<{ success: boolean; message: string }> => {
     try {
       const cleanCpf = cpf.replace(/\D/g, "");
-      await api.post("/users", {
-        name,
+      await api.post("/people/register-user", {
+        nome: name,
         email,
-        password,
+        senha: password,
         telefone: phone || undefined,
-        cpf: cleanCpf || undefined,
+        cpf: cleanCpf,
       });
 
       try {
-        const loginRes = await api.post<LoginApiResponse>("/auth/login", { email, password });
+        const loginRes = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
         localStorage.setItem("dk_token", loginRes.access_token);
 
+        // Decode JWT to get user info
+        const payload = decodeJwtPayload(loginRes.access_token);
+        const role = (payload?.role as string) ?? 'cliente';
+
         const apiUser: User = {
-          id: String(loginRes.user.id),
-          name: loginRes.user.name,
-          email: loginRes.user.email,
-          role: mapRole(loginRes.user.role),
-          phone: loginRes.user.telefone ?? undefined,
+          id: cleanCpf || email,
+          name,
+          email,
+          role: mapRole(role),
+          phone: phone || undefined,
         };
 
         setUser(apiUser);
@@ -262,7 +300,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (isApiError && err.status === 400) {
-        return { success: false, message: err.message || "Dados inválidos. Verifique os campos." };
+        let errorMsg = err.message || "Dados inválidos. Verifique os campos.";
+        const errors = (err.data as any)?.errors;
+        if (Array.isArray(errors)) {
+          errorMsg = errors.map((e) => e.message).join(", ");
+        }
+        return { success: false, message: errorMsg };
       }
 
       if (!isApiError) {
@@ -280,6 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem("dk_token");
     localStorage.removeItem("dk_user");
+    window.dispatchEvent(new Event("clear-cart"));
   };
 
   const addUser = (userData: Omit<ManagedUser, "id" | "createdAt">) => {
@@ -313,7 +357,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isManager = user?.role === "manager" || user?.role === "superadmin";
   const isSuperAdmin = user?.role === "superadmin";
   const isEmployee = user?.role === "employee";
-  const isInternalUser = isManager || isEmployee;
+  const isCashier = user?.role === "cashier";
+  const isInternalUser = isManager || isEmployee || isCashier;
 
   // Permission controls
   const canEditProducts = isManager;
@@ -334,6 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isManager,
         isSuperAdmin,
         isEmployee,
+        isCashier,
         isInternalUser,
         isAuthenticated: !!user,
         canEditProducts,

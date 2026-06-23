@@ -1,31 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyModel = any;
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
-import { api } from "@/lib/api";
+import { useProducts } from "@/hooks/useProducts";
+import { getDisplayVariant } from "@/lib/catalog";
 
 export default function FeaturedProducts() {
-  const [products, setProducts] = useState<AnyModel[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadFeatured() {
-      try {
-        setLoading(true);
-        // Using getProducts instead of getFeaturedProducts for now as it may not exist
-        const response = await api.get("/products", { page: 1, limit: 4 });
-        setProducts((response as any).data || []);
-      } catch (error) {
-        console.error("Erro ao carregar destaques:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadFeatured();
-  }, []);
+  const { products, isLoading: loading } = useProducts({ page: 1, limit: 4 });
 
   return (
     <section className="py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -54,16 +38,20 @@ export default function FeaturedProducts() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id_produto}
-              id={product.id_produto}
-              titulo={product.titulo}
-              preco={product.preco_base}
-              imagem={product.variants?.[0]?.images?.[0]?.image?.url || "/hero-dress.png"}
-              categoria={product.categories?.[0]?.nome}
-            />
-          ))}
+          {products.map((product) => {
+            const variant = getDisplayVariant(product);
+            return (
+              <ProductCard
+                key={product.idProduto}
+                id={product.idProduto}
+                titulo={product.titulo}
+                preco={variant?.precoVariante ?? product.precoBase}
+                imagem={variant?.images[0]?.url || "/hero-dress.png"}
+                categoria={product.categories[0]?.nome}
+                variant={variant}
+              />
+            );
+          })}
         </div>
       )}
     </section>
