@@ -47,6 +47,7 @@ export default function ProductCard({
   return (
     <Link
       to={`/produtos/${id}`}
+      data-testid="product-card"
       className={`group block ${className || ""}`}
       style={style}
     >

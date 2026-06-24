@@ -107,7 +107,7 @@ export default function CarrinhoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f8f8]">
+    <div className="min-h-screen bg-[#f8f8f8]" data-testid="cart-page">
       <div className="bg-[#1a1a1a] text-white py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-white font-serif text-3xl mb-1">Meu Carrinho</h1>

@@ -5,10 +5,18 @@ SERVICE := app
 export DOCKER_BUILDKIT := 1
 export COMPOSE_DOCKER_CLI_BUILD := 1
 
-.PHONY: help env-setup install dev lint build start \
+.PHONY: help env-setup install dev lint build start selenium selenium-local selenium-local-ui selenium-prod-ui \
     dev-up dev-down dev-logs dev-shell dev-build dev-rebuild dev-reset \
     prod-up prod-down prod-logs prod-build prod-rebuild \
     clean check
+
+SELENIUM_LOCAL_URL ?= http://localhost:3000
+SELENIUM_PROD_URL ?= https://marketplace-frontend-jh71.onrender.com/
+SELENIUM_REMOTE_URL ?= http://localhost:4444
+SELENIUM_NOVNC_URL ?= http://localhost:7900/?autoconnect=1&resize=scale&password=secret
+SELENIUM_UI_START_DELAY ?= 10
+SELENIUM_UI_STEP_DELAY_MS ?= 1500
+SELENIUM_UI_HOLD_OPEN_MS ?= 30000
 
 help:
 	@echo "Setup e local:"
@@ -18,6 +26,10 @@ help:
 	@echo "  make lint             Executa o lint do projeto"
 	@echo "  make build            Gera o build local de producao"
 	@echo "  make start            Inicia a aplicacao local usando o build"
+	@echo "  make selenium         Executa Selenium contra SELENIUM_BASE_URL (producao)"
+	@echo "  make selenium-local   Executa Selenium contra o front local (porta 3000)"
+	@echo "  make selenium-local-ui Executa Selenium remoto com Chrome e noVNC"
+	@echo "  make selenium-prod-ui Executa Selenium remoto contra a producao com Chrome e noVNC"
 	@echo ""
 	@echo "Desenvolvimento (Docker):"
 	@echo "  make dev-up           Sobe o ambiente Docker de desenvolvimento"
@@ -59,6 +71,67 @@ build:
 
 start:
 	pnpm start
+
+selenium:
+	@test -n "$(SELENIUM_BASE_URL)" || (echo "ERRO: informe a URL de producao, por exemplo: SELENIUM_BASE_URL=https://loja.exemplo.com make selenium" && exit 2)
+	SELENIUM_ENV=production SELENIUM_BASE_URL="$(SELENIUM_BASE_URL)" HEADLESS="$(HEADLESS)" pnpm test:selenium
+
+selenium-local:
+	@curl --fail --silent --show-error "$(SELENIUM_LOCAL_URL)" > /dev/null || (echo "ERRO: front indisponivel em $(SELENIUM_LOCAL_URL). Inicie com make dev-up." && exit 2)
+	set -a && . ./.env.development && set +a && \
+	SELENIUM_ENV=local \
+	SELENIUM_BASE_URL="$${SELENIUM_BASE_URL:-$(SELENIUM_LOCAL_URL)}" \
+	HEADLESS="$(HEADLESS)" \
+	pnpm test:selenium
+
+selenium-local-ui:
+	$(COMPOSE_DEV) up -d app
+	$(COMPOSE_DEV) up -d --force-recreate selenium
+	@echo "Aguardando front em $(SELENIUM_LOCAL_URL)..."
+	@attempt=0; until curl --fail --silent "$(SELENIUM_LOCAL_URL)" > /dev/null; do \
+		attempt=$$((attempt + 1)); \
+		if [ $$attempt -ge 60 ]; then echo "ERRO: front indisponivel em $(SELENIUM_LOCAL_URL)."; exit 2; fi; \
+		sleep 1; \
+	done
+	@echo "Aguardando Selenium em $(SELENIUM_REMOTE_URL)/status..."
+	@attempt=0; until curl --fail --silent "$(SELENIUM_REMOTE_URL)/status" > /dev/null; do \
+		attempt=$$((attempt + 1)); \
+		if [ $$attempt -ge 90 ]; then echo "ERRO: Selenium indisponivel em $(SELENIUM_REMOTE_URL)/status."; exit 2; fi; \
+		sleep 1; \
+	done
+	@echo "Abra para acompanhar o navegador:"
+	@echo "$(SELENIUM_NOVNC_URL)"
+	@echo "Os testes iniciam em $(SELENIUM_UI_START_DELAY) segundos."
+	@sleep $(SELENIUM_UI_START_DELAY)
+	set -a && . ./.env.development && set +a && \
+	SELENIUM_ENV=local \
+	SELENIUM_BASE_URL="$(SELENIUM_LOCAL_URL)" \
+	SELENIUM_REMOTE_URL="$(SELENIUM_REMOTE_URL)" \
+	SELENIUM_HOST_GATEWAY="$$( $(COMPOSE_DEV) exec -T selenium getent hosts host.docker.internal | awk 'NR==1 { print $$1 }')" \
+	HEADLESS=false \
+	SELENIUM_STEP_DELAY_MS="$(SELENIUM_UI_STEP_DELAY_MS)" \
+	SELENIUM_HOLD_OPEN_MS="$(SELENIUM_UI_HOLD_OPEN_MS)" \
+	pnpm test:selenium
+
+selenium-prod-ui:
+	$(COMPOSE_DEV) up -d selenium
+	@echo "Aguardando Selenium em $(SELENIUM_REMOTE_URL)/status..."
+	@attempt=0; until curl --fail --silent "$(SELENIUM_REMOTE_URL)/status" > /dev/null; do \
+		attempt=$$((attempt + 1)); \
+		if [ $$attempt -ge 90 ]; then echo "ERRO: Selenium indisponivel em $(SELENIUM_REMOTE_URL)/status."; exit 2; fi; \
+		sleep 1; \
+	done
+	@echo "Abra para acompanhar o navegador:"
+	@echo "$(SELENIUM_NOVNC_URL)"
+	@echo "Os testes iniciam em $(SELENIUM_UI_START_DELAY) segundos."
+	@sleep $(SELENIUM_UI_START_DELAY)
+	SELENIUM_ENV=production \
+	SELENIUM_BASE_URL="$${SELENIUM_BASE_URL:-$(SELENIUM_PROD_URL)}" \
+	SELENIUM_REMOTE_URL="$(SELENIUM_REMOTE_URL)" \
+	HEADLESS=false \
+	SELENIUM_STEP_DELAY_MS="$(SELENIUM_UI_STEP_DELAY_MS)" \
+	SELENIUM_HOLD_OPEN_MS="$(SELENIUM_UI_HOLD_OPEN_MS)" \
+	pnpm test:selenium
 
 dev-up:
 	$(COMPOSE_DEV) up -d
