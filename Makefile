@@ -14,9 +14,12 @@ SELENIUM_LOCAL_URL ?= http://localhost:3000
 SELENIUM_PROD_URL ?= https://marketplace-frontend-jh71.onrender.com/
 SELENIUM_REMOTE_URL ?= http://localhost:4444
 SELENIUM_NOVNC_URL ?= http://localhost:7900/?autoconnect=1&resize=scale&password=secret
-SELENIUM_UI_START_DELAY ?= 10
+SELENIUM_UI_START_DELAY ?= 0
 SELENIUM_UI_STEP_DELAY_MS ?= 1500
 SELENIUM_UI_HOLD_OPEN_MS ?= 30000
+SELENIUM_CHECKOUT_PAYMENT_HOLD_MS ?= 8000
+SELENIUM_ALLOW_ADMIN_MUTATIONS ?= false
+SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS ?= 1000
 
 help:
 	@echo "Setup e local:"
@@ -114,7 +117,7 @@ selenium-local-ui:
 	pnpm test:selenium
 
 selenium-prod-ui:
-	$(COMPOSE_DEV) up -d selenium
+	$(COMPOSE_DEV) up -d --force-recreate --no-deps selenium
 	@echo "Aguardando Selenium em $(SELENIUM_REMOTE_URL)/status..."
 	@attempt=0; until curl --fail --silent "$(SELENIUM_REMOTE_URL)/status" > /dev/null; do \
 		attempt=$$((attempt + 1)); \
@@ -125,9 +128,14 @@ selenium-prod-ui:
 	@echo "$(SELENIUM_NOVNC_URL)"
 	@echo "Os testes iniciam em $(SELENIUM_UI_START_DELAY) segundos."
 	@sleep $(SELENIUM_UI_START_DELAY)
+	set -a && . ./.env.production && set +a && \
 	SELENIUM_ENV=production \
 	SELENIUM_BASE_URL="$${SELENIUM_BASE_URL:-$(SELENIUM_PROD_URL)}" \
 	SELENIUM_REMOTE_URL="$(SELENIUM_REMOTE_URL)" \
+	SELENIUM_ALLOW_CHECKOUT_PAYMENT="$${SELENIUM_ALLOW_CHECKOUT_PAYMENT:-true}" \
+	SELENIUM_CHECKOUT_PAYMENT_HOLD_MS="$${SELENIUM_CHECKOUT_PAYMENT_HOLD_MS:-$(SELENIUM_CHECKOUT_PAYMENT_HOLD_MS)}" \
+	SELENIUM_ALLOW_ADMIN_MUTATIONS="$(SELENIUM_ALLOW_ADMIN_MUTATIONS)" \
+	SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS="$${SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS:-$(SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS)}" \
 	HEADLESS=false \
 	SELENIUM_STEP_DELAY_MS="$(SELENIUM_UI_STEP_DELAY_MS)" \
 	SELENIUM_HOLD_OPEN_MS="$(SELENIUM_UI_HOLD_OPEN_MS)" \

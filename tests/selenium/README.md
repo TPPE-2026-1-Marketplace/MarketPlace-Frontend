@@ -50,12 +50,29 @@ http://localhost:7900/?autoconnect=1&resize=scale&password=secret
 - `CHROME_BINARY`: caminho opcional para um binário específico do Chrome.
 - `SELENIUM_STEP_DELAY_MS`: pausa entre cenários no modo visual.
 - `SELENIUM_HOLD_OPEN_MS`: tempo que o navegador permanece aberto ao final.
+- `SELENIUM_CHECKOUT_PAYMENT_HOLD_MS`: tempo que o navegador fica na aba do
+  checkout externo antes de fechar e voltar para a loja; padrão `8000` no
+  `make selenium-prod-ui` e `5000` no runner direto.
 - `SELENIUM_ADMIN_EMAIL` e `SELENIUM_ADMIN_PASSWORD`: administrador criado pelo
   `make demo` do backend.
 - `SELENIUM_PROD_ADMIN_EMAIL` e `SELENIUM_PROD_ADMIN_PASSWORD`: credenciais do
   administrador de produção usadas quando `SELENIUM_ENV=production`.
 - `SELENIUM_MANAGER_EMAIL` e `SELENIUM_MANAGER_PASSWORD`: gerente local
   opcional; o cenário é ignorado quando não estão definidos.
+- `SELENIUM_ALLOW_CHECKOUT_PAYMENT`: use `true` apenas quando quiser que o
+  fluxo de checkout crie pedido, abra o checkout externo de pagamento em uma
+  nova aba e volte para a loja. O `make selenium-prod-ui` ativa esse fluxo por
+  padrão para demonstração visual. O teste não clica em pagar dentro do checkout
+  externo.
+- `SELENIUM_ALLOW_ADMIN_MUTATIONS`: permite que o admin crie um produto com
+  imagem e um usuário operacional. Use `true` para ativar. Esse cenário grava
+  dados reais no backend e fica desativado por padrão.
+- `SELENIUM_ADMIN_MUTATION_ROLE`: perfil do usuário operacional criado pelo
+  cenário administrativo; use `cashier` ou `manager`. O padrão é `cashier`.
+- `SELENIUM_ADMIN_PRODUCT_IMAGE_URL`: URL da imagem usada no produto criado
+  pelo cenário administrativo.
+- `SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS`: pausa visual entre as etapas do
+  cenário administrativo; padrão `1000` no `make selenium-prod-ui`.
 
 No ambiente demo/local, `SELENIUM_ADMIN_EMAIL` deve corresponder ao administrador
 criado por `make demo` e `SELENIUM_ADMIN_PASSWORD` deve usar a senha demo
@@ -72,7 +89,7 @@ Exemplo para depuração:
 HEADLESS=false make selenium-local
 ```
 
-`make selenium-local-ui` aguarda 10 segundos antes de iniciar, pausa 1,5 segundo
+`make selenium-local-ui` inicia sem pausa artificial, pausa 1,5 segundo
 entre cenários e mantém o Chrome aberto por 30 segundos após o resultado. Esses
 valores podem ser ajustados:
 
@@ -89,6 +106,10 @@ make selenium-local-ui \
 - listagem de produtos, estado vazio e filtro por categoria;
 - detalhe de produto, nome e imagem;
 - inclusão no carrinho armazenado no navegador, quando existe produto;
+- fluxo de cliente por carrinho, dados pessoais, endereço e preparação do
+  checkout de pagamento;
+- abertura do checkout externo de pagamento e retorno para a loja quando
+  `SELENIUM_ALLOW_CHECKOUT_PAYMENT=true`;
 - abertura do formulário de autenticação sem uso de credenciais;
 - bloqueio seguro da área de gestão para usuário anônimo;
 - redirecionamento seguro do PDV para login;
@@ -97,6 +118,8 @@ make selenium-local-ui \
   credenciais `SELENIUM_PROD_*` estão configuradas;
 - navegação somente leitura por estoque, pedidos, relatórios, comissões e
   cupons;
+- criação autenticada de produto com imagem e usuário operacional quando
+  `SELENIUM_ALLOW_ADMIN_MUTATIONS=true`;
 - abertura autenticada do PDV sem iniciar venda;
 - validação básica das permissões do gerente, quando houver credenciais.
 
