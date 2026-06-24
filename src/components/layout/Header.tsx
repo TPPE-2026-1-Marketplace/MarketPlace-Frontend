@@ -228,6 +228,8 @@ export default function Header() {
             {/* Cart */}
             <Link
               to="/carrinho"
+              data-testid="cart-link"
+              aria-label="Carrinho"
               className="relative p-2.5 text-gray-600 hover:text-[#1a1a1a] transition-colors"
             >
               <ShoppingCart className="w-5 h-5" />
