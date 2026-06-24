@@ -25,7 +25,7 @@ const managerPassword = process.env.SELENIUM_MANAGER_PASSWORD;
 const checkoutEmail = process.env.SELENIUM_CHECKOUT_EMAIL ?? "selenium.checkout@example.com";
 const checkoutCpf = process.env.SELENIUM_CHECKOUT_CPF ?? "11144477735";
 const checkoutPhone = process.env.SELENIUM_CHECKOUT_PHONE ?? "61999999999";
-const checkoutCep = process.env.SELENIUM_CHECKOUT_CEP ?? "01001000";
+const checkoutCep = process.env.SELENIUM_CHECKOUT_CEP ?? "72240811";
 const allowCheckoutPayment = process.env.SELENIUM_ALLOW_CHECKOUT_PAYMENT === "true";
 const allowAdminMutations = process.env.SELENIUM_ALLOW_ADMIN_MUTATIONS === "true";
 const checkoutPaymentHoldMs = Number(process.env.SELENIUM_CHECKOUT_PAYMENT_HOLD_MS ?? 5_000);
