@@ -15,6 +15,23 @@ services:
     volumes:
       - .:/app
       - node_modules:/app/node_modules
+    networks:
+      default:
+        aliases:
+          - app.internal
+
+  selenium:
+    image: selenium/standalone-chrome:latest
+    shm_size: 2g
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    depends_on:
+      - app
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   node_modules:
