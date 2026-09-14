@@ -895,6 +895,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
             price: form.basePrice,
           }];
       const registeredImages = new Map<string, number>();
+      const imageErrors: string[] = [];
 
       for (const variant of variantsToCreate) {
         const codigoSku = variants.length
@@ -917,41 +918,56 @@ export function Inventory({ readOnly = false }: InventoryProps) {
           tipoMovimentacao: "ajuste",
         });
 
+        // Imagens são opcionais: uma falha aqui (ex.: ImgBB indisponível/sem
+        // chave) NÃO deve invalidar o produto/variante/estoque já criados.
         const color = form.colors.find((item: any) => item.name === variant.color);
-        for (let index = 0; index < (color?.images?.length ?? 0); index += 1) {
-          const source = color.images[index] as string;
-          let imageId = registeredImages.get(source);
+        try {
+          for (let index = 0; index < (color?.images?.length ?? 0); index += 1) {
+            const source = color.images[index] as string;
+            let imageId = registeredImages.get(source);
 
-          if (!imageId && source.startsWith("data:image")) {
-            const response = await fetch(source);
-            const blob = await response.blob();
-            const file = new File([blob], `img_${index}.jpg`, { type: blob.type });
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("ordem", String(index + 1));
-            const uploaded = await api.post<{ idImagem: number }>("/images/upload", formData, {
-              headers: { "Content-Type": "multipart/form-data" },
+            if (!imageId && source.startsWith("data:image")) {
+              const response = await fetch(source);
+              const blob = await response.blob();
+              const file = new File([blob], `img_${index}.jpg`, { type: blob.type });
+              const formData = new FormData();
+              formData.append("file", file);
+              formData.append("ordem", String(index + 1));
+              const uploaded = await api.post<{ idImagem: number }>("/images/upload", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+              });
+              imageId = uploaded.idImagem;
+            } else if (!imageId) {
+              const registered = await api.post<{ idImagem: number }>("/images", {
+                url: source,
+                ordem: index + 1,
+              });
+              imageId = registered.idImagem;
+            }
+            registeredImages.set(source, imageId);
+
+            await api.post("/images/catalog", {
+              imageId,
+              variantSku: codigoSku,
+              ordem_no_catalogo: index + 1,
             });
-            imageId = uploaded.idImagem;
-          } else if (!imageId) {
-            const registered = await api.post<{ idImagem: number }>("/images", {
-              url: source,
-              ordem: index + 1,
-            });
-            imageId = registered.idImagem;
           }
-          registeredImages.set(source, imageId);
-
-          await api.post("/images/catalog", {
-            imageId,
-            variantSku: codigoSku,
-            ordem_no_catalogo: index + 1,
-          });
+        } catch (imgErr) {
+          console.warn(`Falha ao processar imagens da variante ${codigoSku}:`, imgErr);
+          imageErrors.push(codigoSku);
         }
       }
 
       await refetch();
-      alert("Produto cadastrado com sucesso no banco de dados!");
+      if (imageErrors.length > 0) {
+        alert(
+          "Produto cadastrado com sucesso! Porém não foi possível enviar as imagens " +
+          `das variantes: ${imageErrors.join(", ")}. ` +
+          "Você pode adicioná-las depois pela edição do produto.",
+        );
+      } else {
+        alert("Produto cadastrado com sucesso no banco de dados!");
+      }
       setShowAddProduct(false);
     } catch (saveError) {
       console.error("Erro ao salvar produto no backend:", saveError);

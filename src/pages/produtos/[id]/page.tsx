@@ -226,7 +226,7 @@ export default function ProductDetailPage() {
   const productSizeTable = SIZE_TABLE.filter(([size]) => sizes.includes(size));
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-white font-sans" data-testid="product-detail">
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center gap-2 text-xs text-gray-400">
@@ -494,6 +494,7 @@ export default function ProductDetailPage() {
               </button>
               <button
                 onClick={handleAddToCart}
+                data-testid="add-to-cart"
                 className={`flex-1 flex items-center justify-center gap-2 py-3.5 border transition-colors text-sm tracking-wide ${
                   added
                     ? "border-green-500 bg-green-50 text-green-700"
