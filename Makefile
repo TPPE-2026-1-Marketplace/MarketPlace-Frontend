@@ -8,7 +8,7 @@ export COMPOSE_DOCKER_CLI_BUILD := 1
 .PHONY: help env-setup install dev lint build start selenium selenium-local selenium-local-ui selenium-prod-ui \
     dev-up dev-down dev-logs dev-shell dev-build dev-rebuild dev-reset \
     prod-up prod-down prod-logs prod-build prod-rebuild \
-    clean check
+    clean check hooks hooks-off
 
 SELENIUM_LOCAL_URL ?= http://localhost:3000
 SELENIUM_PROD_URL ?= https://marketplace-frontend-jh71.onrender.com/
@@ -23,6 +23,8 @@ SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS ?= 1000
 
 help:
 	@echo "Setup e local:"
+	@echo "  make hooks            Ativa os hooks versionados (.githooks)"
+	@echo "  make hooks-off        Desativa os hooks versionados"
 	@echo "  make env-setup        Cria .env.development e .env.production a partir dos .example"
 	@echo "  make install          Instala dependencias localmente com pnpm"
 	@echo "  make dev              Sobe o Next.js localmente em modo desenvolvimento"
@@ -53,6 +55,16 @@ help:
 	@echo "Utilidades:"
 	@echo "  make clean            Remove artefatos locais de build"
 	@echo "  make check            Verifica se o Dockerfile esta correto"
+
+# Aponta o Git para os hooks versionados: o commit-msg preenche os
+# Co-authored-by do trio. Basta rodar uma vez por clone.
+hooks:
+	git config core.hooksPath .githooks
+	@echo "Hooks ativados a partir de .githooks/"
+
+hooks-off:
+	git config --unset core.hooksPath || true
+	@echo "Hooks desativados (voltando para .git/hooks)"
 
 env-setup:
 	cp -n .env.development.example .env.development || true
