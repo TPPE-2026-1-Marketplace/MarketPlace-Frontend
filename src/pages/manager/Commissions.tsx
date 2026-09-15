@@ -168,9 +168,19 @@ export function Commissions() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-gray-900">Comissões e Metas</h2>
-        <p className="text-gray-500 text-sm">Gerencie as comissões e bônus da equipe de vendas</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-gray-900">Comissões e Metas</h2>
+          <p className="text-gray-500 text-sm">Gerencie as comissões e bônus da equipe de vendas</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => window.open("/painel/ranking-loja", "_blank", "noopener,noreferrer")}
+          className="bt-principal flex items-center gap-2 text-sm px-4 py-2 shrink-0"
+        >
+          <Award className="w-4 h-4" />
+          Abrir ranking para a loja
+        </button>
       </div>
 
       {/* Summary KPIs */}

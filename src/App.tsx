@@ -23,6 +23,7 @@ import PedidoStatusPage from './pages/pedido/[id]/page';
 import { ModuleSelection } from './pages/ModuleSelection';
 import { ManagerDashboard } from './pages/manager/Dashboard';
 import { Cashier } from './pages/pos/Cashier';
+import { StoreRankingDisplay } from './pages/manager/StoreRankingDisplay';
 
 function ShopLayout() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
         </Route>
         
         <Route path="/selecionar-modulo" element={<ModuleSelection />} />
+        <Route path="/painel/ranking-loja" element={<StoreRankingDisplay />} />
         <Route path="/painel/*" element={<ManagerDashboard />} />
         <Route path="/pdv" element={<Cashier />} />
       </Routes>
