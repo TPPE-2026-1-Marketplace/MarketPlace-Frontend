@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/context/AuthContext";
-import { formatCurrency } from "@/lib/utils";
+import { formatCep, formatCpf, formatCurrency, formatPhone } from "@/lib/utils";
 import { api } from "@/lib/api";
 
 type Step = "dados" | "entrega" | "pagamento" | "confirmado";
@@ -511,11 +511,12 @@ export default function CheckoutPage() {
                           type="text"
                           value={form.cpf}
                           onChange={(e) => {
-                            set("cpf", e.target.value);
+                            set("cpf", formatCpf(e.target.value));
                             if (fieldErrors.cpf)
                               setFieldErrors((prev) => ({ ...prev, cpf: undefined }));
                           }}
                           placeholder="000.000.000-00"
+                          inputMode="numeric"
                           maxLength={14}
                           className={fieldErrors.cpf ? inputErrorClass : inputClass}
                         />
@@ -527,8 +528,10 @@ export default function CheckoutPage() {
                         <input
                           type="tel"
                           value={form.telefone}
-                          onChange={(e) => set("telefone", e.target.value)}
-                          placeholder="(61) 9 9999-9999"
+                          onChange={(e) => set("telefone", formatPhone(e.target.value))}
+                          placeholder="(61) 99999-9999"
+                          inputMode="numeric"
+                          maxLength={15}
                           className={inputClass}
                         />
                       </FormField>
@@ -559,7 +562,7 @@ export default function CheckoutPage() {
                   <h2 className="text-gray-900 mb-5 font-serif text-xl">Endereço de Entrega</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
-                      { key: "cep", label: "CEP", type: "text" },
+                      { key: "cep", label: "CEP", type: "text", mask: formatCep, maxLength: 9 },
                       { key: "estado", label: "Estado", type: "text" },
                       { key: "rua", label: "Rua", type: "text", full: true },
                       { key: "numero", label: "Número", type: "text" },
@@ -575,8 +578,13 @@ export default function CheckoutPage() {
                           type={f.type}
                           value={form[f.key as keyof typeof form]}
                           onChange={(e) =>
-                            set(f.key as keyof typeof form, e.target.value)
+                            set(
+                              f.key as keyof typeof form,
+                              f.mask ? f.mask(e.target.value) : e.target.value,
+                            )
                           }
+                          inputMode={f.mask ? "numeric" : undefined}
+                          maxLength={f.maxLength}
                           className={inputClass}
                           placeholder={f.label}
                         />
