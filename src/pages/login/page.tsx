@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, User, Lock, Mail, Phone, AlertCircle, CheckCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { formatCpf, formatPhone } from "@/lib/utils";
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -18,20 +19,11 @@ export default function LoginPage() {
   const { login, register, isAuthenticated, user } = useAuth();
 
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, "");
-    if (value.length > 11) value = value.slice(0, 11);
-    
-    // Format: 000.000.000-00
-    let formatted = value;
-    if (value.length > 9) {
-      formatted = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6, 9)}-${value.slice(9)}`;
-    } else if (value.length > 6) {
-      formatted = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6)}`;
-    } else if (value.length > 3) {
-      formatted = `${value.slice(0, 3)}.${value.slice(3)}`;
-    }
-    
-    setForm({ ...form, cpf: formatted });
+    setForm({ ...form, cpf: formatCpf(e.target.value) });
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, phone: formatPhone(e.target.value) });
   };
   const navigate = useNavigate();
 
@@ -159,6 +151,8 @@ export default function LoginPage() {
                     value={form.cpf}
                     onChange={handleCpfChange}
                     placeholder="000.000.000-00"
+                    inputMode="numeric"
+                    maxLength={14}
                     required
                     className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
                   />
@@ -189,8 +183,10 @@ export default function LoginPage() {
                   <input
                     type="tel"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={handlePhoneChange}
                     placeholder="(11) 99999-9999"
+                    inputMode="numeric"
+                    maxLength={15}
                     className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
                   />
                 </div>

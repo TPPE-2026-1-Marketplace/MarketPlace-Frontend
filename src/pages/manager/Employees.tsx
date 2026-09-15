@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAuth, UserRole } from "../../context/AuthContext";
 import { api, ApiError } from "../../lib/api";
+import { formatCpf, formatPhone } from "../../lib/utils";
 
 export interface ApiEmployee {
   cpf: string;
@@ -256,15 +257,9 @@ export function Employees() {
           <input
             type="text"
             value={form.cpf}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "");
-              let formatted = val;
-              if (val.length > 9) formatted = val.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, "$1.$2.$3-$4");
-              else if (val.length > 6) formatted = val.replace(/(\d{3})(\d{3})(\d{1,3})/, "$1.$2.$3");
-              else if (val.length > 3) formatted = val.replace(/(\d{3})(\d{1,3})/, "$1.$2");
-              setForm({ ...form, cpf: formatted });
-            }}
+            onChange={(e) => setForm({ ...form, cpf: formatCpf(e.target.value) })}
             disabled={!!editingUser}
+            inputMode="numeric"
             className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a] disabled:bg-gray-100 disabled:text-gray-500"
             placeholder="000.000.000-00"
             maxLength={14}
@@ -314,7 +309,9 @@ export function Employees() {
           <input
             type="text"
             value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+            inputMode="numeric"
+            maxLength={15}
             className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
             placeholder="(11) 99999-0000"
           />
