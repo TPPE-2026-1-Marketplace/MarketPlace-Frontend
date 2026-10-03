@@ -24,6 +24,12 @@ CMD ["sh", "-c", "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev
 
 FROM base AS build
 
+# Variáveis VITE_* são embutidas no bundle em BUILD time (os .env.* ficam fora
+# da imagem pelo .dockerignore), então precisam chegar como build-arg.
+# Ex.: docker build --build-arg VITE_API_URL=https://api.exemplo.com/api .
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -31,12 +37,12 @@ RUN pnpm build
 
 FROM nginx:alpine AS runner
 
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY --from=build /app/public /usr/share/nginx/html/public
 
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget -q -O /dev/null http://localhost:80/ || exit 1
+  CMD wget -q -O /dev/null http://localhost:80/healthz || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

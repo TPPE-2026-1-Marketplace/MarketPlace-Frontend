@@ -1,6 +1,12 @@
 services:
   app:
-    image: ${DOCKER_USERNAME}/marketplace-frontend:${TAG:-latest}
+    # Mesma imagem publicada pelo CD no GHCR. `make prod-build` gera localmente.
+    image: ghcr.io/tppe-2026-1-marketplace/marketplace-frontend:${TAG:-latest}
+    build:
+      context: .
+      target: runner
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
     ports:
       - "${APP_PORT:-3003}:80"
     env_file:
@@ -9,7 +15,7 @@ services:
       NODE_ENV: production
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/healthz"]
       interval: 30s
       timeout: 3s
       start_period: 10s

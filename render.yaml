@@ -1,21 +1,17 @@
 services:
   - type: web
-    name: dk-fashion-web
-    runtime: static
-    # SPA Vite: o Render roda o build a partir do repo e publica a pasta dist/.
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
-    staticPublishPath: ./dist
-    pullRequestPreviewsEnabled: false
-    # React Router (SPA): toda rota cai no index.html (senão /pedido, /produtos/:id
-    # etc. dão 404 ao acessar direto ou recarregar).
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      # Embutida em BUILD time pelo Vite. Aponte para a API de produção, incluindo
-      # o sufixo /api. Ex.: https://dk-fashion-api-image.onrender.com/api
-      - key: VITE_API_URL
-        sync: false
-      - key: NODE_VERSION
-        value: "22"
+    name: dk-fashion-web-image
+    # Imagem nginx publicada no GHCR pelo workflow de CD (.github/workflows/cd.yml).
+    # O deploy é disparado pelo CD via API do Render (por digest), após o CI
+    # verde na main — deixe o auto-deploy desligado no painel.
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/tppe-2026-1-marketplace/marketplace-frontend:latest
+      creds:
+        fromRegistryCreds:
+          name: github-container-registry
+    # O fallback de SPA (React Router) é feito pelo nginx (nginx.conf), e a
+    # VITE_API_URL é embutida em build time pelo CD (variável VITE_API_URL do
+    # environment `production` no GitHub) — nada a configurar aqui.
+    healthCheckPath: /healthz
