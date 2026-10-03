@@ -22,9 +22,6 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # TODO: tornar bloqueante quando o eslint.config.mjs deixar de depender do
-    # eslint-config-next (legado do Next.js, não instalado) — hoje o lint quebra.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
