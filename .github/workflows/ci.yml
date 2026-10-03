@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.33.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # TODO: tornar bloqueante quando o eslint.config.mjs deixar de depender do
+    # eslint-config-next (legado do Next.js, não instalado) — hoje o lint quebra.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+  build:
+    name: Typecheck + Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `pnpm build` roda `tsc -b` antes do `vite build`, então já cobre o typecheck.
+      - name: Build
+        run: pnpm build
+
+  docker:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Valida que o estágio `runner` (nginx) builda, sem push. O CD publica a
+      # imagem no GHCR; aqui só garantimos que ela compila antes do merge.
+      - name: Build runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          push: false
+          build-args: |
+            VITE_API_URL=http://localhost:3001/api
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

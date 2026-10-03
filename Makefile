@@ -7,7 +7,7 @@ export COMPOSE_DOCKER_CLI_BUILD := 1
 
 .PHONY: help env-setup install dev lint build start selenium selenium-local selenium-local-ui selenium-prod-ui \
     dev-up dev-down dev-logs dev-shell dev-build dev-rebuild dev-reset \
-    prod-up prod-down prod-logs prod-build prod-rebuild \
+    prod-up prod-down prod-logs prod-build prod-rebuild prod-image \
     clean check hooks hooks-off
 
 SELENIUM_LOCAL_URL ?= http://localhost:3000
@@ -51,6 +51,7 @@ help:
 	@echo "  make prod-logs        Exibe logs do ambiente Docker de producao"
 	@echo "  make prod-build       Apenas constroi a imagem de producao"
 	@echo "  make prod-rebuild     Constroi e sobe o ambiente Docker de producao"
+	@echo "  make prod-image       Builda a imagem runner como o CD (VITE_API_URL=... make prod-image)"
 	@echo ""
 	@echo "Utilidades:"
 	@echo "  make clean            Remove artefatos locais de build"
@@ -188,6 +189,11 @@ prod-build:
 
 prod-rebuild:
 	$(COMPOSE_PROD) up --build -d
+
+# Espelha o build do CD (.github/workflows/cd.yml).
+prod-image:
+	@test -n "$(VITE_API_URL)" || (echo "ERRO: informe VITE_API_URL, por exemplo: VITE_API_URL=http://localhost:3001/api make prod-image" && exit 2)
+	docker build --target runner --build-arg VITE_API_URL="$(VITE_API_URL)" -t marketplace-frontend:local .
 
 clean:
 	rm -rf dist node_modules
