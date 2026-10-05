@@ -1,90 +1,69 @@
-import { act, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "@/lib/api";
-import { renderWithProviders } from "@/test/render";
-import PedidoStatusPage from "./page";
+import { screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PENDING_ORDER_KEY, saveOrderSnapshot } from "@/hooks/useOrderSnapshot";
+import type { OrderSnapshot } from "@/types/checkout";
+import PedidoConfirmacaoPage from "./page";
+import { renderWithProviders } from "@/test/renderWithProviders";
 
-vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/api")>()),
-  api: { get: vi.fn(), post: vi.fn() },
-}));
-const getMock = vi.mocked(api.get);
+const snapshot: OrderSnapshot = {
+  idPedido: 1042,
+  nome: "Mariana Lima",
+  email: "mariana@email.com",
+  itemCount: 2,
+  subtotal: 1498.9,
+  frete: 24.9,
+  desconto: 100,
+  total: 1423.8,
+  tipoRetirada: "entrega",
+  metodoPagamento: "credit_card",
+  parcelas: 6,
+  criadoEm: "2026-10-04T12:00:00.000Z",
+};
 
-function renderPage(route = "/pedido/42") {
-  return renderWithProviders(<PedidoStatusPage />, {
+function renderPedido(route: string) {
+  return renderWithProviders(<PedidoConfirmacaoPage />, {
     route,
     path: route.startsWith("/pedido/") ? "/pedido/:idPedido" : "/pedido",
   });
 }
 
-describe("PedidoStatusPage", () => {
+describe("PedidoConfirmacaoPage (Finalizado)", () => {
   beforeEach(() => {
-    getMock.mockReset();
+    window.scrollTo = vi.fn();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  it("mostra a confirmação com o resumo salvo antes do pagamento", () => {
+    saveOrderSnapshot(snapshot);
+    renderPedido("/pedido/1042");
+
+    expect(screen.getByText("PEDIDO RECEBIDO")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Obrigada pela sua compra!" })).toBeInTheDocument();
+    expect(screen.getByText(/Mariana, seu pedido #1042 foi registrado\./)).toBeInTheDocument();
+
+    const summary = screen.getByRole("region", { name: "Resumo do pedido" });
+    expect(within(summary).getByText("Subtotal (2 itens)")).toBeInTheDocument();
+    expect(summary).toHaveTextContent(/− R\$\s100,00/);
+    expect(summary).toHaveTextContent(/R\$\s1\.423,80/);
+    expect(summary).toHaveTextContent(/6x de R\$\s237,30 sem juros no cartão/);
+
+    expect(screen.getByText("E agora?")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continuar comprando" })).toHaveAttribute("href", "/");
   });
 
-  it("avisa quando não há pedido na rota nem pendente", async () => {
-    renderPage("/pedido");
+  it("sem resumo salvo (outro pedido/dispositivo) mostra só a confirmação", () => {
+    saveOrderSnapshot(snapshot);
+    renderPedido("/pedido/77");
 
-    expect(await screen.findByText("Não foi possível identificar o pedido.")).toBeInTheDocument();
-    expect(getMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/^Seu pedido #77 foi registrado\./)).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Resumo do pedido" })).not.toBeInTheDocument();
   });
 
-  it("confirma o pagamento e limpa o pedido pendente", async () => {
-    localStorage.setItem("dk_pending_order", "42");
-    getMock.mockResolvedValueOnce({ status: "paid", paidAmount: 150.5 });
-    renderPage();
+  it("/pedido sem id usa o último pedido enviado ao pagamento", () => {
+    saveOrderSnapshot({ ...snapshot, metodoPagamento: "pix", parcelas: 1 });
+    expect(localStorage.getItem(PENDING_ORDER_KEY)).toBe("1042");
+    renderPedido("/pedido");
 
-    expect(screen.getByText("Consultando pagamento…")).toBeInTheDocument();
-    expect(await screen.findByText("Pagamento confirmado!")).toBeInTheDocument();
-    expect(getMock).toHaveBeenCalledWith("/payments/order/42");
-    expect(screen.getByText(/R\$\s150,50/)).toBeInTheDocument();
-    expect(localStorage.getItem("dk_pending_order")).toBeNull();
-
-    await userEvent.click(screen.getByRole("button", { name: "Ver meus pedidos" }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/conta");
-  });
-
-  it("usa o pedido pendente salvo quando a rota não traz id", async () => {
-    localStorage.setItem("dk_pending_order", "77");
-    getMock.mockResolvedValueOnce({ status: "failed" });
-    renderPage("/pedido");
-
-    expect(await screen.findByText("Pagamento não concluído")).toBeInTheDocument();
-    expect(getMock).toHaveBeenCalledWith("/payments/order/77");
-  });
-
-  it("consulta de novo enquanto o pagamento está pendente", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    getMock.mockResolvedValueOnce({ status: "pending" }).mockResolvedValueOnce({ status: "paid", paidAmount: null });
-    renderPage();
-
-    expect(await screen.findByText("Aguardando confirmação")).toBeInTheDocument();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
-
-    expect(await screen.findByText("Pagamento confirmado!")).toBeInTheDocument();
-    expect(getMock).toHaveBeenCalledTimes(2);
-  });
-
-  it("mostra o erro da consulta e permite voltar à loja", async () => {
-    getMock.mockRejectedValueOnce(new Error("Pedido não encontrado"));
-    renderPage();
-
-    expect(await screen.findByText("Pedido não encontrado")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Voltar à loja" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
-  });
-
-  it("usa mensagem padrão para erros desconhecidos", async () => {
-    getMock.mockRejectedValueOnce("falha");
-    renderPage();
-
-    expect(await screen.findByText("Não foi possível consultar o pagamento.")).toBeInTheDocument();
+    expect(screen.getByText(/Mariana, seu pedido #1042 foi registrado\./)).toBeInTheDocument();
+    expect(screen.getByText("Pagamento via PIX")).toBeInTheDocument();
   });
 });

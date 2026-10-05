@@ -11,10 +11,20 @@
    ============================ */
 
 :root {
+  /* Fonts (carregadas no index.html) */
+  --font-inter: 'Inter';
+  --font-playfair: 'Playfair Display';
+
   /* Brand */
   --color-brand: #C8427C;
   --color-brand-light: #e06da0;
   --color-brand-dark: #a03062;
+  --background-brand-subtle: #fdf2f8;
+
+  /* Action (Button/Action do Figma: preto = ação/conversão) */
+  --action-primary: #1a1a1a;
+  --action-primary-hover: #333333;
+  --color-white: #ffffff;
 
   /* Background */
   --background: #f9fafb;
@@ -32,6 +42,7 @@
   --border: #e5e7eb;
   --border-hover: #d1d5db;
   --border-accent: rgba(200, 66, 124, 0.4);
+  --border-control: #6b7280;
 
   /* Overlay */
   --overlay: rgba(0, 0, 0, 0.4);
@@ -43,6 +54,10 @@
   --color-warning: #f59e0b;
   --color-error: #ef4444;
   --color-info: #3b82f6;
+  --color-success-text: #166534;
+  --color-error-text: #b91c1c;
+  --color-warning-text: #92400e;
+  --background-error-subtle: #fef2f2;
 
   /* Spacing */
   --header-height: 72px;

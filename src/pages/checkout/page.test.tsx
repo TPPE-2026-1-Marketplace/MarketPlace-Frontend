@@ -1,224 +1,98 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
-import { apiRouter } from "@/test/apiRouter";
-import { customer, renderWithProviders } from "@/test/render";
+import { useAuth } from "@/context/AuthContext";
 import CheckoutPage from "./page";
+import { makeCartItem, renderWithProviders, seedCart } from "@/test/renderWithProviders";
 
-vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/api")>()),
-  api: { get: vi.fn(), post: vi.fn() },
-}));
-const postMock = vi.mocked(api.post);
+vi.mock("@/lib/api", () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: vi.fn() }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
-const viaCep = vi.fn();
-const loggedUser = { ...customer, id: "12345678900" };
-
-function seedCart() {
-  localStorage.setItem(
-    "cart",
-    JSON.stringify({
-      id: 1,
-      subtotal: 200,
-      desconto: 20,
-      total: 180,
-      cupom: "DK10",
-      items: [
-        {
-          id: 1,
-          quantity: 2,
-          variant: { codigoSku: "ROSA-P", precoVariante: 100, cor: "Rosa", tamanho: "P", produto: { idProduto: 1, titulo: "Vestido Rosa", precoBase: 100 } },
-        },
-      ],
-    }),
-  );
-}
-
-function mockBackend(overrides: Record<string, unknown> = {}) {
-  postMock.mockImplementation(
-    apiRouter({
-      "/shipping/calculate": { valor: 20, prazo_dias: 3 },
-      "/orders": { idPedido: 55 },
-      "/payments": { status: "pending", redirectUrl: "https://pay.example/55" },
-      ...overrides,
-    }) as never,
-  );
-}
-
-async function fillDados({ email = "convidada@dk.com", cpf = "123.456.789-00" } = {}) {
-  const emailInput = screen.getByPlaceholderText("seu@email.com");
-  const cpfInput = screen.getByPlaceholderText("000.000.000-00");
-  await userEvent.clear(emailInput);
-  if (email) await userEvent.type(emailInput, email);
-  await userEvent.clear(cpfInput);
-  if (cpf) await userEvent.type(cpfInput, cpf);
-}
-
-async function fillCep(cep = "70000-000") {
-  await userEvent.type(screen.getByPlaceholderText("CEP"), cep);
-  // O frete é calculado 500 ms depois de digitar; o botão só habilita com a cotação.
-  await waitFor(() => expect(screen.getByRole("button", { name: /Finalizar Pedido/ })).toBeEnabled(), { timeout: 3000 });
+function renderCheckout() {
+  window.scrollTo = vi.fn();
+  return renderWithProviders(<CheckoutPage />, { route: "/checkout" });
 }
 
 describe("CheckoutPage", () => {
   beforeEach(() => {
-    seedCart();
-    postMock.mockReset();
-    mockBackend();
-    viaCep.mockReset();
-    viaCep.mockResolvedValue({ json: async () => ({ logradouro: "SQS 308", bairro: "Asa Sul", localidade: "Brasília", uf: "DF" }) });
-    vi.stubGlobal("fetch", viaCep);
+    vi.mocked(useAuth).mockReturnValue({ user: null } as ReturnType<typeof useAuth>);
+    vi.mocked(api.post).mockResolvedValue({ valor: 24.9, prazo_dias: 3 });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ json: async () => ({ erro: true }) }));
   });
 
-  it("valida e-mail e CPF antes de continuar", async () => {
-    renderWithProviders(<CheckoutPage />);
-    expect(screen.getByText("Comprando como convidado — sem necessidade de conta.")).toBeInTheDocument();
-
-    await fillDados({ email: "", cpf: "" });
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
-    expect(screen.getByText("E-mail é obrigatório")).toBeInTheDocument();
-    expect(screen.getByText("CPF é obrigatório")).toBeInTheDocument();
-
-    await fillDados({ email: "invalido", cpf: "123" });
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
-    expect(screen.getByText("E-mail inválido")).toBeInTheDocument();
-    expect(screen.getByText("CPF deve ter 11 dígitos")).toBeInTheDocument();
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it("convidado finaliza o pedido e recebe o link de pagamento", async () => {
-    renderWithProviders(<CheckoutPage />);
-    await userEvent.type(screen.getByPlaceholderText("Seu nome (opcional)"), "Convidada");
-    await userEvent.type(screen.getByPlaceholderText("(61) 9 9999-9999"), "61999990000");
-    await fillDados();
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
-
-    await userEvent.click(screen.getByRole("button", { name: /Continuar como Convidado/ }));
-    expect(screen.getByRole("heading", { name: "Endereço de Entrega" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Finalizar Pedido/ })).toBeDisabled();
-
-    await fillCep();
-    expect(viaCep).toHaveBeenCalledWith("https://viacep.com.br/ws/70000000/json/");
-    await waitFor(() => expect(screen.getByPlaceholderText("Rua")).toHaveValue("SQS 308"));
-    expect(screen.getByPlaceholderText("Estado")).toHaveValue("DF");
-    // Total = 180 (carrinho com cupom) + 20 de frete.
-    expect(screen.getByText("Total").nextElementSibling).toHaveTextContent(/R\$\s200,00/);
-    await userEvent.type(screen.getByPlaceholderText("Número"), "10");
-
-    await userEvent.click(screen.getByRole("button", { name: /Finalizar Pedido/ }));
-
-    expect(await screen.findByText("Pedido registrado")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Abrir pagamento/ })).toHaveAttribute("href", "https://pay.example/55");
-    expect(screen.queryByRole("button", { name: "Ver status" })).not.toBeInTheDocument();
-    expect(postMock).toHaveBeenCalledWith("/orders/guest", expect.objectContaining({
-      items: [{ variantSku: "ROSA-P", quantidade: 2 }],
-      couponNumero: "DK10",
-      valorFrete: 20,
-      enderecoCep: "70000-000",
-      enderecoNumero: "10",
-      enderecoEstado: "DF",
-      clienteCpfAvulso: "12345678900",
-      clienteNomeAvulso: "Convidada",
-      clienteTelefone: "61999990000",
-    }));
-    expect(postMock).toHaveBeenCalledWith("/payments/guest", { idPedido: 55, captureMethod: "pix", installments: 1 });
-    expect(localStorage.getItem("dk_pending_order")).toBe("55");
-    expect(JSON.parse(localStorage.getItem("cart")!).items).toEqual([]);
-
-    await userEvent.click(screen.getByRole("button", { name: "Voltar à loja" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
+  it("sem itens volta para o carrinho", () => {
+    renderCheckout();
+    expect(screen.getByTestId("location")).toHaveTextContent("/carrinho");
   });
 
-  it("cliente logado tem pagamento confirmado direto", async () => {
-    mockBackend({ "/payments": { status: "paid" } });
-    renderWithProviders(<CheckoutPage />, { user: loggedUser });
-    expect(screen.getByPlaceholderText("seu@email.com")).toHaveValue("cliente@dk.com");
+  describe("com itens", () => {
+    beforeEach(() => {
+      seedCart([makeCartItem({ preco: 899.9 }), makeCartItem({ sku: "B", idProduto: 2, preco: 749.9 })]);
+    });
 
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
-    await fillCep();
-    await userEvent.click(screen.getByRole("button", { name: /Finalizar Pedido/ }));
+    it("mostra a página única com stepper, seções e resumo", () => {
+      renderCheckout();
 
-    expect(await screen.findByText("Pedido Confirmado!")).toBeInTheDocument();
-    expect(screen.getByText("#55")).toBeInTheDocument();
-    expect(screen.getByText(/R\$\s200,00/)).toBeInTheDocument();
-    expect(postMock).toHaveBeenCalledWith("/orders", expect.not.objectContaining({ clienteCpfAvulso: expect.anything() }));
-    expect(postMock).toHaveBeenCalledWith("/payments", expect.objectContaining({ idPedido: 55 }));
-    expect(screen.queryByText(/comprou como convidado/)).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Finalizar compra" })).toBeInTheDocument();
+      const stepper = screen.getByRole("navigation", { name: "Etapas da compra" });
+      expect(within(stepper).getByRole("button", { current: "step" })).toHaveTextContent("1");
+      for (const name of ["Dados de contato", "Entrega", "Pagamento", "Resumo do pedido"]) {
+        expect(screen.getByRole("heading", { name })).toBeInTheDocument();
+      }
+      expect(screen.getByRole("button", { name: "Finalizar pedido" })).toBeInTheDocument();
+    });
 
-    await userEvent.click(screen.getByRole("button", { name: "Voltar à Loja" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
-  });
+    it("valida ao finalizar: erro abaixo do campo e foco no primeiro inválido", async () => {
+      const user = userEvent.setup();
+      renderCheckout();
 
-  it("cliente logado pode ver o status do pedido pendente", async () => {
-    renderWithProviders(<CheckoutPage />, { user: loggedUser });
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
-    await fillCep();
-    await userEvent.click(screen.getByRole("button", { name: /Finalizar Pedido/ }));
+      await user.click(screen.getByRole("button", { name: "Finalizar pedido" }));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Ver status" }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/pedido/55");
-  });
+      const nome = screen.getByLabelText("Nome completo");
+      expect(nome).toHaveFocus();
+      expect(nome).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getByText("Informe seu nome completo.")).toBeInTheDocument();
+      expect(screen.getByText("Informe seu e-mail.")).toBeInTheDocument();
+      expect(api.post).not.toHaveBeenCalledWith("/orders/guest", expect.anything());
 
-  it("convidado pode escolher entrar", async () => {
-    renderWithProviders(<CheckoutPage />);
-    await fillDados();
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
+      await user.type(nome, "Mariana");
+      expect(screen.queryByText("Informe seu nome completo.")).not.toBeInTheDocument();
+    });
 
-    await userEvent.click(screen.getByRole("button", { name: /^Entrar$/ }));
+    it("aplica máscara no CPF e calcula o frete pelo CEP", async () => {
+      const user = userEvent.setup();
+      renderCheckout();
 
-    expect(screen.getByTestId("location")).toHaveTextContent("/conta?retorno=checkout");
-  });
+      await user.type(screen.getByLabelText("CPF"), "11144477735");
+      expect(screen.getByLabelText("CPF")).toHaveValue("111.444.777-35");
 
-  it("mostra erros do frete e do CEP", async () => {
-    mockBackend({ "/shipping/calculate": () => Promise.reject(new Error("CEP fora da área")) });
-    viaCep.mockResolvedValueOnce({ json: async () => ({ erro: true }) });
-    renderWithProviders(<CheckoutPage />, { user: loggedUser });
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
+      await user.type(screen.getByLabelText("CEP"), "70000000");
+      expect(screen.getByLabelText("CEP")).toHaveValue("70000-000");
 
-    await userEvent.type(screen.getByPlaceholderText("CEP"), "70000000");
-    expect(await screen.findByText("CEP fora da área", undefined, { timeout: 3000 })).toBeInTheDocument();
-    expect(await screen.findByText("CEP não encontrado.")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(api.post).toHaveBeenCalledWith("/shipping/calculate", { cep_destino: "70000000" }),
+      );
+      expect(await screen.findByText(/3 dias úteis • R\$\s24,90/)).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Resumo do pedido" })).toHaveTextContent(/R\$\s1\.674,70/);
+    });
 
-    mockBackend({ "/shipping/calculate": () => Promise.reject("falha") });
-    viaCep.mockRejectedValueOnce(new Error("offline"));
-    await userEvent.clear(screen.getByPlaceholderText("CEP"));
-    await userEvent.type(screen.getByPlaceholderText("CEP"), "71000000");
-    expect(await screen.findByText("Não foi possível calcular o frete para este CEP.", undefined, { timeout: 3000 })).toBeInTheDocument();
-    expect(screen.getByText("Não foi possível consultar o CEP.")).toBeInTheDocument();
+    it("Retirar na loja esconde o endereço e zera o frete", async () => {
+      const user = userEvent.setup();
+      renderCheckout();
 
-    await userEvent.click(screen.getByRole("button", { name: "Voltar" }));
-    expect(screen.getByRole("heading", { name: "Dados Pessoais" })).toBeInTheDocument();
-  });
+      await user.click(screen.getByRole("radio", { name: /Retirar na loja/ }));
 
-  it("trata falha ao criar o pedido e permite tentar de novo", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    mockBackend({ "/orders": () => Promise.reject(new Error("Estoque insuficiente")) });
-    renderWithProviders(<CheckoutPage />, { user: loggedUser });
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
-    await fillCep();
-
-    await userEvent.click(screen.getByRole("button", { name: /Finalizar Pedido/ }));
-    expect(await screen.findByText("Estoque insuficiente")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Ops!" })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Tentar Novamente" }));
-    expect(screen.getByRole("heading", { name: "Endereço de Entrega" })).toBeInTheDocument();
-  });
-
-  it("trata falha no pagamento sem recriar o pedido", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    mockBackend({ "/payments": () => Promise.reject("gateway") });
-    renderWithProviders(<CheckoutPage />, { user: loggedUser });
-    await userEvent.click(screen.getByRole("button", { name: /Continuar/ }));
-    await fillCep();
-
-    await userEvent.click(screen.getByRole("button", { name: /Finalizar Pedido/ }));
-    expect(await screen.findByText("Pedido criado, mas o pagamento falhou. Tente novamente.")).toBeInTheDocument();
-
-    mockBackend({ "/payments": { status: "paid" } });
-    await userEvent.click(screen.getByRole("button", { name: "Tentar Novamente" }));
-    await userEvent.click(screen.getByRole("button", { name: /Finalizar Pedido/ }));
-    expect(await screen.findByText("Pedido Confirmado!")).toBeInTheDocument();
-    expect(postMock.mock.calls.filter(([path]) => path === "/orders")).toHaveLength(1);
+      expect(screen.queryByLabelText("CEP")).not.toBeInTheDocument();
+      expect(screen.getByText("Retire na loja a partir de amanhã, sem custo de frete.")).toBeInTheDocument();
+      const summary = screen.getByRole("region", { name: "Resumo do pedido" });
+      expect(within(summary).getByText("Grátis")).toBeInTheDocument();
+      expect(summary).toHaveTextContent(/R\$\s1\.649,80/);
+    });
   });
 });

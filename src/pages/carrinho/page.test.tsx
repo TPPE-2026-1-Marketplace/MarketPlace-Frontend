@@ -1,173 +1,115 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "@/lib/api";
-import { renderWithProviders } from "@/test/render";
 import CarrinhoPage from "./page";
+import { makeCartItem, renderWithProviders, seedCart } from "@/test/renderWithProviders";
 
-vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/api")>()),
-  api: { get: vi.fn(), post: vi.fn() },
-}));
-const getMock = vi.mocked(api.get);
-const postMock = vi.mocked(api.post);
+vi.mock("@/lib/api", () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 
-function seedCart() {
-  localStorage.setItem(
-    "cart",
-    JSON.stringify({
-      id: 1,
-      subtotal: 500,
-      desconto: 0,
-      total: 500,
-      frete: 0,
-      items: [
-        {
-          id: 1,
-          quantity: 2,
-          variant: {
-            codigoSku: "ROSA-P",
-            precoVariante: 200,
-            cor: "Rosa",
-            tamanho: "P",
-            images: [{ url: "/rosa.jpg" }],
-            produto: { idProduto: 1, titulo: "Vestido Rosa", precoBase: 180 },
-          },
-        },
-        {
-          id: 2,
-          quantity: 1,
-          variant: { codigoSku: "AZUL-M", produto: { idProduto: 2, titulo: "Vestido Azul", precoBase: 100 } },
-        },
-      ],
-    }),
-  );
+const rose = makeCartItem({ sku: "ROSE-M", idProduto: 1, titulo: "Vestido Princesa Rosé", preco: 899.9 });
+const marinho = makeCartItem({
+  sku: "MAR-G",
+  idProduto: 2,
+  titulo: "Vestido Longo Marinho",
+  cor: "Azul-marinho",
+  tamanho: "G",
+  preco: 749.9,
+});
+
+function renderCart() {
+  window.scrollTo = vi.fn();
+  return renderWithProviders(<CarrinhoPage />, { route: "/carrinho" });
 }
 
-const money = (text: string) => new RegExp(text.replace(/[.$]/g, (c) => `\\${c}`).replace(" ", "\\s"));
-
 describe("CarrinhoPage", () => {
-  beforeEach(() => {
-    vi.spyOn(window, "scrollTo").mockImplementation(() => {});
-    getMock.mockReset();
-    postMock.mockReset();
+  it("carrinho vazio mostra o EmptyState com CTA para o catálogo", () => {
+    renderCart();
+
+    expect(screen.getByRole("heading", { name: "Seu carrinho está vazio" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Explorar vestidos" })).toHaveAttribute("href", "/produtos");
   });
 
-  it("mostra o carrinho vazio", () => {
-    renderWithProviders(<CarrinhoPage />);
+  describe("com itens", () => {
+    beforeEach(() => {
+      seedCart([rose, marinho], { cep: "70000000", frete: 24.9, prazoDias: 3 });
+    });
 
-    expect(screen.getByText("Seu carrinho está vazio")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Continuar Comprando/ })).toHaveAttribute("href", "/produtos");
+    it("mostra contagem, itens e resumo com frete incluído", () => {
+      renderCart();
+
+      expect(screen.getByRole("heading", { level: 1, name: "Seu carrinho" })).toBeInTheDocument();
+      expect(screen.getByText("2 itens · Confira tamanho e cor")).toBeInTheDocument();
+      expect(screen.getAllByTestId("cart-line-item")).toHaveLength(2);
+
+      const summary = screen.getByRole("region", { name: "Resumo do pedido" });
+      expect(within(summary).getByText("Subtotal (2 itens)")).toBeInTheDocument();
+      expect(within(summary).getByText(/R\$\s1\.674,70/)).toBeInTheDocument();
+      expect(within(summary).getByText("Frete incluído no total")).toBeInTheDocument();
+      expect(screen.getByText("Entrega para 70000-000")).toBeInTheDocument();
+    });
+
+    it("+ aumenta a quantidade e recalcula", async () => {
+      const user = userEvent.setup();
+      renderCart();
+
+      await user.click(screen.getByRole("button", { name: "Aumentar quantidade de Vestido Princesa Rosé" }));
+
+      expect(screen.getByText("3 itens · Confira tamanho e cor")).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Resumo do pedido" })).toHaveTextContent(/R\$\s2\.574,60/);
+    });
+
+    it("Manter no carrinho fecha o diálogo sem remover", async () => {
+      const user = userEvent.setup();
+      renderCart();
+
+      await user.click(screen.getByRole("button", { name: "Remover Vestido Princesa Rosé" }));
+      const dialog = await screen.findByRole("dialog", { name: "Remover este vestido?" });
+      await user.click(within(dialog).getByRole("button", { name: "Manter no carrinho" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getAllByTestId("cart-line-item")).toHaveLength(2);
+    });
+
+    it("remove item a item até o estado vazio, com o diálogo final no último", async () => {
+      const user = userEvent.setup();
+      renderCart();
+
+      await user.click(screen.getByRole("button", { name: "Remover Vestido Princesa Rosé" }));
+      await user.click(
+        within(await screen.findByRole("dialog", { name: "Remover este vestido?" })).getByRole("button", {
+          name: "Remover vestido",
+        }),
+      );
+      expect(screen.getByText("1 item · Confira tamanho e cor")).toBeInTheDocument();
+
+      // "−" com quantidade 1 também pede confirmação.
+      await user.click(screen.getByRole("button", { name: "Diminuir quantidade de Vestido Longo Marinho" }));
+      await user.click(
+        within(await screen.findByRole("dialog", { name: "Remover o último vestido?" })).getByRole("button", {
+          name: "Remover vestido",
+        }),
+      );
+
+      expect(await screen.findByRole("heading", { name: "Seu carrinho está vazio" })).toBeInTheDocument();
+    });
+
+    it("Finalizar a compra leva ao checkout", async () => {
+      const user = userEvent.setup();
+      renderCart();
+
+      await user.click(screen.getAllByRole("button", { name: "Finalizar a compra" })[0]);
+
+      expect(screen.getByTestId("location")).toHaveTextContent("/checkout");
+    });
   });
 
-  it("lista itens com variação, preço unitário e resumo", () => {
-    seedCart();
-    renderWithProviders(<CarrinhoPage />);
+  it("sem CEP informado, o frete fica a calcular e o campo de CEP aparece", () => {
+    seedCart([rose]);
+    renderCart();
 
-    expect(screen.getByText("2 items")).toBeInTheDocument();
-    expect(screen.getByText("Vestido Rosa")).toBeInTheDocument();
-    expect(screen.getByText("P")).toBeInTheDocument();
-    expect(screen.getByText(money("R$ 400,00"))).toBeInTheDocument();
-    expect(screen.getByText(/R\$\s200,00 cada/)).toBeInTheDocument();
-    expect(screen.getByAltText("Vestido Azul")).toHaveAttribute("src", "/hero-dress.png");
-    expect(screen.getByText("Subtotal (2 itens)")).toBeInTheDocument();
-  });
-
-  it("altera quantidades, remove itens, limpa e finaliza", async () => {
-    seedCart();
-    renderWithProviders(<CarrinhoPage />);
-    const rosa = screen.getByText("Vestido Rosa").closest("div.bg-white") as HTMLElement;
-    const [remove, minus, plus] = Array.from(rosa.querySelectorAll("button"));
-
-    await userEvent.click(plus);
-    expect(rosa).toHaveTextContent("3");
-    await userEvent.click(minus);
-    await userEvent.click(minus);
-    expect(screen.queryByText(/cada$/)).not.toBeInTheDocument();
-    await userEvent.click(remove);
-    expect(screen.queryByText("Vestido Rosa")).not.toBeInTheDocument();
-    expect(screen.getByText("1 item")).toBeInTheDocument();
-    expect(screen.getByText("Subtotal (1 item)")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /Finalizar Compra/ }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/checkout");
-
-    await userEvent.click(screen.getByRole("button", { name: "Limpar carrinho" }));
-    expect(screen.getByText("Seu carrinho está vazio")).toBeInTheDocument();
-  });
-
-  it("valida o CEP e calcula o frete", async () => {
-    seedCart();
-    postMock.mockResolvedValueOnce({ valor: 25.9, prazo_dias: 3 }).mockResolvedValueOnce({ valor: 0, prazo_dias: 1 });
-    renderWithProviders(<CarrinhoPage />);
-    const cep = screen.getByPlaceholderText("Digite seu CEP");
-    const calcular = screen.getByRole("button", { name: "Calcular" });
-
-    await userEvent.type(cep, "123");
-    await userEvent.click(calcular);
-    expect(screen.getByText("CEP inválido. Use 8 dígitos.")).toBeInTheDocument();
-
-    await userEvent.clear(cep);
-    await userEvent.type(cep, "70000-000");
-    await userEvent.click(calcular);
-    // O plural hoje sai "dias útileis" (" útil" + "eis"): só o início é verificado.
-    expect(await screen.findByText(/^Prazo estimado: 3 dias/)).toBeInTheDocument();
-    expect(postMock).toHaveBeenCalledWith("/shipping/calculate", { cep_destino: "70000000" });
-    expect(screen.getByText(money("R$ 25,90"))).toBeInTheDocument();
-
-    await userEvent.click(calcular);
-    expect(await screen.findByText("Grátis")).toBeInTheDocument();
-    expect(screen.getByText("Prazo estimado: 1 dia útil")).toBeInTheDocument();
-
-    postMock.mockRejectedValueOnce(new Error("offline"));
-    await userEvent.click(calcular);
-    expect(await screen.findByText("Erro ao calcular frete. Tente novamente.")).toBeInTheDocument();
-  });
-
-  it("aplica cupom percentual e fixo e trata cupons inválidos", async () => {
-    seedCart();
-    renderWithProviders(<CarrinhoPage />);
-    const input = screen.getByPlaceholderText("Código do cupom");
-    const aplicar = screen.getByRole("button", { name: "Aplicar" });
-
-    await userEvent.click(aplicar);
-    expect(getMock).not.toHaveBeenCalled();
-
-    getMock.mockResolvedValueOnce({ valid: true, tipoCupom: "porcentagem", valorDesconto: 10 });
-    await userEvent.type(input, " DK10 ");
-    await userEvent.click(aplicar);
-    expect(await screen.findByText("Cupom aplicado com sucesso!")).toBeInTheDocument();
-    expect(getMock).toHaveBeenCalledWith("/coupons/validate/DK10?productIds=1,2");
-    expect(screen.getByText(money("-R$ 50,00"))).toBeInTheDocument();
-
-    getMock.mockResolvedValueOnce({ valid: true, tipoCupom: "fixo", valorDesconto: 30 });
-    await userEvent.click(aplicar);
-    await waitFor(() => expect(screen.getByText(money("-R$ 30,00"))).toBeInTheDocument());
-
-    for (const [reason, text] of [
-      ["expired", "Cupom expirado."],
-      ["limit_reached", "Limite de uso atingido."],
-      ["ineligible_products", "Cupom não aplicável a estes produtos."],
-      ["outro", "Cupom inválido."],
-    ]) {
-      getMock.mockResolvedValueOnce({ valid: false, reason });
-      await userEvent.click(aplicar);
-      expect(await screen.findByText(text)).toBeInTheDocument();
-    }
-    expect(screen.queryByText("Desconto")).not.toBeInTheDocument();
-
-    getMock.mockRejectedValueOnce(new Error("offline"));
-    await userEvent.click(aplicar);
-    expect(await screen.findByText("Erro ao validar cupom.")).toBeInTheDocument();
-  });
-
-  it("mostra o cupom já aplicado no carrinho salvo", () => {
-    seedCart();
-    const cart = JSON.parse(localStorage.getItem("cart")!);
-    localStorage.setItem("cart", JSON.stringify({ ...cart, cupom: "SALVO", desconto: 10, total: 490 }));
-
-    renderWithProviders(<CarrinhoPage />);
-
-    expect(screen.getByText("Cupom SALVO aplicado.")).toBeInTheDocument();
+    const summary = screen.getByRole("region", { name: "Resumo do pedido" });
+    expect(within(summary).getByText("A calcular")).toBeInTheDocument();
+    expect(within(summary).getByText("Informe o CEP para incluir o frete")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("CEP de entrega").length).toBeGreaterThan(0);
   });
 });
