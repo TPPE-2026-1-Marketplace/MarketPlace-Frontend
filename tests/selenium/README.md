@@ -50,9 +50,9 @@ http://localhost:7900/?autoconnect=1&resize=scale&password=secret
 - `CHROME_BINARY`: caminho opcional para um binário específico do Chrome.
 - `SELENIUM_STEP_DELAY_MS`: pausa entre cenários no modo visual.
 - `SELENIUM_HOLD_OPEN_MS`: tempo que o navegador permanece aberto ao final.
-- `SELENIUM_CHECKOUT_PAYMENT_HOLD_MS`: tempo que o navegador fica na aba do
-  checkout externo antes de fechar e voltar para a loja; padrão `8000` no
-  `make selenium-prod-ui` e `5000` no runner direto.
+- `SELENIUM_CHECKOUT_PAYMENT_HOLD_MS`: tempo que o navegador fica no
+  checkout externo antes de voltar para a tela de pedido recebido da loja;
+  padrão `8000` no `make selenium-prod-ui` e `5000` no runner direto.
 - `SELENIUM_ADMIN_EMAIL` e `SELENIUM_ADMIN_PASSWORD`: administrador criado pelo
   `make demo` do backend.
 - `SELENIUM_PROD_ADMIN_EMAIL` e `SELENIUM_PROD_ADMIN_PASSWORD`: credenciais do
@@ -60,10 +60,10 @@ http://localhost:7900/?autoconnect=1&resize=scale&password=secret
 - `SELENIUM_MANAGER_EMAIL` e `SELENIUM_MANAGER_PASSWORD`: gerente local
   opcional; o cenário é ignorado quando não estão definidos.
 - `SELENIUM_ALLOW_CHECKOUT_PAYMENT`: use `true` apenas quando quiser que o
-  fluxo de checkout crie pedido, abra o checkout externo de pagamento em uma
-  nova aba e volte para a loja. O `make selenium-prod-ui` ativa esse fluxo por
-  padrão para demonstração visual. O teste não clica em pagar dentro do checkout
-  externo.
+  fluxo de checkout crie pedido, siga (na mesma aba) para o checkout externo de
+  pagamento e volte para a tela de pedido recebido. O `make selenium-prod-ui`
+  ativa esse fluxo por padrão para demonstração visual. O teste não clica em
+  pagar dentro do checkout externo.
 - `SELENIUM_ALLOW_ADMIN_MUTATIONS`: permite que o admin crie um produto com
   imagem e um usuário operacional. Use `true` para ativar. Esse cenário grava
   dados reais no backend e fica desativado por padrão.
@@ -106,10 +106,10 @@ make selenium-local-ui \
 - listagem de produtos, estado vazio e filtro por categoria;
 - detalhe de produto, nome e imagem;
 - inclusão no carrinho armazenado no navegador, quando existe produto;
-- fluxo de cliente por carrinho, dados pessoais, endereço e preparação do
-  checkout de pagamento;
-- abertura do checkout externo de pagamento e retorno para a loja quando
-  `SELENIUM_ALLOW_CHECKOUT_PAYMENT=true`;
+- fluxo de cliente por carrinho e checkout em página única (dados de contato,
+  entrega e pagamento);
+- redirecionamento para o checkout externo de pagamento e retorno para a tela
+  de pedido recebido quando `SELENIUM_ALLOW_CHECKOUT_PAYMENT=true`;
 - abertura do formulário de autenticação sem uso de credenciais;
 - bloqueio seguro da área de gestão para usuário anônimo;
 - redirecionamento seguro do PDV para login;

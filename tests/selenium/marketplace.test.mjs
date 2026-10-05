@@ -100,6 +100,14 @@ async function fillInput(selector, value) {
   return input;
 }
 
+async function fillIfEmpty(selector, value) {
+  const input = await driver.wait(until.elementLocated(By.css(selector)), timeout);
+  if (!(await input.getAttribute("value"))) {
+    await input.sendKeys(value);
+  }
+  return input;
+}
+
 async function fillElement(element, value) {
   await driver.wait(until.elementIsVisible(element), timeout);
   await element.clear();
@@ -511,7 +519,7 @@ test("produto disponivel abre detalhes e atualiza o carrinho local", async (t) =
   await clickVisible(await findLinkByHrefPart("/carrinho"));
   await driver.wait(until.urlContains("/carrinho"), timeout);
 
-  assert.equal(await (await waitForHeading("Meu Carrinho")).isDisplayed(), true);
+  assert.equal(await (await waitForHeading("Seu carrinho")).isDisplayed(), true);
 });
 
 test("cliente percorre carrinho, endereco e prepara checkout de pagamento", async (t) => {
@@ -520,68 +528,62 @@ test("cliente percorre carrinho, endereco e prepara checkout de pagamento", asyn
   await clickVisible(await findButtonByText("Adicionar ao Carrinho"));
   await clickVisible(await findLinkByHrefPart("/carrinho"));
   await driver.wait(until.urlContains("/carrinho"), timeout);
-  assert.equal(await (await waitForHeading("Meu Carrinho")).isDisplayed(), true);
+  assert.equal(await (await waitForHeading("Seu carrinho")).isDisplayed(), true);
 
-  await clickVisible(await findButtonByText("Finalizar Compra"));
+  await clickVisible(await findButtonByText("Finalizar a compra"));
   await driver.wait(until.urlContains("/checkout"), timeout);
-  assert.equal(await (await waitForHeading("Finalizar Compra")).isDisplayed(), true);
+  assert.equal(await (await waitForHeading("Finalizar compra")).isDisplayed(), true);
 
-  await fillInput('input[placeholder="Seu nome (opcional)"]', "Cliente Selenium");
-  await fillInput('input[placeholder="seu@email.com"]', checkoutEmail);
-  await fillInput('input[placeholder="000.000.000-00"]', checkoutCpf);
-  await fillInput('input[placeholder="(61) 9 9999-9999"]', checkoutPhone);
-  await clickVisible(await findButtonByText("Continuar"));
-  await clickVisible(await findButtonByText("Continuar como Convidado"));
+  // Checkout em página única (sem modal de convidado): contato, entrega e pagamento.
+  await fillInput('input[name="nome"]', "Cliente Selenium");
+  await fillInput('input[name="email"]', checkoutEmail);
+  await fillInput('input[name="cpf"]', checkoutCpf);
+  await fillInput('input[name="telefone"]', checkoutPhone);
+  await fillInput('input[name="cep"]', checkoutCep);
+  await fillInput('input[name="numero"]', "100");
 
-  assert.equal(await (await waitForHeading("Endereço de Entrega")).isDisplayed(), true);
-  await fillInput('input[placeholder="CEP"]', checkoutCep);
-  await fillInput('input[placeholder="Número"]', "100");
+  // Espera a cotação do frete (o ViaCEP completa o endereço quando responde).
+  await driver.wait(
+    until.elementLocated(By.xpath('//*[@role="radio"][contains(normalize-space(.), "dias úte") or contains(normalize-space(.), "dia útil")]')),
+    timeout,
+  );
+  await fillIfEmpty('input[name="rua"]', "Rua Selenium");
+  await fillIfEmpty('input[name="bairro"]', "Centro");
+  await fillIfEmpty('input[name="cidade"]', "Brasília");
+  await fillIfEmpty('input[name="estado"]', "DF");
 
-  const finishOrder = await findButtonByText("Finalizar Pedido");
+  const finishOrder = await findButtonByText("Finalizar pedido");
   await driver.wait(async () => (await finishOrder.isEnabled()) === true, timeout);
 
   if (!allowCheckoutPayment) {
     t.diagnostic(
-      "Checkout preenchido ate endereco; defina SELENIUM_ALLOW_CHECKOUT_PAYMENT=true para criar pedido e abrir a etapa de pagamento.",
+      "Checkout preenchido ate endereco; defina SELENIUM_ALLOW_CHECKOUT_PAYMENT=true para criar pedido e abrir o pagamento.",
     );
     return;
   }
 
   await clickVisible(finishOrder);
-  await driver.wait(
-    until.elementLocated(
-      By.xpath("//*[contains(normalize-space(.), 'Gerando pagamento') or contains(normalize-space(.), 'Pedido registrado')]"),
-    ),
-    timeout,
-  );
 
-  const paymentLink = await driver.wait(
-    until.elementLocated(By.xpath('//a[contains(normalize-space(.), "Abrir pagamento")]')),
-    timeout,
-  );
-  const originalWindow = await driver.getWindowHandle();
-  const existingWindows = await driver.getAllWindowHandles();
-  await clickVisible(paymentLink);
-
-  await driver.wait(async () => {
-    const handles = await driver.getAllWindowHandles();
-    return handles.length > existingWindows.length;
-  }, timeout);
-
-  const openedWindows = await driver.getAllWindowHandles();
-  const paymentWindow = openedWindows.find((handle) => !existingWindows.includes(handle));
-  assert.ok(paymentWindow, "O checkout de pagamento nao abriu em uma nova aba.");
-
-  await driver.switchTo().window(paymentWindow);
+  // O pedido é criado e o navegador segue, na mesma aba, para o checkout
+  // hospedado do gateway (ou direto para /pedido quando já vem aprovado).
   await driver.wait(async () => {
     const currentUrl = await driver.getCurrentUrl();
-    return currentUrl && currentUrl !== "about:blank";
+    return !currentUrl.startsWith(baseUrl) || currentUrl.includes("/pedido");
   }, timeout);
   await visualPause(checkoutPaymentHoldMs);
-  await driver.close();
 
-  await driver.switchTo().window(originalWindow);
-  await clickVisible(await findButtonByText("Voltar à loja"));
+  // Retorno do gateway: a tela Finalizado usa o resumo salvo no navegador.
+  if (!(await driver.getCurrentUrl()).includes("/pedido")) {
+    await driver.get(url("/pedido"));
+  }
+  assert.equal(await (await waitForHeading("Obrigada pela sua compra!")).isDisplayed(), true);
+
+  await clickVisible(
+    await driver.wait(
+      until.elementLocated(By.xpath('//a[normalize-space()="Continuar comprando"]')),
+      timeout,
+    ),
+  );
   await driver.wait(until.urlIs(url("/")), timeout);
 });
 

@@ -1,756 +1,120 @@
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Check,
-  CreditCard,
-  ChevronRight,
-  AlertCircle,
-  User,
-  ShoppingBag,
-  ExternalLink,
-} from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import OrderSummary from "@/components/cart/OrderSummary";
+import CheckoutStepper from "@/components/checkout/CheckoutStepper";
+import ContactSection from "@/components/checkout/ContactSection";
+import DeliverySection from "@/components/checkout/DeliverySection";
+import PaymentSection from "@/components/checkout/PaymentSection";
+import { checkoutFieldId } from "@/components/checkout/fieldProps";
+import Button from "@/components/ui/Button";
 import { useCart } from "@/hooks/useCart";
-import { useAuth } from "@/context/AuthContext";
+import { getFirstInvalidField, MAX_INSTALLMENTS, useCheckout } from "@/hooks/useCheckout";
 import { formatCurrency } from "@/lib/utils";
-import { api } from "@/lib/api";
-
-type Step = "dados" | "entrega" | "pagamento" | "confirmado";
-
-type ShippingQuote = {
-  valor: number;
-  prazo_dias: number;
-};
-
-type CheckoutTotals = {
-  subtotal: number;
-  desconto: number;
-  total: number;
-  cupom: string | null;
-};
-
-function GuestCheckoutModal({
-  onContinueAsGuest,
-  onLogin,
-}: {
-  onContinueAsGuest: () => void;
-  onLogin: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-      <div className="bg-white max-w-sm w-full p-7 border border-gray-100">
-        <div className="w-12 h-12 bg-gray-100 flex items-center justify-center mx-auto mb-4">
-          <ShoppingBag className="w-6 h-6 text-gray-600" />
-        </div>
-        <h3 className="text-gray-900 text-center mb-2 font-serif text-xl">Finalizar compra</h3>
-        <p className="text-gray-500 text-sm text-center leading-relaxed mb-1 font-sans">
-          Você pode continuar como convidado — seu CPF e e-mail serão usados para
-          registrar o pedido, sem necessidade de criar uma conta.
-        </p>
-        <p className="text-gray-400 text-xs text-center mb-6 font-sans">
-          Se preferir, entre para vincular o pedido à sua conta.
-        </p>
-
-        <div className="space-y-3 font-sans">
-          <button
-            onClick={onContinueAsGuest}
-            className="bt-principal w-full py-3 text-sm tracking-wide flex items-center justify-center gap-2"
-          >
-            <ShoppingBag className="w-4 h-4" />
-            Continuar como Convidado
-          </button>
-          <button
-            onClick={onLogin}
-            className="w-full border border-gray-300 text-gray-700 py-3 hover:border-[#1a1a1a] hover:text-[#1a1a1a] transition-colors text-sm flex items-center justify-center gap-2"
-          >
-            <User className="w-4 h-4" />
-            Entrar
-          </button>
-        </div>
-
-        <p className="text-gray-400 text-xs text-center mt-4 leading-relaxed font-sans">
-          Ao entrar, o pedido ficará disponível no seu histórico.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function FormField({
-  label,
-  required,
-  children,
-  error,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-  error?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-sm text-gray-600 mb-1">
-        {label}
-        {required ? (
-          <span className="text-red-500 ml-0.5">*</span>
-        ) : (
-          <span className="text-gray-400 text-xs ml-1.5">(opcional)</span>
-        )}
-      </label>
-      {children}
-      {error && (
-        <p className="flex items-center gap-1 text-red-500 text-xs mt-1">
-          <AlertCircle className="w-3 h-3" />
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-const inputClass =
-  "w-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a] transition-colors font-sans";
-const inputErrorClass =
-  "w-full border border-red-400 px-4 py-2.5 text-sm focus:outline-none focus:border-red-500 transition-colors font-sans";
 
 export default function CheckoutPage() {
-  const { cart, clear } = useCart();
-  const { user } = useAuth();
+  const { cart } = useCart();
   const navigate = useNavigate();
-
-  const [step, setStep] = useState<Step>("dados");
-  const [showGuestModal, setShowGuestModal] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; cpf?: string }>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
-  const [shippingLoading, setShippingLoading] = useState(false);
-  const [shippingError, setShippingError] = useState<string | null>(null);
-  const [addressLoading, setAddressLoading] = useState(false);
-  const [addressError, setAddressError] = useState<string | null>(null);
-  const [confirmedOrderId, setConfirmedOrderId] = useState<number | null>(null);
-  const [paymentRedirectUrl, setPaymentRedirectUrl] = useState<string | null>(null);
-  const [checkoutTotals, setCheckoutTotals] = useState<CheckoutTotals | null>(null);
-
-  const [form, setForm] = useState({
-    nome: user?.name || "",
-    email: user?.email || "",
-    cpf: user?.id || "",
-    telefone: "",
-    cep: "",
-    rua: "",
-    numero: "",
-    complemento: "",
-    bairro: "",
-    cidade: "",
-    estado: "",
-  });
-
-  const set = (key: keyof typeof form, value: string) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
-
-  const shipping = shippingQuote?.valor ?? 0;
-  const currentTotal = cart.total + shipping;
-  const summarySubtotal = checkoutTotals?.subtotal ?? cart.subtotal;
-  const summaryDiscount = checkoutTotals?.desconto ?? cart.desconto;
-  const summaryCoupon = checkoutTotals?.cupom ?? cart.cupom;
-  const finalTotal = checkoutTotals?.total ?? currentTotal;
+  const checkout = useCheckout();
+  const { summary, completed } = checkout;
 
   useEffect(() => {
-    const cleanCep = form.cep.replace(/\D/g, "");
+    window.scrollTo(0, 0);
+  }, []);
 
-    if (cleanCep.length !== 8) {
-      setShippingQuote(null);
-      setShippingError(null);
-      setAddressError(null);
-      setShippingLoading(false);
-      setAddressLoading(false);
-      return;
-    }
+  // Sem itens não há checkout. Depois do envio o carrinho esvazia de propósito.
+  useEffect(() => {
+    if (cart.items.length === 0 && !completed) navigate("/carrinho", { replace: true });
+  }, [cart.items.length, completed, navigate]);
 
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      setShippingLoading(true);
-      setAddressLoading(true);
-      setShippingError(null);
-      setAddressError(null);
+  if (cart.items.length === 0 && !completed) return null;
 
-      try {
-        const quote = await api.post<ShippingQuote>("/shipping/calculate", {
-          cep_destino: cleanCep,
-        });
-        if (!cancelled) {
-          setShippingQuote(quote);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setShippingQuote(null);
-          setShippingError(
-            err instanceof Error
-              ? err.message
-              : "Não foi possível calcular o frete para este CEP.",
-          );
-        }
-      }
-
-      try {
-        const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        const data = (await response.json()) as {
-          erro?: boolean;
-          logradouro?: string;
-          bairro?: string;
-          localidade?: string;
-          uf?: string;
-        };
-
-        if (!cancelled) {
-          if (data.erro) {
-            setAddressError("CEP não encontrado.");
-          } else {
-            setForm((prev) => ({
-              ...prev,
-              rua: prev.rua || data.logradouro || "",
-              bairro: prev.bairro || data.bairro || "",
-              cidade: prev.cidade || data.localidade || "",
-              estado: prev.estado || data.uf || "",
-            }));
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setAddressError("Não foi possível consultar o CEP.");
-        }
-      } finally {
-        if (!cancelled) {
-          setShippingLoading(false);
-          setAddressLoading(false);
-        }
-      }
-    }, 500);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [form.cep]);
-
-  const steps: { key: Step; label: string }[] = [
-    { key: "dados", label: "Dados Pessoais" },
-    { key: "entrega", label: "Entrega" },
-    { key: "pagamento", label: "Pagamento" },
-  ];
-  const stepIndex = steps.findIndex((s) => s.key === step);
-
-  const validateDados = () => {
-    const errors: { email?: string; cpf?: string } = {};
-    if (!form.email.trim()) errors.email = "E-mail é obrigatório";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      errors.email = "E-mail inválido";
-    if (!form.cpf.trim()) errors.cpf = "CPF é obrigatório";
-    else if (form.cpf.replace(/\D/g, "").length !== 11)
-      errors.cpf = "CPF deve ter 11 dígitos";
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const errors = await checkout.submit();
+    const firstInvalid = getFirstInvalidField(errors);
+    if (firstInvalid) document.getElementById(checkoutFieldId(firstInvalid))?.focus();
   };
 
-  const handleDadosContinue = () => {
-    if (!validateDados()) return;
-    if (!user) {
-      setShowGuestModal(true);
-    } else {
-      setStep("entrega");
-    }
-  };
+  const scrollToSection = (id: string) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-  const handleConfirm = async () => {
-    if (!shippingQuote) {
-      setSubmitError("Informe um CEP válido para calcular o frete.");
-      return;
-    }
-
-    setSubmitting(true);
-    setSubmitError(null);
-    setPaymentRedirectUrl(null);
-    setCheckoutTotals({
-      subtotal: cart.subtotal,
-      desconto: cart.desconto,
-      total: currentTotal,
-      cupom: cart.cupom ?? null,
-    });
-    setStep("pagamento");
-
-    // 1. Cria o pedido.
-    //    - Se logado: usa endpoint autenticado (/orders)
-    //    - Se convidado: usa endpoint público (/orders/guest) com CPF, e-mail e nome
-    let orderId = confirmedOrderId;
-    if (orderId == null) {
-      try {
-        const addressPayload = {
-          enderecoCep: form.cep.trim() || null,
-          enderecoRua: form.rua.trim() || null,
-          enderecoNumero: form.numero.trim() || null,
-          enderecoComplemento: form.complemento.trim() || null,
-          enderecoBairro: form.bairro.trim() || null,
-          enderecoCidade: form.cidade.trim() || null,
-          enderecoEstado: form.estado.trim().toUpperCase().slice(0, 2) || null,
-        };
-
-        const orderPayload: Record<string, unknown> = {
-          items: cart.items.map((i) => ({
-            variantSku: i.variant.codigoSku,
-            quantidade: i.quantity,
-          })),
-          couponNumero: cart.cupom ?? null,
-          valorFrete: shippingQuote.valor,
-          tipoRetirada: "entrega",
-          ...addressPayload,
-        };
-
-        if (user) {
-          const response = await api.post<{ idPedido: number }>("/orders", orderPayload);
-          orderId = response.idPedido;
-        } else {
-          const response = await api.post<{ idPedido: number }>("/orders/guest", {
-            ...orderPayload,
-            clienteCpfAvulso: form.cpf.replace(/\D/g, ""),
-            clienteEmailAvulso: form.email.trim(),
-            clienteNomeAvulso: form.nome.trim() || null,
-            clienteTelefone: form.telefone.trim() || null,
-          });
-          orderId = response.idPedido;
-        }
-        setConfirmedOrderId(orderId);
-      } catch (err) {
-        console.error("Erro ao criar pedido:", err);
-        setSubmitError(
-          err instanceof Error
-            ? err.message
-            : "Não foi possível concluir o pedido. Tente novamente.",
-        );
-        setSubmitting(false);
-        return;
-      }
-    }
-
-    // 2. Aciona o pagamento do pedido. O checkout da InfinitePay continua
-    //    hospedado, mas registramos a tentativa como PIX para este fluxo.
-    try {
-      const paymentsEndpoint = user ? "/payments" : "/payments/guest";
-      const paymentResult = await api.post<{
-        status: string;
-        redirectUrl?: string | null;
-      }>(paymentsEndpoint, {
-        idPedido: orderId,
-        captureMethod: "pix",
-        installments: 1,
-      });
-
-      // A InfinitePay documenta geração de link hospedado. Em vez de mandar
-      // o cliente automaticamente para fora da loja, mostramos o link para
-      // ele abrir o pagamento quando estiver pronto.
-      if (paymentResult.status !== "paid" && paymentResult.redirectUrl) {
-        localStorage.setItem("dk_pending_order", String(orderId));
-        clear();
-        setPaymentRedirectUrl(paymentResult.redirectUrl);
-        setSubmitting(false);
-        setStep("pagamento");
-        return;
-      }
-    } catch (err) {
-      console.error("Erro ao processar pagamento:", err);
-      setSubmitError(
-        err instanceof Error
-          ? err.message
-          : "Pedido criado, mas o pagamento falhou. Tente novamente.",
-      );
-      setSubmitting(false);
-      return;
-    }
-
-    clear();
-    setSubmitting(false);
-    setStep("confirmado");
-  };
-
-  if (step === "confirmado") {
-    return (
-      <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center font-sans">
-        <div className="bg-white p-10 border border-gray-100 max-w-md w-full mx-4 text-center">
-          <div className="w-20 h-20 bg-green-100 flex items-center justify-center mx-auto mb-4 rounded-full">
-            <Check className="w-10 h-10 text-green-600" />
-          </div>
-          <h2 className="text-gray-900 mb-2 font-serif text-2xl">Pedido Confirmado!</h2>
-          <p className="text-gray-500 text-sm mb-2">
-            Seu pedido foi realizado com sucesso.
-          </p>
-          {!user && (
-            <p className="text-amber-600 text-xs mb-2 bg-amber-50 border border-amber-100 px-3 py-2">
-              Você comprou como convidado. Este pedido não está vinculado a nenhuma conta.
-            </p>
-          )}
-          <div className="bg-gray-50 border border-gray-100 p-4 mb-6 text-sm text-left">
-            <p className="text-gray-500">Número do pedido:</p>
-            <p className="text-gray-900 font-medium mb-2">
-              {confirmedOrderId ? `#${confirmedOrderId}` : "#--"}
-            </p>
-            <p className="text-gray-500">Total pago:</p>
-            <p className="text-gray-900 font-medium">
-              {formatCurrency(finalTotal)}
-            </p>
-          </div>
-          <p className="text-gray-400 text-xs mb-6">
-            Você receberá um e-mail de confirmação em{" "}
-            <strong>{form.email}</strong> com os detalhes do pedido.
-          </p>
-          <button
-            onClick={() => navigate("/")}
-            className="bt-principal w-full py-3 text-sm tracking-wide"
-          >
-            Voltar à Loja
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const fields = { form: checkout.form, errors: checkout.errors, setField: checkout.setField };
 
   return (
-    <>
-      {showGuestModal && (
-        <GuestCheckoutModal
-          onContinueAsGuest={() => {
-            setShowGuestModal(false);
-            setStep("entrega");
-          }}
-          onLogin={() => {
-            setShowGuestModal(false);
-            navigate("/conta?retorno=checkout");
-          }}
+    <div className="bg-[var(--background)]">
+      <div className="mx-auto max-w-[1440px] px-3.5 pt-6 pb-10 lg:px-20 lg:pt-8 lg:pb-[60px]">
+        <h1 className="font-serif text-[32px] leading-[38px] font-normal text-[var(--foreground)] lg:text-[40px] lg:leading-[48px]">
+          Finalizar compra
+        </h1>
+        <CheckoutStepper
+          className="mt-5 lg:mt-[26px] lg:w-[820px]"
+          current={checkout.currentStep}
+          onStepClick={scrollToSection}
         />
-      )}
 
-      <div className="min-h-screen bg-[#f8f8f8]">
-        <div className="bg-[#1a1a1a] text-white py-8">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-white mb-4 font-serif text-3xl">Finalizar Compra</h1>
-            {!user && (
-              <p className="text-gray-400 text-xs mb-4 font-sans">
-                Comprando como convidado — sem necessidade de conta.
+        <form
+          noValidate
+          onSubmit={handleSubmit}
+          className="mt-5 flex flex-col gap-5 lg:mt-[26px] lg:grid lg:grid-cols-[minmax(0,820px)_400px] lg:items-start lg:gap-10"
+        >
+          <div className="flex flex-col gap-5 lg:gap-[18px]">
+            <ContactSection {...fields} />
+            <DeliverySection
+              {...fields}
+              delivery={checkout.delivery}
+              onDeliveryChange={checkout.setDelivery}
+              quote={checkout.shipping.quote}
+              quoteLoading={checkout.shipping.loading}
+              addressError={checkout.addressError}
+            />
+            <PaymentSection
+              method={checkout.paymentMethod}
+              onMethodChange={checkout.setPaymentMethod}
+              installments={checkout.installments}
+              onInstallmentsChange={checkout.setInstallments}
+              total={summary.total}
+            />
+          </div>
+
+          <aside className="flex flex-col gap-5 lg:sticky lg:top-44 lg:gap-3.5">
+            <OrderSummary
+              itemCount={summary.itemCount}
+              subtotal={summary.subtotal}
+              frete={summary.frete}
+              freteLoading={checkout.delivery === "entrega" && checkout.shipping.loading}
+              desconto={summary.desconto}
+              total={summary.total}
+              note={`ou ${MAX_INSTALLMENTS}x de ${formatCurrency(summary.total / MAX_INSTALLMENTS)} sem juros`}
+            />
+
+            {checkout.submitError && (
+              <p
+                role="alert"
+                className="flex items-start gap-2 rounded-[var(--radius-md)] bg-[var(--background-error-subtle)] p-3 text-sm leading-5 text-[var(--color-error-text)]"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+                {checkout.submitError}
               </p>
             )}
-            <div className="flex items-center gap-2 font-sans">
-              {steps.map((s, i) => (
-                <React.Fragment key={s.key}>
-                  <div
-                    className={`flex items-center gap-2 ${
-                      i <= stepIndex ? "text-white" : "text-gray-500"
-                    }`}
-                  >
-                    <div
-                      className={`w-6 h-6 flex items-center justify-center text-xs border rounded-full ${
-                        i < stepIndex
-                          ? "bg-white text-[#1a1a1a] border-white"
-                          : i === stepIndex
-                          ? "border-white text-white"
-                          : "border-gray-600 text-gray-600"
-                      }`}
-                    >
-                      {i < stepIndex ? <Check className="w-3 h-3" /> : i + 1}
-                    </div>
-                    <span className="text-sm hidden sm:block">{s.label}</span>
-                  </div>
-                  {i < steps.length - 1 && <ChevronRight className="w-4 h-4 text-gray-600" />}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        </div>
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-sans">
-          <div className="flex flex-col lg:flex-row gap-8">
-            <div className="flex-1">
-              {step === "dados" && (
-                <div className="bg-white p-6 border border-gray-100">
-                  <h2 className="text-gray-900 mb-1 font-serif text-xl">Dados Pessoais</h2>
-                  <p className="text-gray-400 text-xs mb-5">
-                    <span className="text-red-500">*</span> Campos obrigatórios
-                    &nbsp;·&nbsp; Nome é opcional
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <FormField label="Nome completo">
-                        <input
-                          type="text"
-                          value={form.nome}
-                          onChange={(e) => set("nome", e.target.value)}
-                          placeholder="Seu nome (opcional)"
-                          className={inputClass}
-                        />
-                      </FormField>
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <FormField label="E-mail" required error={fieldErrors.email}>
-                        <input
-                          type="email"
-                          value={form.email}
-                          onChange={(e) => {
-                            set("email", e.target.value);
-                            if (fieldErrors.email)
-                              setFieldErrors((prev) => ({ ...prev, email: undefined }));
-                          }}
-                          placeholder="seu@email.com"
-                          className={fieldErrors.email ? inputErrorClass : inputClass}
-                        />
-                      </FormField>
-                    </div>
-
-                    <div>
-                      <FormField label="CPF" required error={fieldErrors.cpf}>
-                        <input
-                          type="text"
-                          value={form.cpf}
-                          onChange={(e) => {
-                            set("cpf", e.target.value);
-                            if (fieldErrors.cpf)
-                              setFieldErrors((prev) => ({ ...prev, cpf: undefined }));
-                          }}
-                          placeholder="000.000.000-00"
-                          maxLength={14}
-                          className={fieldErrors.cpf ? inputErrorClass : inputClass}
-                        />
-                      </FormField>
-                    </div>
-
-                    <div>
-                      <FormField label="Telefone">
-                        <input
-                          type="tel"
-                          value={form.telefone}
-                          onChange={(e) => set("telefone", e.target.value)}
-                          placeholder="(61) 9 9999-9999"
-                          className={inputClass}
-                        />
-                      </FormField>
-                    </div>
-                  </div>
-
-                  {!user && (
-                    <div className="mt-4 flex items-start gap-2 p-3 bg-gray-50 border border-gray-100 text-xs text-gray-500">
-                      <AlertCircle className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                      <span>
-                        Você está comprando como <strong>convidado</strong>. Seu
-                        CPF e e-mail serão usados para registrar o pedido.
-                      </span>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleDadosContinue}
-                    className="bt-principal mt-6 w-full py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
-                  >
-                    Continuar <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {step === "entrega" && (
-                <div className="bg-white p-6 border border-gray-100">
-                  <h2 className="text-gray-900 mb-5 font-serif text-xl">Endereço de Entrega</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {[
-                      { key: "cep", label: "CEP", type: "text" },
-                      { key: "estado", label: "Estado", type: "text" },
-                      { key: "rua", label: "Rua", type: "text", full: true },
-                      { key: "numero", label: "Número", type: "text" },
-                      { key: "complemento", label: "Complemento", type: "text" },
-                      { key: "bairro", label: "Bairro", type: "text" },
-                      { key: "cidade", label: "Cidade", type: "text" },
-                    ].map((f) => (
-                      <div key={f.key} className={f.full ? "sm:col-span-2" : ""}>
-                        <label className="block text-sm text-gray-600 mb-1">
-                          {f.label}
-                        </label>
-                        <input
-                          type={f.type}
-                          value={form[f.key as keyof typeof form]}
-                          onChange={(e) =>
-                            set(f.key as keyof typeof form, e.target.value)
-                          }
-                          className={inputClass}
-                          placeholder={f.label}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  {(shippingError || addressError || shippingLoading || addressLoading) && (
-                    <div className="mt-4 space-y-1 text-xs">
-                      {shippingLoading && (
-                        <p className="text-gray-500">Calculando frete pelo CEP informado...</p>
-                      )}
-                      {addressLoading && (
-                        <p className="text-gray-500">Consultando endereço do CEP...</p>
-                      )}
-                      {shippingError && <p className="text-red-600">{shippingError}</p>}
-                      {addressError && <p className="text-amber-600">{addressError}</p>}
-                    </div>
-                  )}
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={() => setStep("dados")}
-                      className="flex-1 border border-gray-200 text-gray-600 py-3 hover:border-gray-400 transition-colors text-sm"
-                    >
-                      Voltar
-                    </button>
-                    <button
-                      onClick={handleConfirm}
-                      disabled={submitting || !shippingQuote || shippingLoading}
-                      className="bt-principal flex-1 py-3 flex items-center justify-center gap-2 text-sm tracking-wide"
-                    >
-                      {submitting ? "Gerando pagamento..." : "Finalizar Pedido"} <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {step === "pagamento" && (
-                <div className="bg-white p-6 border border-gray-100 text-center">
-                  {submitting ? (
-                    <div className="animate-pulse py-8">
-                      <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <h2 className="text-gray-900 mb-2 font-serif text-xl">Gerando pagamento...</h2>
-                      <p className="text-gray-500 text-sm">
-                        Criando pedido e preparando o checkout seguro.
-                      </p>
-                    </div>
-                  ) : paymentRedirectUrl ? (
-                    <div className="py-8">
-                      <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <h2 className="text-gray-900 mb-2 font-serif text-xl">Pedido registrado</h2>
-                      <p className="text-gray-500 text-sm mb-6">
-                        O pedido #{confirmedOrderId ?? "--"} foi criado. Abra o checkout seguro
-                        para concluir o pagamento por Pix ou cartão.
-                      </p>
-                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <a
-                          href={paymentRedirectUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bt-principal px-6 py-3 text-sm inline-flex items-center justify-center gap-2"
-                        >
-                          Abrir pagamento
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                        {user && confirmedOrderId && (
-                          <button
-                            onClick={() => navigate(`/pedido/${confirmedOrderId}`)}
-                            className="border border-gray-300 text-gray-700 px-6 py-3 hover:border-[#1a1a1a] hover:text-[#1a1a1a] transition-colors text-sm"
-                          >
-                            Ver status
-                          </button>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => navigate("/")}
-                        className="mt-4 text-gray-500 hover:text-gray-900 text-sm transition-colors"
-                      >
-                        Voltar à loja
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="py-8">
-                      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-                      <h2 className="text-gray-900 mb-2 font-serif text-xl">Ops!</h2>
-                      <p className="text-red-600 text-sm mb-6">
-                        {submitError || "Não foi possível processar o pedido."}
-                      </p>
-                      <button
-                        onClick={() => setStep("entrega")}
-                        className="bt-principal px-6 py-3 text-sm"
-                      >
-                        Tentar Novamente
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="lg:w-72 shrink-0">
-              <div className="bg-white p-5 border border-gray-100 sticky top-24">
-                <h3 className="text-gray-900 mb-4 font-serif text-lg">Resumo</h3>
-                <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pr-2">
-                  {cart.items.map((item) => (
-                    <div
-                      key={item.variant.codigoSku}
-                      className="flex gap-2"
-                    >
-                      <div className="w-12 h-14 relative shrink-0">
-                        <img
-                          src={item.variant.images?.[0]?.url || "/hero-dress.png"}
-                          alt={item.variant.produto.titulo}
-                          className="object-cover object-top"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-700 line-clamp-1">
-                          {item.variant.produto.titulo}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {item.variant.tamanho} · {item.variant.cor} · x{item.quantity}
-                        </p>
-                        <p className="text-xs text-gray-800 font-medium">
-                          {formatCurrency((item.variant.precoVariante ?? item.variant.produto.precoBase) * item.quantity)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-500">
-                    <span>Subtotal</span>
-                    <span>{formatCurrency(summarySubtotal)}</span>
-                  </div>
-                  {summaryDiscount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Desconto {summaryCoupon ? `(${summaryCoupon})` : ""}</span>
-                      <span>-{formatCurrency(summaryDiscount)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-gray-500">
-                    <span>Frete</span>
-                    {shippingLoading ? (
-                      <span>Calculando...</span>
-                    ) : shippingQuote ? (
-                      <span>{formatCurrency(shippingQuote.valor)}</span>
-                    ) : (
-                      <span>Informe um CEP válido</span>
-                    )}
-                  </div>
-                  {shippingQuote && (
-                    <p className="text-xs text-gray-400">
-                      Prazo estimado: {shippingQuote.prazo_dias} dia
-                      {shippingQuote.prazo_dias !== 1 ? "s" : ""} útil
-                    </p>
-                  )}
-                </div>
-                <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
-                  <span className="text-gray-900 font-medium">Total</span>
-                  <span className="text-gray-900 font-bold text-lg">
-                    {formatCurrency(finalTotal)}
-                  </span>
-                </div>
-
-                {!user && (
-                  <p className="text-gray-400 text-xs mt-4 pt-3 border-t border-gray-100 text-center">
-                    Compra como convidado — sem necessidade de conta.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+            <Button
+              type="submit"
+              variant="action"
+              size="touch"
+              fullWidth
+              loading={checkout.submitting || checkout.completed}
+              disabled={checkout.delivery === "entrega" && checkout.shipping.loading}
+            >
+              {checkout.submitting || checkout.completed ? "Carregando..." : "Finalizar pedido"}
+            </Button>
+            <p className="text-center text-xs leading-4 text-[var(--foreground-muted)] lg:text-left lg:leading-[18px]">
+              <span className="lg:hidden">Compra segura • troca facilitada</span>
+              <span className="hidden lg:inline">Ao finalizar, você concorda com os termos e políticas.</span>
+            </p>
+          </aside>
+        </form>
       </div>
-    </>
+    </div>
   );
 }
