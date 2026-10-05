@@ -104,6 +104,16 @@ describe("useCart", () => {
     expect(result.current.cart).toMatchObject({ cupom: null, desconto: 0, total: 200 });
   });
 
+  it("limpa o carrinho pelo evento global clear-cart", () => {
+    seedCart([makeCartItem()]);
+    const { result } = renderHook(() => useCart(), { wrapper });
+
+    act(() => {
+      window.dispatchEvent(new Event("clear-cart"));
+    });
+    expect(result.current.itemCount).toBe(0);
+  });
+
   it("persiste no localStorage e limpa tudo com clear", () => {
     const { result } = renderHook(() => useCart(), { wrapper });
     act(() => result.current.addItem(makeCartItem().variant));

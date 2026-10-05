@@ -52,6 +52,24 @@ docker build -t marketplace-frontend .
 docker run --rm -p 3000:3000 marketplace-frontend
 ```
 
+## Testes de unidade
+
+Os testes usam [Vitest](https://vitest.dev/) com Testing Library em `jsdom`, ficam
+ao lado do código (`*.test.ts(x)` em `src/`) e compartilham utilitários em
+`src/test/` (render com os providers da aplicação, fábricas de produto e um
+roteador de respostas para simular a API).
+
+```bash
+pnpm test            # roda todos os testes uma vez
+pnpm test:watch      # modo watch durante o desenvolvimento
+pnpm test:coverage   # testes + cobertura em coverage/
+```
+
+O `test:coverage` gera `coverage/lcov.info` (cobertura) e
+`coverage/sonar-report.xml` (execução dos testes), que o workflow do SonarCloud
+envia para alimentar as métricas `coverage`, `tests` e `test_execution_time`.
+Componentes de biblioteca em `src/components/ui/` ficam fora da cobertura.
+
 ## Variáveis de ambiente
 
 Crie os arquivos reais a partir dos templates:
@@ -64,7 +82,8 @@ Variáveis públicas do Vite devem usar o prefixo `VITE_`.
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`): em push/PR para `dev` e `main` roda lint, typecheck + build e o build da imagem Docker (`runner`).
+- **CI** (`.github/workflows/ci.yml`): em push/PR para `dev` e `main` roda lint, testes de unidade, typecheck + build e o build da imagem Docker (`runner`).
+- **SonarCloud** (`.github/workflows/sonarcloud.yml`): roda `pnpm test:coverage` e envia cobertura e execução dos testes junto com a análise.
 - **CD** (`.github/workflows/cd.yml`): após o CI verde em push na `main`, builda a imagem nginx com `VITE_API_URL` embutida, publica em `ghcr.io/tppe-2026-1-marketplace/marketplace-frontend` (`latest` e `sha-<commit>`), dispara o deploy da imagem (por digest) no Render e roda um smoke test (`/healthz`, `/` e fallback de SPA).
 
 Configuração necessária no GitHub (Settings → Environments → `production`):
