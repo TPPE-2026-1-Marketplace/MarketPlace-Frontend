@@ -40,7 +40,7 @@ describe("App", () => {
 
     expect(screen.getByLabelText("Banner principal")).toBeInTheDocument();
     expect(screen.getByTestId("cart-link")).toBeInTheDocument();
-    expect(screen.getByText("© 2026 DK Festas. Todos os direitos reservados.")).toBeInTheDocument();
+    expect(screen.getByText("© 2026 DK Fashion. Todos os direitos reservados.")).toBeInTheDocument();
     await screen.findByText("Destaques");
   });
 
