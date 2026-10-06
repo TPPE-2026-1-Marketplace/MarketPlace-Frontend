@@ -10,21 +10,11 @@ import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
 import { useProducts } from "@/hooks/useProducts";
 import { getDisplayVariant } from "@/lib/catalog";
+import { CATEGORIAS, TIPOS as TIPOS_CATALOGO } from "@/lib/categories";
 
-const CATEGORIES = [
-  { value: "all", label: "Todas" },
-  { value: "debutante", label: "Debutante" },
-  { value: "formatura", label: "Formatura" },
-  { value: "casamento", label: "Casamento" },
-  { value: "festa", label: "Festa" },
-];
+const CATEGORIES = [{ value: "all", label: "Todas" }, ...CATEGORIAS];
 
-const TIPOS = [
-  { value: "all", label: "Todos" },
-  { value: "midi", label: "Midi" },
-  { value: "longo", label: "Longo" },
-  { value: "longuete", label: "Longuete" },
-];
+const TIPOS = [{ value: "all", label: "Todos" }, ...TIPOS_CATALOGO];
 
 const SORT_OPTIONS = [
   { value: "relevancia", label: "Relevância" },
@@ -41,22 +31,31 @@ const ALL_COLORS = [
 ];
 
 function ProdutosContent() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
   
   // Local state for UI
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
-  const [selectedTipo, setSelectedTipo] = useState("all");
   const [sort, setSort] = useState("relevancia");
 
   const category = searchParams.get("categoria") || "all";
   const search = searchParams.get("busca") || "";
+  // O comprimento vem da URL (?tipo=), assim os links do Header filtram a lista
+  const selectedTipo = searchParams.get("tipo") || "all";
+  const setSelectedTipo = (tipo: string) =>
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tipo === "all") next.delete("tipo");
+      else next.set("tipo", tipo);
+      return next;
+    });
 
   // Hook state
   const [apiFilters, setApiFilters] = useState<ProductFiltersType>({
     busca: search || undefined,
+    categoria: category !== "all" ? category : undefined,
     page: 1,
     limit: 20,
   });
@@ -67,6 +66,7 @@ function ProdutosContent() {
     setApiFilters((prev: any) => ({
       ...prev,
       busca: search || undefined,
+      categoria: category !== "all" ? category : undefined,
       page: 1,
     }));
   }, [category, search]);

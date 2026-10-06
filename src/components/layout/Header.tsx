@@ -4,19 +4,15 @@ import { ShoppingBag, User, Menu, X, Search, Heart, LogOut, LayoutDashboard, Sto
 import { cn } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/context/AuthContext";
+import { CATEGORIAS, TIPOS } from "@/lib/categories";
 
 type Category = { label: string; param?: "categoria" | "tipo"; value?: string };
 
 // Mesmos parâmetros da listagem de produtos (/produtos?categoria=... e ?tipo=...)
 const CATEGORIES: Category[] = [
   { label: "Todos os Vestidos" },
-  { label: "Festas", param: "categoria", value: "festa" },
-  { label: "Formatura", param: "categoria", value: "formatura" },
-  { label: "Casamento", param: "categoria", value: "casamento" },
-  { label: "Debutante", param: "categoria", value: "debutante" },
-  { label: "Midi", param: "tipo", value: "midi" },
-  { label: "Longo", param: "tipo", value: "longo" },
-  { label: "Longuete", param: "tipo", value: "longuete" },
+  ...CATEGORIAS.map((c) => ({ ...c, param: "categoria" as const })),
+  ...TIPOS.map((t) => ({ ...t, param: "tipo" as const })),
 ];
 
 const categoryPath = (cat: Category) =>
@@ -55,6 +51,14 @@ export default function Header() {
     setSearchQuery(urlQuery);
   }
 
+  // O Header não desmonta entre rotas: qualquer navegação fecha os menus
+  const [prevLocationKey, setPrevLocationKey] = useState(location.key);
+  if (location.key !== prevLocationKey) {
+    setPrevLocationKey(location.key);
+    setMenuOpen(false);
+    setUserMenuOpen(false);
+  }
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -91,8 +95,11 @@ export default function Header() {
     if (term) params.set("busca", term);
     else params.delete("busca");
     const query = params.toString();
-    navigate(query ? `/produtos?${query}` : "/produtos");
+    const target = query ? `/produtos?${query}` : "/produtos";
     setMenuOpen(false);
+    // Evita empilhar entradas repetidas no histórico
+    if (target === location.pathname + location.search) return;
+    navigate(target);
   };
 
   const isActiveCategory = (cat: Category) => {
@@ -144,26 +151,27 @@ export default function Header() {
             className={cn(actionClass, "lg:hidden")}
             aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
             aria-expanded={menuOpen}
-            aria-controls="mobile-menu"
+            aria-controls={menuOpen ? "mobile-menu" : undefined}
           >
             {menuOpen ? <X {...iconProps} /> : <Menu {...iconProps} />}
           </button>
 
           {/* Logo */}
           <Link to="/" className="flex items-center shrink-0" aria-label="DK Fashion — página inicial">
-            {/* index.css força img { height: auto; display: block }: o tamanho vem da largura */}
-            <span className="lg:hidden">
-              <img src="/dk-logo-mark.svg" alt="" className="w-[72px]" />
-            </span>
-            <span className="hidden lg:block">
-              <img src="/dk-logo.svg" alt="" className="w-[63px]" />
-            </span>
+            <img src="/dk-logo-mark.svg" alt="" className="lg:hidden h-16 w-auto" />
+            <img src="/dk-logo.svg" alt="" className="hidden lg:block h-16 w-auto" />
           </Link>
         </div>
 
         {/* Search (desktop) */}
         <form onSubmit={handleSearch} role="search" className={cn(searchPillClass, "hidden lg:flex h-10 text-xs leading-[18px]")}>
-          <Search {...iconProps} className="w-5 h-5 shrink-0 text-[var(--foreground)]" />
+          <button
+            type="submit"
+            aria-label="Buscar"
+            className="flex items-center justify-center shrink-0 size-8 -ml-1.5 rounded-full text-[var(--foreground)] hover:bg-[var(--border)] focus-visible:outline-2 focus-visible:outline-[var(--color-brand-dark)]"
+          >
+            <Search {...iconProps} />
+          </button>
           {searchInput("Buscar vestidos, ocasiões e estilos...")}
         </form>
 
@@ -180,7 +188,6 @@ export default function Header() {
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className={actionClass}
               aria-label="Minha conta"
-              aria-haspopup="menu"
               aria-expanded={userMenuOpen}
             >
               <User {...iconProps} />
@@ -296,7 +303,13 @@ export default function Header() {
       {/* Search (mobile) */}
       <div className="lg:hidden px-4 pt-2 pb-4">
         <form onSubmit={handleSearch} role="search" className={cn(searchPillClass, "h-12 text-base leading-6")}>
-          <Search {...iconProps} className="w-5 h-5 shrink-0 text-[var(--foreground)]" />
+          <button
+            type="submit"
+            aria-label="Buscar"
+            className="flex items-center justify-center shrink-0 size-8 -ml-1.5 rounded-full text-[var(--foreground)] hover:bg-[var(--border)] focus-visible:outline-2 focus-visible:outline-[var(--color-brand-dark)]"
+          >
+            <Search {...iconProps} />
+          </button>
           {searchInput("Buscar vestidos...")}
         </form>
       </div>
@@ -315,10 +328,10 @@ export default function Header() {
               aria-current={active ? "page" : undefined}
               className={cn(
                 "flex items-center justify-center h-11 px-3 rounded-[var(--radius-sm)] text-xs leading-[18px] whitespace-nowrap hover:bg-[var(--background-secondary)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--color-brand-dark)] transition-colors",
+                active ? "text-[var(--color-brand)]" : "text-[var(--foreground)]",
               )}
             >
-              {/* index.css força a { color: inherit }: a cor fica no span */}
-              <span className={active ? "text-[var(--color-brand)]" : "text-[var(--foreground)]"}>{cat.label}</span>
+              {cat.label}
             </Link>
           );
         })}
@@ -337,9 +350,10 @@ export default function Header() {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex items-center h-11 px-3 rounded-[var(--radius-sm)] text-sm hover:bg-[var(--background-secondary)] transition-colors",
+                  active ? "text-[var(--color-brand)]" : "text-[var(--foreground)]",
                 )}
               >
-                <span className={active ? "text-[var(--color-brand)]" : "text-[var(--foreground)]"}>{cat.label}</span>
+                {cat.label}
               </Link>
             );
           })}

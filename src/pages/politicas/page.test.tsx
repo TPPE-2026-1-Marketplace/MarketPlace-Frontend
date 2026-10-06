@@ -6,7 +6,6 @@ import PoliticasPage from "./page";
 describe("PoliticasPage", () => {
   afterEach(() => {
     vi.useRealTimers();
-    window.location.hash = "";
   });
 
   it("mostra todas as seções de políticas", () => {
@@ -22,9 +21,7 @@ describe("PoliticasPage", () => {
     vi.useFakeTimers();
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
-    window.location.hash = "#lgpd";
-
-    renderWithProviders(<PoliticasPage />);
+    renderWithProviders(<PoliticasPage />, { route: "/politicas#lgpd" });
     act(() => vi.advanceTimersByTime(100));
 
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });

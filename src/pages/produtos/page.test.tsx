@@ -46,9 +46,31 @@ describe("ProdutosPage", () => {
   });
 
   it("mostra o nome da categoria escolhida", async () => {
+    vi.mocked(fetchProducts).mockResolvedValue({
+      data: [{ ...catalog[0], categories: [{ idCategoria: 3, nome: "Formatura" }] }],
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
     await renderPage("/produtos?categoria=formatura");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Formatura");
     expect(screen.getByRole("link", { name: "Formatura" })).toHaveClass("bg-[#1a1a1a]");
+  });
+
+  it("filtra pela categoria da URL e marca o comprimento da URL", async () => {
+    vi.mocked(fetchProducts).mockResolvedValue({
+      data: [
+        { ...catalog[0], categories: [{ idCategoria: 2, nome: "Festa" }] },
+        { ...catalog[1], categories: [{ idCategoria: 2, nome: "Festa" }] },
+        catalog[2],
+      ],
+      meta: { page: 1, limit: 20, total: 3, totalPages: 1 },
+    });
+
+    await renderPage("/produtos?categoria=festa&tipo=midi");
+    expect(titles()).toEqual(["Vestido Rosa", "Vestido Azul"]);
+    expect(screen.getByRole("radio", { name: "Midi" })).toBeChecked();
+
+    await userEvent.click(screen.getByRole("radio", { name: "Longo" }));
+    expect(screen.getByTestId("location").textContent).toBe("/produtos?categoria=festa&tipo=longo");
   });
 
   it("ordena por preço e por novidade", async () => {

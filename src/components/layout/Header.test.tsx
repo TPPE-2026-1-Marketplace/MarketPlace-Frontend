@@ -25,7 +25,7 @@ describe("Header", () => {
     renderWithProviders(<Header />, { route: "/produtos?categoria=festa&busca=azul" });
     const desktopSearch = screen.getByPlaceholderText("Buscar vestidos, ocasiões e estilos...");
     expect(desktopSearch).toHaveValue("azul");
-    expect(screen.getByRole("link", { name: "Festas" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Festa" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Todos os Vestidos" })).not.toHaveAttribute("aria-current");
 
     await userEvent.clear(desktopSearch);
@@ -87,6 +87,29 @@ describe("Header", () => {
 
     fireEvent.mouseDown(document.body);
     expect(screen.queryByText("Entrar")).not.toBeInTheDocument();
+  });
+
+  it("busca ao clicar na lupa e não repete a navegação para a mesma URL", async () => {
+    renderWithProviders(<Header />, { route: "/produtos?categoria=festa" });
+    const desktopSearch = screen.getByPlaceholderText("Buscar vestidos, ocasiões e estilos...");
+
+    await userEvent.type(desktopSearch, "rosa");
+    await userEvent.click(screen.getAllByRole("button", { name: "Buscar" })[0]);
+    expect(location()).toBe("/produtos?categoria=festa&busca=rosa");
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Buscar" })[0]);
+    expect(location()).toBe("/produtos?categoria=festa&busca=rosa");
+  });
+
+  it("fecha o menu mobile ao navegar por outro controle", async () => {
+    renderWithProviders(<Header />);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir menu" }));
+    expect(document.getElementById("mobile-menu")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("cart-link"));
+    expect(location()).toBe("/carrinho");
+    expect(document.getElementById("mobile-menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir menu" })).not.toHaveAttribute("aria-controls");
   });
 
   it("fecha o menu do usuário com Escape e devolve o foco ao botão", async () => {
