@@ -5,22 +5,37 @@ import { customer, employee, manager, renderWithProviders, superadmin } from "@/
 import Header from "./Header";
 
 const location = () => screen.getByTestId("location").textContent;
-// O botão do menu do usuário não tem rótulo acessível: é o vizinho do botão de favoritos.
-const openUserMenu = () =>
-  userEvent.click(screen.getByLabelText("Favoritos").nextElementSibling!.querySelector("button")!);
+const openUserMenu = () => userEvent.click(screen.getByRole("button", { name: "Minha conta" }));
 
 describe("Header", () => {
-  it("busca vestidos pelo formulário e ignora buscas vazias", async () => {
+  it("busca vestidos pelo formulário, mantém o termo e ignora buscas vazias", async () => {
     renderWithProviders(<Header />);
-    const [desktopSearch] = screen.getAllByPlaceholderText("Buscar vestidos...");
+    const desktopSearch = screen.getByPlaceholderText("Buscar vestidos, ocasiões e estilos...");
 
     fireEvent.submit(desktopSearch.closest("form")!);
     expect(location()).toBe("/");
 
     await userEvent.type(desktopSearch, "  vestido rosa ");
     fireEvent.submit(desktopSearch.closest("form")!);
-    expect(location()).toBe("/produtos?busca=vestido%20rosa");
-    expect(desktopSearch).toHaveValue("");
+    expect(location()).toBe("/produtos?busca=vestido+rosa");
+    expect(desktopSearch).toHaveValue("vestido rosa");
+  });
+
+  it("preserva os filtros da listagem ao buscar e marca a categoria ativa", async () => {
+    renderWithProviders(<Header />, { route: "/produtos?categoria=festa&busca=azul" });
+    const desktopSearch = screen.getByPlaceholderText("Buscar vestidos, ocasiões e estilos...");
+    expect(desktopSearch).toHaveValue("azul");
+    expect(screen.getByRole("link", { name: "Festa" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Todos os Vestidos" })).not.toHaveAttribute("aria-current");
+
+    await userEvent.clear(desktopSearch);
+    await userEvent.type(desktopSearch, "rosa");
+    fireEvent.submit(desktopSearch.closest("form")!);
+    expect(location()).toBe("/produtos?categoria=festa&busca=rosa");
+
+    await userEvent.clear(desktopSearch);
+    fireEvent.submit(desktopSearch.closest("form")!);
+    expect(location()).toBe("/produtos?categoria=festa");
   });
 
   it("manda visitantes para o login ao abrir favoritos e mostra opções de entrar", async () => {
@@ -74,19 +89,53 @@ describe("Header", () => {
     expect(screen.queryByText("Entrar")).not.toBeInTheDocument();
   });
 
-  it("abre o menu mobile, busca por ele e fecha ao escolher categoria", async () => {
-    renderWithProviders(<Header />);
-    await userEvent.click(screen.getAllByRole("button")[0]);
+  it("busca ao clicar na lupa e não repete a navegação para a mesma URL", async () => {
+    renderWithProviders(<Header />, { route: "/produtos?categoria=festa" });
+    const desktopSearch = screen.getByPlaceholderText("Buscar vestidos, ocasiões e estilos...");
 
-    const mobileSearch = screen.getAllByPlaceholderText("Buscar vestidos...")[1];
+    await userEvent.type(desktopSearch, "rosa");
+    await userEvent.click(screen.getAllByRole("button", { name: "Buscar" })[0]);
+    expect(location()).toBe("/produtos?categoria=festa&busca=rosa");
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Buscar" })[0]);
+    expect(location()).toBe("/produtos?categoria=festa&busca=rosa");
+  });
+
+  it("fecha o menu mobile ao navegar por outro controle", async () => {
+    renderWithProviders(<Header />);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir menu" }));
+    expect(document.getElementById("mobile-menu")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("cart-link"));
+    expect(location()).toBe("/carrinho");
+    expect(document.getElementById("mobile-menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir menu" })).not.toHaveAttribute("aria-controls");
+  });
+
+  it("fecha o menu do usuário com Escape e devolve o foco ao botão", async () => {
+    renderWithProviders(<Header />);
+    const accountButton = screen.getByRole("button", { name: "Minha conta" });
+    await userEvent.click(accountButton);
+    expect(accountButton).toHaveAttribute("aria-expanded", "true");
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByText("Entrar")).not.toBeInTheDocument();
+    expect(accountButton).toHaveAttribute("aria-expanded", "false");
+    expect(accountButton).toHaveFocus();
+  });
+
+  it("busca pelo campo mobile e fecha o menu mobile ao escolher categoria", async () => {
+    renderWithProviders(<Header />);
+    const mobileSearch = screen.getByPlaceholderText("Buscar vestidos...");
     await userEvent.type(mobileSearch, "midi");
     fireEvent.submit(mobileSearch.closest("form")!);
     expect(location()).toBe("/produtos?busca=midi");
-    expect(screen.getAllByPlaceholderText("Buscar vestidos...")).toHaveLength(1);
 
-    await userEvent.click(screen.getAllByRole("button")[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir menu" }));
+    expect(screen.getByRole("button", { name: "Fechar menu" })).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(screen.getAllByRole("link", { name: "Formatura" })[1]);
     expect(location()).toBe("/produtos?categoria=formatura");
+    expect(screen.getByRole("button", { name: "Abrir menu" })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("mostra a quantidade de itens do carrinho", () => {

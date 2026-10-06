@@ -1,6 +1,6 @@
 
 import React, { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Truck, RefreshCw, Shield, MessageCircle, Clock, FileText, ChevronRight } from "lucide-react";
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -20,15 +20,17 @@ const sections = [
 ];
 
 export default function PoliticasPage() {
+  const { hash } = useLocation();
+
+  // Roda a cada troca de hash, inclusive vindo do rodapé com a página já aberta
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash) {
-      const id = window.location.hash.replace("#", "");
-      setTimeout(() => {
-        const el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
-    }
-  }, []);
+    if (!hash) return;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(hash.replace("#", ""));
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [hash]);
 
   return (
     <div className="min-h-screen bg-[#f8f8f8] font-sans">
@@ -76,7 +78,7 @@ export default function PoliticasPage() {
           {/* Content */}
           <div className="flex-1 space-y-8">
             {/* Entrega */}
-            <section id="entrega" className="bg-white border border-gray-100 p-8 scroll-mt-24">
+            <section id="entrega" className="bg-white border border-gray-100 p-8 scroll-mt-44">
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
                   <Truck className="w-5 h-5" />
@@ -150,7 +152,7 @@ export default function PoliticasPage() {
             </section>
 
             {/* Trocas e Devoluções */}
-            <section id="trocas" className="bg-white border border-gray-100 p-8 scroll-mt-24">
+            <section id="trocas" className="bg-white border border-gray-100 p-8 scroll-mt-44">
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
                   <RefreshCw className="w-5 h-5" />
@@ -226,7 +228,7 @@ export default function PoliticasPage() {
             </section>
 
             {/* Formas de Pagamento */}
-            <section id="pagamento" className="bg-white border border-gray-100 p-8 scroll-mt-24">
+            <section id="pagamento" className="bg-white border border-gray-100 p-8 scroll-mt-44">
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
                   <FileText className="w-5 h-5" />
@@ -269,7 +271,7 @@ export default function PoliticasPage() {
             </section>
 
             {/* LGPD */}
-            <section id="lgpd" className="bg-white border border-gray-100 p-8 scroll-mt-24">
+            <section id="lgpd" className="bg-white border border-gray-100 p-8 scroll-mt-44">
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
                   <Shield className="w-5 h-5" />
@@ -369,7 +371,7 @@ export default function PoliticasPage() {
             </section>
 
             {/* Atendimento */}
-            <section id="contato" className="bg-white border border-gray-100 p-8 scroll-mt-24">
+            <section id="contato" className="bg-white border border-gray-100 p-8 scroll-mt-44">
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-10 h-10 bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
                   <MessageCircle className="w-5 h-5" />
