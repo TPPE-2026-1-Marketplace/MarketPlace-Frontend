@@ -144,4 +144,18 @@ describe("ContaPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Sair/ }));
     expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
   });
+
+  it("não salva telefone inválido", async () => {
+    renderConta();
+    await startEditing();
+
+    const telefone = screen.getByPlaceholderText("Informe seu telefone");
+    await userEvent.clear(telefone);
+    await userEvent.type(telefone, "6100000000");
+    expect(telefone).toHaveValue("(61) 0000-0000");
+    await userEvent.click(screen.getByRole("button", { name: /Salvar/ }));
+
+    expect(await screen.findByText("Telefone inválido. Use DDD + número, ex.: (61) 99999-0000.")).toBeInTheDocument();
+    expect(patchMock).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ telefone: "6100000000" }));
+  });
 });

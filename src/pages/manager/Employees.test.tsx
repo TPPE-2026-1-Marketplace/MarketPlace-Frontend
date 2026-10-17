@@ -113,6 +113,12 @@ describe("Employees", () => {
     await userEvent.type(input("000.000.000-00"), "45678900");
     expect(input("000.000.000-00")).toHaveValue("123.456.789-00");
     await userEvent.click(salvar);
+    expect(screen.getByText("CPF inválido. Confira os números digitados.")).toBeInTheDocument();
+
+    await userEvent.clear(input("000.000.000-00"));
+    await userEvent.type(input("000.000.000-00"), "52998224725");
+    expect(input("000.000.000-00")).toHaveValue("529.982.247-25");
+    await userEvent.click(salvar);
     expect(screen.getByText("Código do vendedor é obrigatório para funcionários.")).toBeInTheDocument();
   });
 
@@ -122,7 +128,7 @@ describe("Employees", () => {
     await renderEmployees();
     await userEvent.click(screen.getByRole("button", { name: /Novo Usuário/ }));
 
-    await userEvent.type(input("000.000.000-00"), "12345678900");
+    await userEvent.type(input("000.000.000-00"), "52998224725");
     await userEvent.type(input("Ex: Ana Silva"), "Nova");
     await userEvent.type(input("usuario@dkfestas.com.br"), "nova@dk.com");
     const senha = input("Senha de acesso");
@@ -130,12 +136,13 @@ describe("Employees", () => {
     await userEvent.click(senha.nextElementSibling as HTMLElement);
     expect(senha).toHaveAttribute("type", "text");
     await userEvent.type(input("(11) 99999-0000"), "61988887777");
+    expect(input("(11) 99999-0000")).toHaveValue("(61) 98888-7777");
     await userEvent.type(input("Ex: ANA01"), "nova01");
     await userEvent.click(screen.getByLabelText(/Programa de bônus/));
     await userEvent.click(screen.getByRole("button", { name: /Cadastrar Usuário/ }));
 
     expect(postMock).toHaveBeenCalledWith("/employees", {
-      cpf: "12345678900",
+      cpf: "52998224725",
       nome: "Nova",
       email: "nova@dk.com",
       senha: "segredo",
@@ -210,5 +217,20 @@ describe("Employees", () => {
     renderWithProviders(<Employees />, { user: superadmin });
 
     expect(await screen.findByText("Erro ao carregar funcionários.")).toBeInTheDocument();
+  });
+
+  it("rejeita telefone inválido no cadastro", async () => {
+    await renderEmployees();
+    await userEvent.click(screen.getByRole("button", { name: /Novo Usuário/ }));
+
+    await userEvent.type(input("000.000.000-00"), "52998224725");
+    await userEvent.type(input("Ex: Ana Silva"), "Nova");
+    await userEvent.type(input("usuario@dkfestas.com.br"), "nova@dk.com");
+    await userEvent.type(input("Senha de acesso"), "segredo");
+    await userEvent.type(input("(11) 99999-0000"), "6100000000");
+    await userEvent.click(screen.getByRole("button", { name: /Cadastrar Usuário/ }));
+
+    expect(screen.getByText("Telefone inválido. Use DDD + número, ex.: (61) 99999-0000.")).toBeInTheDocument();
+    expect(postMock).not.toHaveBeenCalledWith("/employees", expect.anything());
   });
 });

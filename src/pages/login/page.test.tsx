@@ -70,23 +70,25 @@ describe("LoginPage", () => {
     expect(screen.getByText("Crie sua conta e comece a comprar")).toBeInTheDocument();
 
     const cpf = screen.getByPlaceholderText("000.000.000-00");
-    await userEvent.type(cpf, "123");
-    expect(cpf).toHaveValue("123");
-    await userEvent.type(cpf, "4");
-    expect(cpf).toHaveValue("123.4");
-    await userEvent.type(cpf, "567");
-    expect(cpf).toHaveValue("123.456.7");
-    await userEvent.type(cpf, "890099");
-    expect(cpf).toHaveValue("123.456.789-00");
+    await userEvent.type(cpf, "529");
+    expect(cpf).toHaveValue("529");
+    await userEvent.type(cpf, "9");
+    expect(cpf).toHaveValue("529.9");
+    await userEvent.type(cpf, "822");
+    expect(cpf).toHaveValue("529.982.2");
+    await userEvent.type(cpf, "472599");
+    expect(cpf).toHaveValue("529.982.247-25");
 
     await userEvent.type(screen.getByPlaceholderText("Seu nome"), "Ana");
     await userEvent.type(screen.getByPlaceholderText("seu@email.com"), "ana@dk.com");
-    await userEvent.type(screen.getByPlaceholderText("(11) 99999-9999"), "61999990000");
+    const phone = screen.getByPlaceholderText("(11) 99999-9999");
+    await userEvent.type(phone, "61999990000");
+    expect(phone).toHaveValue("(61) 99999-0000");
     await userEvent.type(screen.getByPlaceholderText("Sua senha"), "senha1234");
     await userEvent.click(screen.getAllByRole("button", { name: "Criar Conta" })[1]);
 
     expect(await screen.findByText("Cadastro concluído, mas falha no auto-login.")).toBeInTheDocument();
-    expect(postMock).toHaveBeenNthCalledWith(1, "/people/register-user", expect.objectContaining({ cpf: "12345678900" }));
+    expect(postMock).toHaveBeenNthCalledWith(1, "/people/register-user", expect.objectContaining({ cpf: "52998224725", telefone: "61999990000" }));
   });
 
   it("valida o CPF incompleto e mostra sucesso no cadastro completo", async () => {
@@ -94,7 +96,7 @@ describe("LoginPage", () => {
     await userEvent.click(screen.getAllByRole("button", { name: "Criar Conta" })[0]);
 
     await userEvent.type(screen.getByPlaceholderText("Seu nome"), "Ana");
-    await userEvent.type(screen.getByPlaceholderText("000.000.000-00"), "123");
+    await userEvent.type(screen.getByPlaceholderText("000.000.000-00"), "529");
     await userEvent.type(screen.getByPlaceholderText("seu@email.com"), "ana@dk.com");
     await userEvent.type(screen.getByPlaceholderText("Sua senha"), "senha1234");
     await userEvent.click(screen.getAllByRole("button", { name: "Criar Conta" })[1]);
@@ -102,8 +104,29 @@ describe("LoginPage", () => {
     expect(postMock).not.toHaveBeenCalled();
 
     postMock.mockResolvedValueOnce({}).mockResolvedValueOnce({ access_token: jwt({ role: "cliente" }) });
-    await userEvent.type(screen.getByPlaceholderText("000.000.000-00"), "45678900");
+    await userEvent.type(screen.getByPlaceholderText("000.000.000-00"), "98224725");
     await userEvent.click(screen.getAllByRole("button", { name: "Criar Conta" })[1]);
     await waitFor(() => expect(location()).toBe("/conta"));
+  });
+
+  it("rejeita CPF com dígito verificador errado e telefone inválido", async () => {
+    renderWithProviders(<LoginPage />, { route: "/login?modo=cadastro", path: "/login" });
+    const cpf = screen.getByPlaceholderText("000.000.000-00");
+
+    await userEvent.type(screen.getByPlaceholderText("Seu nome"), "Ana");
+    await userEvent.type(cpf, "12345678900");
+    await userEvent.type(screen.getByPlaceholderText("seu@email.com"), "ana@dk.com");
+    await userEvent.type(screen.getByPlaceholderText("Sua senha"), "senha1234");
+    await userEvent.click(screen.getAllByRole("button", { name: "Criar Conta" })[1]);
+    expect(await screen.findByText("CPF inválido. Confira os números digitados.")).toBeInTheDocument();
+
+    await userEvent.clear(cpf);
+    await userEvent.type(cpf, "52998224725");
+    const phone = screen.getByPlaceholderText("(11) 99999-9999");
+    await userEvent.type(phone, "6100000000");
+    expect(phone).toHaveValue("(61) 0000-0000");
+    await userEvent.click(screen.getAllByRole("button", { name: "Criar Conta" })[1]);
+    expect(await screen.findByText("Telefone inválido. Use DDD + número, ex.: (61) 99999-0000.")).toBeInTheDocument();
+    expect(postMock).not.toHaveBeenCalled();
   });
 });

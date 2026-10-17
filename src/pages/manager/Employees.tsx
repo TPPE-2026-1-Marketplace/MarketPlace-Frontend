@@ -16,6 +16,15 @@ import {
 } from "lucide-react";
 import { useAuth, UserRole } from "../../context/AuthContext";
 import { api, ApiError } from "../../lib/api";
+import {
+  CPF_INVALID_MESSAGE,
+  PHONE_INVALID_MESSAGE,
+  formatCpf,
+  formatPhone,
+  isValidCpf,
+  isValidPhone,
+  onlyDigits,
+} from "../../lib/br-validators";
 
 export interface ApiEmployee {
   cpf: string;
@@ -150,11 +159,11 @@ export function Employees() {
   const openEdit = (u: ApiEmployee) => {
     setEditingUser(u);
     setForm({
-      cpf: u.cpf,
+      cpf: formatCpf(u.cpf),
       name: u.person.nome,
       email: u.person.email,
       password: "", // Senha não vem da API
-      phone: u.person.telefone || "",
+      phone: formatPhone(u.person.telefone),
       sellerCode: u.codigo_funcionario || "",
       role: mapRoleToFrontend(u.role_perfil),
       commissionRate: String(Number(u.taxa_comissao) * 100 || 5),
@@ -178,6 +187,20 @@ export function Employees() {
       return;
     }
 
+    // No cadastro o CPF é digitado agora; na edição o campo é bloqueado e o dado já existe.
+    if (!editingUser && !isValidCpf(cleanCpf)) {
+      setMsg({ type: "error", text: CPF_INVALID_MESSAGE });
+      return;
+    }
+
+    // Telefone é opcional; só valida se foi preenchido e é diferente do que já estava salvo.
+    const cleanPhone = onlyDigits(form.phone);
+    const originalPhone = onlyDigits(editingUser?.person.telefone);
+    if (cleanPhone && cleanPhone !== originalPhone && !isValidPhone(cleanPhone)) {
+      setMsg({ type: "error", text: PHONE_INVALID_MESSAGE });
+      return;
+    }
+
     if (form.role === "employee" && !form.sellerCode.trim()) {
       setMsg({ type: "error", text: "Código do vendedor é obrigatório para funcionários." });
       return;
@@ -187,7 +210,7 @@ export function Employees() {
       const payload: any = {
         nome: form.name,
         email: form.email,
-        telefone: form.phone || undefined,
+        telefone: cleanPhone || undefined,
         ativo: form.active,
         role_perfil: mapFrontendToRole(form.role),
         taxa_comissao: form.role === "employee" ? Number(form.commissionRate) / 100 : undefined,
@@ -256,14 +279,8 @@ export function Employees() {
           <input
             type="text"
             value={form.cpf}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "");
-              let formatted = val;
-              if (val.length > 9) formatted = val.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, "$1.$2.$3-$4");
-              else if (val.length > 6) formatted = val.replace(/(\d{3})(\d{3})(\d{1,3})/, "$1.$2.$3");
-              else if (val.length > 3) formatted = val.replace(/(\d{3})(\d{1,3})/, "$1.$2");
-              setForm({ ...form, cpf: formatted });
-            }}
+            inputMode="numeric"
+            onChange={(e) => setForm({ ...form, cpf: formatCpf(e.target.value) })}
             disabled={!!editingUser}
             className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a] disabled:bg-gray-100 disabled:text-gray-500"
             placeholder="000.000.000-00"
@@ -312,9 +329,10 @@ export function Employees() {
         <div>
           <label className="block text-xs text-gray-500 mb-1">Telefone</label>
           <input
-            type="text"
+            type="tel"
+            inputMode="tel"
             value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
             className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
             placeholder="(11) 99999-0000"
           />

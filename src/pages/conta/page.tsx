@@ -8,6 +8,15 @@ import { useFavorites } from "@/context/FavoritesContext";
 import { useProducts } from "@/hooks/useProducts";
 import { getDisplayVariant } from "@/lib/catalog";
 import { api } from "@/lib/api";
+import {
+  CPF_INVALID_MESSAGE,
+  PHONE_INVALID_MESSAGE,
+  formatCpf,
+  formatPhone,
+  isValidCpf,
+  isValidPhone,
+  onlyDigits,
+} from "@/lib/br-validators";
 
 interface UserProfile {
   cpf: string;
@@ -47,8 +56,8 @@ export default function ContaPage() {
         setForm({
           name: data.nome || "",
           email: data.email || "",
-          telefone: data.telefone || "",
-          cpf: data.cpf || "",
+          telefone: formatPhone(data.telefone),
+          cpf: formatCpf(data.cpf),
         });
       })
       .catch(() => {
@@ -56,7 +65,7 @@ export default function ContaPage() {
         setForm({
           name: user.name || "",
           email: user.email || "",
-          telefone: user.phone || "",
+          telefone: formatPhone(user.phone),
           cpf: user.id || "",
         });
       });
@@ -97,8 +106,8 @@ export default function ContaPage() {
     setForm({
       name: profile?.nome || user?.name || "",
       email: profile?.email || user?.email || "",
-      telefone: profile?.telefone || user?.phone || "",
-      cpf: profile?.cpf || "",
+      telefone: formatPhone(profile?.telefone || user?.phone),
+      cpf: formatCpf(profile?.cpf),
     });
   };
 
@@ -129,8 +138,25 @@ export default function ContaPage() {
 
       if (form.name !== currentName) updatePayload.nome = form.name;
       if (form.email !== currentEmail) updatePayload.email = form.email;
-      if (form.telefone !== currentTelefone) updatePayload.telefone = form.telefone || undefined;
-      if (form.cpf !== currentCpf) updatePayload.cpf = form.cpf || undefined;
+      const newTelefone = onlyDigits(form.telefone);
+      const newCpf = onlyDigits(form.cpf);
+      const telefoneChanged = newTelefone !== onlyDigits(currentTelefone);
+      const cpfChanged = newCpf !== onlyDigits(currentCpf);
+
+      // Valida só o que o usuário alterou, para não bloquear quem tem dado antigo salvo.
+      if (telefoneChanged && newTelefone && !isValidPhone(newTelefone)) {
+        setMessage({ type: "error", text: PHONE_INVALID_MESSAGE });
+        setSaving(false);
+        return;
+      }
+      if (cpfChanged && newCpf && !isValidCpf(newCpf)) {
+        setMessage({ type: "error", text: CPF_INVALID_MESSAGE });
+        setSaving(false);
+        return;
+      }
+
+      if (telefoneChanged) updatePayload.telefone = newTelefone || undefined;
+      if (cpfChanged) updatePayload.cpf = newCpf || undefined;
 
       if (Object.keys(updatePayload).length === 0) {
         setMessage({ type: "error", text: "Nenhuma alteração detectada." });
@@ -143,8 +169,8 @@ export default function ContaPage() {
       setForm({
         name: updated.nome || "",
         email: updated.email || "",
-        telefone: updated.telefone || "",
-        cpf: updated.cpf || "",
+        telefone: formatPhone(updated.telefone),
+        cpf: formatCpf(updated.cpf),
       });
 
       // Update localStorage user data
@@ -301,9 +327,15 @@ export default function ContaPage() {
                         <input
                           type={field.type}
                           value={form[field.key as keyof typeof form]}
-                          onChange={(e) =>
-                            setForm((prev) => ({ ...prev, [field.key]: e.target.value }))
-                          }
+                          inputMode={field.key === "telefone" ? "tel" : field.key === "cpf" ? "numeric" : undefined}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const value =
+                              field.key === "telefone" ? formatPhone(raw)
+                              : field.key === "cpf" ? formatCpf(raw)
+                              : raw;
+                            setForm((prev) => ({ ...prev, [field.key]: value }));
+                          }}
                           className="flex-1 border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gray-400 transition-colors"
                           placeholder={`Informe seu ${field.label.toLowerCase()}`}
                         />
