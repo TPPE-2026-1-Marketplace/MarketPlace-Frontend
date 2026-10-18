@@ -145,14 +145,14 @@ describe("Cashier (PDV)", () => {
     expect(screen.getByText("O nome do cliente é obrigatório.")).toBeInTheDocument();
 
     await userEvent.type(screen.getByPlaceholderText("Nome completo do cliente"), "Maria");
-    await userEvent.type(screen.getByPlaceholderText("CPF do cliente"), "123.456.789-00");
+    await userEvent.type(screen.getByPlaceholderText("CPF do cliente"), "529.982.247-25");
     await userEvent.click(screen.getByRole("button", { name: /PIX/ }));
     await userEvent.click(screen.getByRole("button", { name: "Confirmar Venda" }));
 
     expect(await screen.findByText("Venda #77 finalizada com sucesso!")).toBeInTheDocument();
     expect(postMock).toHaveBeenCalledWith("/orders/in-store", expect.objectContaining({
       codigoVendedor: "ANA01",
-      idUsuario: "12345678900",
+      idUsuario: "52998224725",
       clienteNomeAvulso: "Maria",
     }));
     expect(screen.queryByRole("heading", { name: "Finalizar Venda" })).not.toBeInTheDocument();
@@ -179,5 +179,20 @@ describe("Cashier (PDV)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(screen.queryByRole("heading", { name: "Finalizar Venda" })).not.toBeInTheDocument();
+  });
+
+  it("bloqueia a venda quando o CPF do cliente é inválido", async () => {
+    await renderCashier();
+    await addRosa();
+
+    await userEvent.click(screen.getByRole("button", { name: "Finalizar Venda" }));
+    await userEvent.type(screen.getByPlaceholderText("Ex: VEND01 ou CPF"), "ANA01");
+    await userEvent.type(screen.getByPlaceholderText("Nome completo do cliente"), "Maria");
+    await userEvent.type(screen.getByPlaceholderText("CPF do cliente"), "12345678900");
+    expect(screen.getByPlaceholderText("CPF do cliente")).toHaveValue("123.456.789-00");
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar Venda" }));
+
+    expect(screen.getByText("CPF inválido. Confira os números digitados.")).toBeInTheDocument();
+    expect(postMock).not.toHaveBeenCalledWith("/orders/in-store", expect.anything());
   });
 });
