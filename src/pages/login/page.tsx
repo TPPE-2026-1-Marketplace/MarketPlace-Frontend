@@ -7,12 +7,10 @@ import { useAuth } from "@/context/AuthContext";
 import {
   CPF_INVALID_MESSAGE,
   PHONE_INVALID_MESSAGE,
-  formatCpf,
-  formatPhone,
   isValidCpf,
   isValidPhone,
-  onlyDigits,
 } from "@/lib/br-validators";
+import { maskCpf, maskPhone, onlyDigits } from "@/lib/utils";
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -27,11 +25,11 @@ export default function LoginPage() {
   const { login, register, isAuthenticated, user } = useAuth();
 
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, cpf: formatCpf(e.target.value) });
+    setForm({ ...form, cpf: maskCpf(e.target.value) });
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, phone: formatPhone(e.target.value) });
+    setForm({ ...form, phone: maskPhone(e.target.value) });
   };
   const navigate = useNavigate();
 

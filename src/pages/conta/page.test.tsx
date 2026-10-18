@@ -87,7 +87,7 @@ describe("ContaPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Salvar/ }));
 
     expect(await screen.findByText("Dados atualizados com sucesso!")).toBeInTheDocument();
-    expect(patchMock).toHaveBeenCalledWith("/people/12345678900", { nome: "Nome Novo", telefone: undefined });
+    expect(patchMock).toHaveBeenCalledWith("/people/12345678900", { nome: "Nome Novo", telefone: null });
     expect(JSON.parse(localStorage.getItem("dk_user")!).name).toBe("Nome Novo");
     expect(screen.getByText("Nome Novo", { selector: "h1" })).toBeInTheDocument();
   });
@@ -157,5 +157,13 @@ describe("ContaPage", () => {
 
     expect(await screen.findByText("Telefone inválido. Use DDD + número, ex.: (61) 99999-0000.")).toBeInTheDocument();
     expect(patchMock).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ telefone: "6100000000" }));
+  });
+
+  it("mantém o CPF somente leitura (ele é a chave da conta)", async () => {
+    renderConta();
+    await startEditing();
+
+    expect(screen.getByPlaceholderText("Informe seu cpf")).toBeDisabled();
+    expect(screen.getByPlaceholderText("Informe seu cpf")).toHaveValue("123.456.789-00");
   });
 });

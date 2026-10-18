@@ -19,12 +19,10 @@ import { api, ApiError } from "../../lib/api";
 import {
   CPF_INVALID_MESSAGE,
   PHONE_INVALID_MESSAGE,
-  formatCpf,
-  formatPhone,
   isValidCpf,
   isValidPhone,
-  onlyDigits,
 } from "../../lib/br-validators";
+import { maskCpf, maskPhone, onlyDigits } from "../../lib/utils";
 
 export interface ApiEmployee {
   cpf: string;
@@ -159,11 +157,11 @@ export function Employees() {
   const openEdit = (u: ApiEmployee) => {
     setEditingUser(u);
     setForm({
-      cpf: formatCpf(u.cpf),
+      cpf: maskCpf(u.cpf),
       name: u.person.nome,
       email: u.person.email,
       password: "", // Senha não vem da API
-      phone: formatPhone(u.person.telefone),
+      phone: maskPhone(u.person.telefone ?? ""),
       sellerCode: u.codigo_funcionario || "",
       role: mapRoleToFrontend(u.role_perfil),
       commissionRate: String(Number(u.taxa_comissao) * 100 || 5),
@@ -195,7 +193,7 @@ export function Employees() {
 
     // Telefone é opcional; só valida se foi preenchido e é diferente do que já estava salvo.
     const cleanPhone = onlyDigits(form.phone);
-    const originalPhone = onlyDigits(editingUser?.person.telefone);
+    const originalPhone = onlyDigits(editingUser?.person.telefone ?? "");
     if (cleanPhone && cleanPhone !== originalPhone && !isValidPhone(cleanPhone)) {
       setMsg({ type: "error", text: PHONE_INVALID_MESSAGE });
       return;
@@ -206,11 +204,19 @@ export function Employees() {
       return;
     }
 
+    // Na edição só envia o telefone se mudou (null remove). Assim um telefone antigo, fora do
+    // padrão, não impede de editar os outros campos.
+    const telefone = editingUser
+      ? cleanPhone !== originalPhone
+        ? cleanPhone || null
+        : undefined
+      : cleanPhone || undefined;
+
     try {
       const payload: any = {
         nome: form.name,
         email: form.email,
-        telefone: cleanPhone || undefined,
+        telefone,
         ativo: form.active,
         role_perfil: mapFrontendToRole(form.role),
         taxa_comissao: form.role === "employee" ? Number(form.commissionRate) / 100 : undefined,
@@ -280,7 +286,7 @@ export function Employees() {
             type="text"
             value={form.cpf}
             inputMode="numeric"
-            onChange={(e) => setForm({ ...form, cpf: formatCpf(e.target.value) })}
+            onChange={(e) => setForm({ ...form, cpf: maskCpf(e.target.value) })}
             disabled={!!editingUser}
             className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a] disabled:bg-gray-100 disabled:text-gray-500"
             placeholder="000.000.000-00"
@@ -332,7 +338,7 @@ export function Employees() {
             type="tel"
             inputMode="tel"
             value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+            onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })}
             className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
             placeholder="(11) 99999-0000"
           />

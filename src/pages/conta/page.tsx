@@ -8,15 +8,8 @@ import { useFavorites } from "@/context/FavoritesContext";
 import { useProducts } from "@/hooks/useProducts";
 import { getDisplayVariant } from "@/lib/catalog";
 import { api } from "@/lib/api";
-import {
-  CPF_INVALID_MESSAGE,
-  PHONE_INVALID_MESSAGE,
-  formatCpf,
-  formatPhone,
-  isValidCpf,
-  isValidPhone,
-  onlyDigits,
-} from "@/lib/br-validators";
+import { PHONE_INVALID_MESSAGE, isValidPhone } from "@/lib/br-validators";
+import { maskCpf, maskPhone, onlyDigits } from "@/lib/utils";
 
 interface UserProfile {
   cpf: string;
@@ -56,8 +49,8 @@ export default function ContaPage() {
         setForm({
           name: data.nome || "",
           email: data.email || "",
-          telefone: formatPhone(data.telefone),
-          cpf: formatCpf(data.cpf),
+          telefone: maskPhone(data.telefone ?? ""),
+          cpf: maskCpf(data.cpf ?? ""),
         });
       })
       .catch(() => {
@@ -65,7 +58,7 @@ export default function ContaPage() {
         setForm({
           name: user.name || "",
           email: user.email || "",
-          telefone: formatPhone(user.phone),
+          telefone: maskPhone(user.phone ?? ""),
           cpf: user.id || "",
         });
       });
@@ -106,8 +99,8 @@ export default function ContaPage() {
     setForm({
       name: profile?.nome || user?.name || "",
       email: profile?.email || user?.email || "",
-      telefone: formatPhone(profile?.telefone || user?.phone),
-      cpf: formatCpf(profile?.cpf),
+      telefone: maskPhone(profile?.telefone || user?.phone || ""),
+      cpf: maskCpf(profile?.cpf ?? ""),
     });
   };
 
@@ -128,20 +121,18 @@ export default function ContaPage() {
     setMessage(null);
 
     try {
-      const updatePayload: Record<string, string | undefined> = {};
+      const updatePayload: Record<string, string | null> = {};
 
       // Only send changed fields
       const currentName = profile?.nome || user?.name || "";
       const currentEmail = profile?.email || user?.email || "";
       const currentTelefone = profile?.telefone || "";
-      const currentCpf = profile?.cpf || "";
 
       if (form.name !== currentName) updatePayload.nome = form.name;
       if (form.email !== currentEmail) updatePayload.email = form.email;
+      // O CPF é a chave da conta (PK) e não pode ser alterado por aqui.
       const newTelefone = onlyDigits(form.telefone);
-      const newCpf = onlyDigits(form.cpf);
       const telefoneChanged = newTelefone !== onlyDigits(currentTelefone);
-      const cpfChanged = newCpf !== onlyDigits(currentCpf);
 
       // Valida só o que o usuário alterou, para não bloquear quem tem dado antigo salvo.
       if (telefoneChanged && newTelefone && !isValidPhone(newTelefone)) {
@@ -149,14 +140,9 @@ export default function ContaPage() {
         setSaving(false);
         return;
       }
-      if (cpfChanged && newCpf && !isValidCpf(newCpf)) {
-        setMessage({ type: "error", text: CPF_INVALID_MESSAGE });
-        setSaving(false);
-        return;
-      }
 
-      if (telefoneChanged) updatePayload.telefone = newTelefone || undefined;
-      if (cpfChanged) updatePayload.cpf = newCpf || undefined;
+      // `null` remove o telefone cadastrado (o backend aceita null).
+      if (telefoneChanged) updatePayload.telefone = newTelefone || null;
 
       if (Object.keys(updatePayload).length === 0) {
         setMessage({ type: "error", text: "Nenhuma alteração detectada." });
@@ -169,8 +155,8 @@ export default function ContaPage() {
       setForm({
         name: updated.nome || "",
         email: updated.email || "",
-        telefone: formatPhone(updated.telefone),
-        cpf: formatCpf(updated.cpf),
+        telefone: maskPhone(updated.telefone ?? ""),
+        cpf: maskCpf(updated.cpf ?? ""),
       });
 
       // Update localStorage user data
@@ -327,16 +313,14 @@ export default function ContaPage() {
                         <input
                           type={field.type}
                           value={form[field.key as keyof typeof form]}
-                          inputMode={field.key === "telefone" ? "tel" : field.key === "cpf" ? "numeric" : undefined}
+                          inputMode={field.key === "telefone" ? "tel" : undefined}
+                          disabled={field.key === "cpf"}
                           onChange={(e) => {
                             const raw = e.target.value;
-                            const value =
-                              field.key === "telefone" ? formatPhone(raw)
-                              : field.key === "cpf" ? formatCpf(raw)
-                              : raw;
+                            const value = field.key === "telefone" ? maskPhone(raw) : raw;
                             setForm((prev) => ({ ...prev, [field.key]: value }));
                           }}
-                          className="flex-1 border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gray-400 transition-colors"
+                          className="flex-1 border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-gray-400 transition-colors disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
                           placeholder={`Informe seu ${field.label.toLowerCase()}`}
                         />
                       </div>

@@ -23,7 +23,8 @@ import { useAuth } from "../../context/AuthContext";
 import { usePOS } from "../../context/POSContext";
 import { ApiProduct, POSSaleItem } from "../../data/pos-types";
 import { api } from "../../lib/api";
-import { CPF_INVALID_MESSAGE, formatCpf, isValidCpf } from "../../lib/br-validators";
+import { CPF_INVALID_MESSAGE, isValidCpf } from "../../lib/br-validators";
+import { maskCpf } from "../../lib/utils";
 
 export function Cashier() {
   const navigate = useNavigate();
@@ -493,7 +494,7 @@ export function Cashier() {
                         type="text"
                         inputMode="numeric"
                         value={customerCpf}
-                        onChange={(e) => setCustomerCpf(formatCpf(e.target.value))}
+                        onChange={(e) => setCustomerCpf(maskCpf(e.target.value))}
                         placeholder="CPF do cliente"
                         className="w-full border border-gray-200 pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
                       />

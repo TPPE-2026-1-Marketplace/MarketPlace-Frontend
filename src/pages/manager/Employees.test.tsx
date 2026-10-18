@@ -179,6 +179,28 @@ describe("Employees", () => {
     expect(await screen.findByText("Usuário atualizado com sucesso!")).toBeInTheDocument();
   });
 
+  it("na edição não reenvia o telefone se ele não mudou, mas o exibe com máscara", async () => {
+    patchMock.mockResolvedValueOnce({});
+    await renderEmployees();
+
+    await userEvent.click(within(rows()[1]).getByTitle("Editar"));
+    expect(input("(11) 99999-0000")).toHaveValue("(61) 99999-0000");
+    await userEvent.click(screen.getByRole("button", { name: /Salvar Alterações/ }));
+
+    expect((patchMock.mock.calls[0][1] as { telefone?: string | null }).telefone).toBeUndefined();
+  });
+
+  it("na edição envia telefone null quando o campo é esvaziado", async () => {
+    patchMock.mockResolvedValueOnce({});
+    await renderEmployees();
+
+    await userEvent.click(within(rows()[1]).getByTitle("Editar"));
+    await userEvent.clear(input("(11) 99999-0000"));
+    await userEvent.click(screen.getByRole("button", { name: /Salvar Alterações/ }));
+
+    expect((patchMock.mock.calls[0][1] as { telefone?: string | null }).telefone).toBeNull();
+  });
+
   it("mostra o erro da API ao salvar e cancela o formulário", async () => {
     patchMock.mockRejectedValueOnce(new ApiError(409, "E-mail em uso"));
     await renderEmployees();
