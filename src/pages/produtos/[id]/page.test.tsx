@@ -188,4 +188,22 @@ describe("ProductDetailPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Voltar/ }));
   });
+
+  it("abre o modal de foto ampliada, alterna zoom e navega pelas imagens", async () => {
+    await renderProduct();
+
+    await userEvent.click(screen.getByRole("button", { name: /Toque na imagem para ampliar/i }));
+    expect(screen.getByRole("dialog", { name: /Foto ampliada de Vestido Gala/i })).toBeInTheDocument();
+
+    const zoomToggle = screen.getByRole("button", { name: /Ativar zoom 2.5x/i });
+    expect(zoomToggle).toBeInTheDocument();
+    await userEvent.click(zoomToggle);
+    expect(screen.getByRole("button", { name: /Desativar zoom/i })).toBeInTheDocument();
+
+    const nextModalBtn = screen.getByRole("button", { name: "Próxima foto" });
+    await userEvent.click(nextModalBtn);
+
+    await userEvent.click(screen.getByRole("button", { name: "Fechar imagem" }));
+    expect(screen.queryByRole("dialog", { name: /Foto ampliada de Vestido Gala/i })).not.toBeInTheDocument();
+  });
 });

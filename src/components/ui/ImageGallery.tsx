@@ -219,9 +219,11 @@ export default function ImageGallery({
       {/* Modal de Foto Ampliada do Figma (Node 417:338 e 417:511) */}
       <ProductImageZoomModal
         isOpen={isZoomOpen}
-        imageUrl={currentImageUrl}
+        images={safeImages}
+        initialIndex={activeIndex}
         productName={productName}
         onClose={() => setIsZoomOpen(false)}
+        onIndexChange={handleSelect}
       />
     </div>
   );
