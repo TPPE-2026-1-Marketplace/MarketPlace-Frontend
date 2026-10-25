@@ -11,15 +11,15 @@ import {
   type Product,
 } from "@/lib/catalog";
 import ImageGallery from "@/components/ui/ImageGallery";
-import { ProductBreadcrumb } from "./components/ProductBreadcrumb";
-import { ProductPurchaseInfo } from "./components/ProductPurchaseInfo";
-import { ProductDetailsTabs } from "./components/ProductDetailsTabs";
-import { ProductReviewsSection } from "./components/ProductReviewsSection";
-import { ProductRelatedSection } from "./components/ProductRelatedSection";
-import { MobileStickyPurchaseBar } from "./components/MobileStickyPurchaseBar";
-import { SizeGuideModal } from "./components/SizeGuideModal";
-import { ProductDetailSkeleton } from "./components/ProductDetailSkeleton";
-import { ProductNotFound } from "./components/ProductNotFound";
+import { ProductBreadcrumb } from "@/components/product/ProductBreadcrumb";
+import { ProductPurchaseInfo } from "@/components/product/ProductPurchaseInfo";
+import { ProductDetailsSection } from "@/components/product/ProductDetailsSection";
+import { ProductReviewsSection } from "@/components/product/ProductReviewsSection";
+import { ProductRelatedSection } from "@/components/product/ProductRelatedSection";
+import { MobileStickyPurchaseBar } from "@/components/product/MobileStickyPurchaseBar";
+import { SizeGuideModal } from "@/components/product/SizeGuideModal";
+import { ProductDetailSkeleton } from "@/components/product/ProductDetailSkeleton";
+import { ProductNotFound } from "@/components/product/ProductNotFound";
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -233,8 +233,8 @@ export default function ProductDetailPage() {
           />
         </div>
 
-        {/* Abas de Detalhes, Guia de Medidas e Informações Técnicas */}
-        <ProductDetailsTabs
+        {/* Apresentação do Produto / Conheça o Vestido e Informações Técnicas */}
+        <ProductDetailsSection
           description={product.descricao}
           sku={activeVariantSku}
           categoryName={categoryName}
@@ -259,7 +259,7 @@ export default function ProductDetailPage() {
         isOutOfStock={stockEcommerce <= 0}
       />
 
-      {/* Modal Guia de Medidas */}
+      {/* Modal Guia e Tabela de Medidas */}
       <SizeGuideModal
         isOpen={showSizeModal}
         onClose={() => setShowSizeModal(false)}
