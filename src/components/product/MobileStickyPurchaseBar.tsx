@@ -28,14 +28,14 @@ export function MobileStickyPurchaseBar({
       )}
     >
       <div className="flex flex-col min-w-0">
-        <span className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider font-medium">
+        <span className="text-xs text-[var(--foreground-muted)] uppercase tracking-wider font-medium font-sans">
           Total
         </span>
-        <span className="text-lg font-serif font-semibold text-[var(--foreground)] truncate">
+        <span className="text-lg font-sans font-medium text-[var(--foreground)] truncate">
           {formatCurrency(price)}
         </span>
-        <span className="text-[10px] text-[var(--foreground-muted)] truncate">
-          ou 6x de {formatCurrency(installments)}
+        <span className="text-[10px] text-[var(--foreground-muted)] truncate font-sans">
+          6x de {formatCurrency(installments)} sem juros
         </span>
       </div>
 
@@ -58,7 +58,7 @@ export function MobileStickyPurchaseBar({
               Item adicionado!
             </>
           ) : isOutOfStock ? (
-            "Sem estoque"
+            "Esgotado"
           ) : (
             <>
               <ShoppingCart className="size-4" />
