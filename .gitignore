@@ -17,4 +17,4 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 .scannerwork
-CONTEXT.md
+.temp/
