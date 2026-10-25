@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
+import { ProductImageZoomModal } from "@/components/product/ProductImageZoomModal";
 import { cn } from "@/lib/utils";
 
 export interface ImageGalleryItem {
@@ -34,6 +35,7 @@ export default function ImageGallery({
   className,
 }: ImageGalleryProps) {
   const [internalIndex, setInternalIndex] = useState(0);
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   const activeIndex = selectedIndex !== undefined ? selectedIndex : internalIndex;
 
@@ -101,11 +103,14 @@ export default function ImageGallery({
 
       {/* Main Image Container (Figma: Desktop 544x632px, Mobile 343x420px) */}
       <div className="flex-1 relative">
-        <div className="relative aspect-[3/4] rounded-[var(--radius-lg)] overflow-hidden bg-[var(--background-secondary)] border border-[var(--border)] shadow-sm">
+        <div
+          onClick={() => setIsZoomOpen(true)}
+          className="relative aspect-[3/4] rounded-[var(--radius-lg)] overflow-hidden bg-[var(--background-secondary)] border border-[var(--border)] shadow-sm cursor-zoom-in group"
+        >
           <img
             src={currentImageUrl}
             alt={productName}
-            className="w-full h-full object-cover object-top transition-opacity duration-200"
+            className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
           />
 
           {/* Badges de Desconto e Estoque */}
@@ -124,8 +129,11 @@ export default function ImageGallery({
           {/* Botão de Favoritar (Heart) */}
           <button
             type="button"
-            onClick={onToggleFavorite}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-[var(--background-card)]/90 backdrop-blur-sm flex items-center justify-center hover:bg-[var(--background-card)] transition-colors border border-[var(--border)] shadow-sm text-[var(--foreground)]"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onToggleFavorite?.();
+            }}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-[var(--background-card)]/90 backdrop-blur-sm flex items-center justify-center hover:bg-[var(--background-card)] transition-colors border border-[var(--border)] shadow-sm text-[var(--foreground)] cursor-pointer"
             aria-label={isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
           >
             <Heart
@@ -143,16 +151,22 @@ export default function ImageGallery({
             <>
               <button
                 type="button"
-                onClick={handlePrev}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[var(--background-card)]/80 backdrop-blur-sm flex items-center justify-center hover:bg-[var(--background-card)] transition-colors text-[var(--foreground)] shadow-sm"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  handlePrev();
+                }}
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[var(--background-card)]/80 backdrop-blur-sm flex items-center justify-center hover:bg-[var(--background-card)] transition-colors text-[var(--foreground)] shadow-sm cursor-pointer"
                 aria-label="Imagem anterior"
               >
                 <ChevronLeft className="w-4 h-4 text-[var(--foreground-secondary)]" />
               </button>
               <button
                 type="button"
-                onClick={handleNext}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[var(--background-card)]/80 backdrop-blur-sm flex items-center justify-center hover:bg-[var(--background-card)] transition-colors text-[var(--foreground)] shadow-sm"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  handleNext();
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[var(--background-card)]/80 backdrop-blur-sm flex items-center justify-center hover:bg-[var(--background-card)] transition-colors text-[var(--foreground)] shadow-sm cursor-pointer"
                 aria-label="Próxima imagem"
               >
                 <ChevronRight className="w-4 h-4 text-[var(--foreground-secondary)]" />
@@ -192,11 +206,23 @@ export default function ImageGallery({
           </div>
         )}
 
-        {/* Indicador de fotos (Figma: 1 / 5 fotos · Toque na imagem para ampliar) */}
-        <p className="mt-2 text-center text-xs text-[var(--foreground-muted)]">
+        {/* Indicador de fotos com gatilho de zoom (Figma: 1 / 5 fotos · Toque na imagem para ampliar) */}
+        <button
+          type="button"
+          onClick={() => setIsZoomOpen(true)}
+          className="w-full mt-2 text-center text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+        >
           {activeIndex + 1} / {safeImages.length} fotos · Toque na imagem para ampliar
-        </p>
+        </button>
       </div>
+
+      {/* Modal de Foto Ampliada do Figma (Node 417:338 e 417:511) */}
+      <ProductImageZoomModal
+        isOpen={isZoomOpen}
+        imageUrl={currentImageUrl}
+        productName={productName}
+        onClose={() => setIsZoomOpen(false)}
+      />
     </div>
   );
 }
