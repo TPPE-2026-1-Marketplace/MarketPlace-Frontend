@@ -1,60 +1,74 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type AnyModel = any;
-
 import React from "react";
+import { ShoppingBag } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { buttonClassName } from "@/components/ui/button-variants";
+import EmptyState from "@/components/ui/EmptyState";
 import ProductCard from "@/components/ui/ProductCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProducts } from "@/hooks/useProducts";
 import { getDisplayVariant } from "@/lib/catalog";
 
 export default function FeaturedProducts() {
-  const { products, isLoading: loading } = useProducts({ page: 1, limit: 4 });
+  const { products, isLoading, error } = useProducts({ page: 1, limit: 4 });
 
   return (
-    <section className="py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-gray-900 font-serif text-2xl" style={{ letterSpacing: "-0.02em" }}>
-            Destaques
-          </h2>
-          <p className="text-gray-500 text-sm mt-1">
-            Curadoria das peças mais amadas da nossa coleção
-          </p>
-        </div>
-        <Link
-          to="/produtos"
-          className="text-sm text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-1"
-        >
-          Ver todos <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
+    <section className="bg-[var(--background-card)] px-4 py-16 sm:px-6 lg:px-20">
+      <div className="mx-auto max-w-7xl">
+        <h2 className="font-serif text-[2rem] leading-[1.2] text-[var(--foreground)] sm:text-[2.5rem]">
+          Uma seleção para o seu momento
+        </h2>
+        <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
+          Salve seus favoritos e escolha tamanho e cor na página do produto.
+        </p>
 
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="aspect-[3/4] rounded-none border border-[var(--border)]" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {products.map((product) => {
-            const variant = getDisplayVariant(product);
-            return (
-              <ProductCard
-                key={product.idProduto}
-                id={product.idProduto}
-                titulo={product.titulo}
-                preco={variant?.precoVariante ?? product.precoBase}
-                imagem={variant?.images[0]?.url || "/hero-dress.png"}
-                categoria={product.categories[0]?.nome}
-                variant={variant}
-              />
-            );
-          })}
-        </div>
-      )}
+        {isLoading ? (
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)]">
+                <Skeleton className="aspect-[3/4] rounded-none" />
+                <div className="space-y-2 p-3">
+                  <Skeleton className="h-3 w-1/3" />
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : error || products.length === 0 ? (
+          <div className="mt-6">
+            <EmptyState
+              icon={<ShoppingBag className="size-7" />}
+              title={error ? "Não foi possível carregar os destaques" : "Nenhum vestido em destaque"}
+              body={error ? "Tente novamente em instantes." : "Volte em breve para ver as novidades."}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="mt-6 grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+              {products.map((product) => {
+                const variant = getDisplayVariant(product);
+                return (
+                  <ProductCard
+                    key={product.idProduto}
+                    id={product.idProduto}
+                    titulo={product.titulo}
+                    preco={variant?.precoVariante ?? product.precoBase}
+                    imagem={variant?.images[0]?.url || "/hero-dress.png"}
+                    categoria={product.categories[0]?.nome}
+                    variant={variant}
+                  />
+                );
+              })}
+            </div>
+            <Link
+              to="/produtos"
+              className={buttonClassName({ variant: "outline-neutral", size: "touch", className: "mt-6" })}
+            >
+              Ver todos os vestidos
+            </Link>
+          </>
+        )}
+      </div>
     </section>
   );
 }

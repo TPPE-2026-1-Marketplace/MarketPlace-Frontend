@@ -1,10 +1,9 @@
-
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import { ShoppingCart, Heart, Check } from "lucide-react";
+import { Heart } from "lucide-react";
+import { buttonClassName } from "@/components/ui/button-variants";
 import { formatCurrency } from "@/lib/utils";
 import { useFavorites } from "@/context/FavoritesContext";
-import { useCart } from "@/hooks/useCart";
 import type { ProductVariant } from "@/lib/catalog";
 
 interface ProductCardProps {
@@ -14,12 +13,16 @@ interface ProductCardProps {
   precoOriginal?: number;
   imagem: string;
   categoria?: string;
-  nota?: number;
   className?: string;
   style?: React.CSSProperties;
   variant?: ProductVariant;
 }
 
+/**
+ * Card de produto do design system (Figma "ProductCard"): imagem 3:4,
+ * favorito sempre visível (alvo de 44px) e "Escolher opções" leva ao
+ * detalhe do produto, onde tamanho/cor são selecionados antes da compra.
+ */
 export default function ProductCard({
   id,
   titulo,
@@ -27,135 +30,70 @@ export default function ProductCard({
   precoOriginal,
   imagem,
   categoria,
-  nota,
   className,
   style,
-  variant,
 }: ProductCardProps) {
   const { toggleFavorite, isFavorite } = useFavorites();
-  const { addItem } = useCart();
-  const [added, setAdded] = useState(false);
   const favorited = isFavorite(String(id));
+  const href = `/produtos/${id}`;
 
   const desconto = precoOriginal
     ? Math.round(((precoOriginal - preco) / precoOriginal) * 100)
     : null;
 
-  const availableSize = variant?.tamanho;
-  const canQuickAdd = Boolean(variant?.ativo && variant.stock.qtdOnline > 0);
-
   return (
-    <Link
-      to={`/produtos/${id}`}
+    <div
       data-testid="product-card"
-      className={`group block ${className || ""}`}
+      className={`overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-card)] ${className || ""}`}
       style={style}
     >
-      <div className="bg-white overflow-hidden hover:shadow-md transition-all duration-300 border border-gray-100">
-        {/* Image */}
-        <div className="relative overflow-hidden aspect-[3/4] bg-gray-50">
+      <div className="group relative aspect-[3/4] overflow-hidden bg-gray-50">
+        <Link to={href} className="block h-full w-full">
           <img
             src={imagem}
             alt={titulo}
-            className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+            className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
           />
-          {/* Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-1">
-            {desconto && (
-              <span className="bg-[#1a1a1a] text-white text-xs px-2 py-0.5 tracking-wide">
-                -{desconto}%
-              </span>
-            )}
-            <span className="bg-gray-600 text-white text-xs px-2 py-0.5 tracking-wide">
-              Destaque
-            </span>
-          </div>
-          {/* Wishlist */}
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              toggleFavorite(String(id));
-            }}
-            className={`absolute top-3 right-3 w-8 h-8 flex items-center justify-center transition-opacity border border-gray-100 ${
-              favorited
-                ? "bg-[#1a1a1a] text-white opacity-100"
-                : "bg-white text-gray-600 opacity-0 group-hover:opacity-100 hover:bg-gray-100"
-            }`}
-          >
-            <Heart className={`w-4 h-4 ${favorited ? "fill-current" : ""}`} />
-          </button>
-          {/* Quick add */}
-          <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                if (added || !variant || !canQuickAdd) return;
-                setAdded(true);
-                addItem(
-                  {
-                    codigoSku: variant.codigoSku,
-                    precoVariante: variant.precoVariante,
-                    tamanho: variant.tamanho,
-                    cor: variant.cor,
-                    produto: { idProduto: id, titulo, precoBase: preco },
-                    images: variant.images,
-                  },
-                  1
-                );
-                setTimeout(() => setAdded(false), 1500);
-              }}
-              disabled={!canQuickAdd}
-              className="bt-principal w-full py-2.5 flex items-center justify-center gap-2 text-xs tracking-wide"
-            >
-              {added ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Adicionado!
-                </>
-              ) : (
-                <>
-                  <ShoppingCart className="w-4 h-4" />
-                  {canQuickAdd ? "Adicionar ao Carrinho" : "Indisponível"}
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Info */}
-        <div className="p-3">
-          <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
-            {categoria || "Vestido"}
-          </p>
-          <h3 className="text-gray-900 text-sm truncate group-hover:text-gray-600 transition-colors">
-            {titulo}
-          </h3>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-gray-900 text-sm">
-              {formatCurrency(preco)}
-            </span>
-            {precoOriginal && (
-              <span className="text-gray-400 line-through text-xs">
-                {formatCurrency(precoOriginal)}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-gray-400 mt-0.5">
-            12x de {formatCurrency(preco / 12)}
-          </p>
-          {/* Sizes preview */}
-          {availableSize && (
-            <div className="flex gap-1 mt-2 flex-wrap">
-              <span
-                key={`${variant?.codigoSku}-${availableSize}`}
-                className="text-xs border border-gray-200 px-1.5 py-0.5 text-gray-500 hover:border-gray-800 transition-colors"
-              >
-                {availableSize}
-              </span>
-            </div>
-          )}
-        </div>
+        </Link>
+        {desconto && (
+          <span className="absolute top-3 left-3 bg-[var(--action-primary)] px-2 py-0.5 text-xs tracking-wide text-white">
+            -{desconto}%
+          </span>
+        )}
+        <button
+          onClick={() => toggleFavorite(String(id))}
+          aria-label={favorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+          aria-pressed={favorited}
+          className={`absolute top-2 right-2 flex size-11 items-center justify-center rounded-full transition-colors ${
+            favorited ? "bg-[var(--action-primary)] text-white" : "bg-[var(--background-card)] text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <Heart className={`size-5 ${favorited ? "fill-current" : ""}`} />
+        </button>
       </div>
-    </Link>
+
+      <div className="flex flex-col gap-1 px-3 pt-3">
+        <p className="text-xs font-medium tracking-widest text-[var(--foreground-muted)] uppercase">
+          {categoria || "Vestido"}
+        </p>
+        <Link to={href} className="truncate text-base font-medium text-[var(--foreground)] hover:text-gray-600">
+          {titulo}
+        </Link>
+        <p className="text-base font-semibold text-[var(--foreground)]">
+          {formatCurrency(preco)}
+          {precoOriginal && (
+            <span className="ml-2 text-xs font-normal text-gray-400 line-through">
+              {formatCurrency(precoOriginal)}
+            </span>
+          )}
+        </p>
+      </div>
+
+      <div className="p-3">
+        <Link to={href} className={buttonClassName({ variant: "action", size: "touch", fullWidth: true })}>
+          Escolher opções
+        </Link>
+      </div>
+    </div>
   );
 }
