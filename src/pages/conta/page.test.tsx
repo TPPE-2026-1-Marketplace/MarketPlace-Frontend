@@ -34,7 +34,11 @@ describe("ContaPage", () => {
   beforeEach(() => {
     getMock.mockReset();
     patchMock.mockReset();
-    getMock.mockResolvedValue(profile);
+    getMock.mockImplementation((path: string) =>
+      path.startsWith("/orders")
+        ? Promise.resolve({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } })
+        : Promise.resolve(profile),
+    );
     vi.mocked(fetchProducts).mockResolvedValue({
       data: [
         makeProduct({ idProduto: 1, titulo: "Vestido Salvo" }),
@@ -126,10 +130,10 @@ describe("ContaPage", () => {
     localStorage.setItem("dk_favorites", JSON.stringify(["1", "2"]));
     renderConta();
 
-    await userEvent.click(screen.getByRole("button", { name: /Meus Pedidos/ }));
-    expect(screen.getByText("Você ainda não tem pedidos.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /Meus Pedidos/ }));
+    expect(await screen.findByText("Você ainda não tem pedidos.")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Favoritos/ }));
+    await userEvent.click(screen.getByRole("tab", { name: /Favoritos/ }));
     expect(await screen.findByText("Vestido Salvo")).toBeInTheDocument();
     expect(screen.getByText("Vestido Salvo").closest("a")).toHaveAttribute("href", "/produtos/1");
     expect(screen.getByText("Vestido")).toBeInTheDocument();
@@ -138,8 +142,8 @@ describe("ContaPage", () => {
 
   it("mostra favoritos vazios e sai da conta", async () => {
     renderConta();
-    await userEvent.click(screen.getByRole("button", { name: /Favoritos/ }));
-    expect(screen.getByText("Nenhum favorito ainda")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /Favoritos/ }));
+    expect(await screen.findByText("Nenhum favorito ainda")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Sair/ }));
     expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
