@@ -2,13 +2,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, MapPin, Shield, RefreshCw } from "lucide-react";
+import { buttonClassName } from "@/components/ui/button-variants";
 
 export default function PromoSection() {
   return (
     <>
       {/* Editorial banner */}
       <section className="my-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden bg-[#1a1a1a] p-10 md:p-16">
+        <div className="relative overflow-hidden bg-[var(--action-primary)] p-10 md:p-16">
           <div className="relative z-10 max-w-lg">
             <p className="text-gray-500 text-xs tracking-[0.3em] uppercase mb-3 font-sans">
               Nova Temporada
@@ -25,7 +26,11 @@ export default function PromoSection() {
             </p>
             <Link
               to="/produtos?categoria=formatura"
-              className="inline-flex items-center gap-2 bg-white text-[#1a1a1a] px-8 py-3 hover:bg-gray-100 transition-colors text-sm tracking-wide font-medium"
+              className={buttonClassName({
+                variant: "outline-neutral",
+                size: "md",
+                className: "text-sm tracking-wide",
+              })}
             >
               Explorar Coleção <ArrowRight className="w-4 h-4" />
             </Link>

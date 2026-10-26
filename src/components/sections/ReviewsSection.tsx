@@ -1,6 +1,8 @@
 
 import React from "react";
 import { Star } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card } from "@/components/ui/card";
 
 export default function ReviewsSection() {
   return (
@@ -35,25 +37,32 @@ export default function ReviewsSection() {
               tag: "Casamento",
             },
           ].map((t, i) => (
-            <div key={i} className="bg-[#f8f8f8] p-6 border border-gray-100">
-              <div className="flex items-center gap-0.5 mb-3">
+            <Card key={i} className="gap-3 rounded-none border-[var(--border)] bg-gray-50 p-6">
+              <div className="flex items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map((s) => (
                   <Star
                     key={s}
-                    className="w-3.5 h-3.5 -[#1a1a1a] text-[#1a1a1a]"
+                    className="w-3.5 h-3.5 fill-[var(--action-primary)] text-[var(--action-primary)]"
                   />
                 ))}
               </div>
-              <p className="text-gray-600 text-sm leading-relaxed mb-5 italic">
+              <p className="text-gray-600 text-sm leading-relaxed italic">
                 "{t.text}"
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-gray-900 text-sm font-medium">{t.name}</span>
+                <div className="flex items-center gap-2">
+                  <Avatar className="size-7">
+                    <AvatarFallback className="text-xs font-medium">
+                      {t.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-gray-900 text-sm font-medium">{t.name}</span>
+                </div>
                 <span className="bg-gray-200 text-gray-700 text-xs px-2.5 py-1">
                   {t.tag}
                 </span>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       </div>

@@ -2,6 +2,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, MapPin } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 const categories = [
   {
@@ -62,21 +63,19 @@ export default function CategorySection() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                to={`/produtos?categoria=${cat.id}`}
-                className="group relative overflow-hidden aspect-[3/4] block bg-gray-100"
-              >
-                <img
-                  src={cat.image}
-                  alt={cat.label}
-                  className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#111111]/80 via-transparent to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <p className="text-white text-sm tracking-wide font-serif">{cat.label}</p>
-                  <p className="text-gray-400 text-xs mt-0.5">{cat.sub}</p>
-                </div>
+              <Link key={cat.id} to={`/produtos?categoria=${cat.id}`} className="group block">
+                <Card className="relative aspect-[3/4] gap-0 overflow-hidden rounded-none border-[var(--border)] p-0">
+                  <img
+                    src={cat.image}
+                    alt={cat.label}
+                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                  <CardContent className="absolute bottom-0 left-0 right-0 p-4">
+                    <p className="text-white text-sm tracking-wide font-serif">{cat.label}</p>
+                    <p className="text-gray-400 text-xs mt-0.5">{cat.sub}</p>
+                  </CardContent>
+                </Card>
               </Link>
             ))}
           </div>
