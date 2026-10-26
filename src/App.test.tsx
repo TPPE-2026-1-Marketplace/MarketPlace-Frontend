@@ -52,7 +52,7 @@ describe("App", () => {
 
   it("painel fica fora do layout da loja", () => {
     renderAt("/painel");
-    expect(screen.getByText("Acesso Restrito")).toBeInTheDocument();
+    expect(screen.getByText("Acesso restrito")).toBeInTheDocument();
     expect(screen.queryByTestId("cart-link")).not.toBeInTheDocument();
   });
 });

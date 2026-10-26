@@ -31,6 +31,11 @@
   --background-secondary: #f3f4f6;
   --background-card: #ffffff;
   --background-elevated: #ffffff;
+  /* Fundo das áreas de trabalho e cabeçalhos de tabela do painel (Figma "background-store") */
+  --background-store: #f8f8f8;
+
+  /* Charts (Figma "color-bg-chart-muted": barras fora do mês em destaque) */
+  --color-bg-chart-muted: #e9a8c4;
 
   /* Foreground */
   --foreground: #111827;

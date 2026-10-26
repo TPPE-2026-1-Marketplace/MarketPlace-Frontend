@@ -90,3 +90,12 @@ export function maskPhone(value: string): string {
 export function formatItemCount(count: number): string {
   return `${count} ${count === 1 ? "item" : "itens"}`;
 }
+
+/**
+ * Hide a CPF keeping only the last two digits: ***.***.***-00.
+ */
+export function obscureCpf(value: string): string {
+  const digits = onlyDigits(value);
+  if (digits.length < 2) return "***.***.***-**";
+  return `***.***.***-${digits.slice(-2)}`;
+}
