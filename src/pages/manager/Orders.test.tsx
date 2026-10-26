@@ -91,10 +91,11 @@ describe("Orders", () => {
       "Pedido: #30",
       "Pedido: #40",
     ]);
-    expect(within(row(10)).getByText("Maria Online · ***.***.***-00")).toBeInTheDocument();
+    expect(within(row(10)).getByText("Maria · ***.***.***-00")).toBeInTheDocument();
+    expect(within(row(10)).getByText("13 set")).toBeInTheDocument();
     expect(within(row(10)).getByText("R$ 899,90")).toBeInTheDocument();
     expect(within(row(10)).getByText("Pago")).toBeInTheDocument();
-    expect(within(row(20)).getByText("Joana Balcão")).toBeInTheDocument();
+    expect(within(row(20)).getByText("Joana")).toBeInTheDocument();
     expect(within(row(20)).getByText("Loja")).toBeInTheDocument();
     expect(within(row(30)).getByText("Cliente não identificado · ***.***.***-66")).toBeInTheDocument();
   });

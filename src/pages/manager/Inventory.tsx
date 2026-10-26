@@ -107,7 +107,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
         <Button
           variant="outline-neutral"
           size="sm"
-          className={`${adminButtonClassName} min-w-[128px]`}
+          className={`${adminButtonClassName} min-w-[128px] whitespace-nowrap`}
           onClick={() => setSelectedRow(row)}
           aria-label={`Ajustar estoque de ${row.codigoSku}`}
         >

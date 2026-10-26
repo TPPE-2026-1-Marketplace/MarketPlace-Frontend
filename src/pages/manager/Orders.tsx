@@ -31,12 +31,15 @@ interface OrderFilters {
 
 const EMPTY_FILTERS: OrderFilters = { search: "", status: "all", pickupType: "all" };
 
+// "26 out", como no protótipo.
 const shortDate = (value: string) =>
-  new Date(value).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "");
+  new Date(value).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "").replace(" de ", " ");
 
+// Na listagem só o primeiro nome (Figma: "Marina · ***.***.***-00"); o nome completo fica no detalhe.
 function customerCell(order: ApiOrder) {
   const cpf = orderCustomerCpf(order);
-  return cpf ? `${orderCustomerName(order)} · ${obscureCpf(cpf)}` : orderCustomerName(order);
+  const name = order.user?.nome || order.clienteNomeAvulso ? orderCustomerName(order).split(" ")[0] : orderCustomerName(order);
+  return cpf ? `${name} · ${obscureCpf(cpf)}` : name;
 }
 
 function matchesFilters(order: ApiOrder, { search, status, pickupType }: OrderFilters) {
@@ -103,7 +106,7 @@ export function Orders({ readOnly = false }: OrdersProps) {
         <Button
           variant="outline-neutral"
           size="sm"
-          className={`${adminButtonClassName} min-w-[128px]`}
+          className={`${adminButtonClassName} min-w-[128px] whitespace-nowrap`}
           onClick={() => setSelectedId(order.idPedido)}
           aria-label={`Ver pedido #${order.idPedido}`}
         >
