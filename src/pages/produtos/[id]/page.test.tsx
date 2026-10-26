@@ -246,4 +246,73 @@ describe("ProductDetailPage", () => {
       categoryId: 1,
     });
   });
+
+  it("desabilita compra para produto de tamanho unico sem cor com estoque zerado", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 99,
+        titulo: "Vestido Tamanho Unico Esgotado",
+        variants: [
+          makeVariant({
+            codigoSku: "UNICO-ZERO",
+            cor: null,
+            tamanho: null,
+            ativo: true,
+            stock: { qtdOnline: 0, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Comprar Agora" })).toBeDisabled();
+    expect(screen.getByTestId("add-to-cart")).toBeDisabled();
+    expect(screen.getByText("0 disponível online")).toBeInTheDocument();
+  });
+
+  it("desabilita compra quando todas as variantes estao inativas", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 98,
+        titulo: "Vestido Variantes Inativas",
+        variants: [
+          makeVariant({
+            codigoSku: "INATIVO-1",
+            cor: "Azul",
+            tamanho: "38",
+            ativo: false,
+            stock: { qtdOnline: 10, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Comprar Agora" })).toBeDisabled();
+    expect(screen.getByTestId("add-to-cart")).toBeDisabled();
+  });
+
+  it("exibe tamanhos numericos plus size (48 a 58) no guia de medidas quando presentes no produto", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 97,
+        titulo: "Vestido Plus Size",
+        variants: [
+          makeVariant({
+            codigoSku: "PLUS-48",
+            tamanho: "48",
+            ativo: true,
+            stock: { qtdOnline: 5, qtdLojaFisica: 0 },
+          }),
+          makeVariant({
+            codigoSku: "PLUS-50",
+            tamanho: "50",
+            ativo: true,
+            stock: { qtdOnline: 5, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Guia de Medidas" }));
+    expect(screen.getAllByRole("row").map((r) => r.firstChild?.textContent)).toEqual(["Tam.", "48", "50"]);
+  });
 });

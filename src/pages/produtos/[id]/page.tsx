@@ -117,6 +117,8 @@ export default function ProductDetailPage() {
     findVariant(product, selectedColor || undefined) ??
     getDisplayVariant(product);
 
+  const hasActiveVariant = Boolean(activeVariant && activeVariant.ativo);
+
   const gallery = activeVariant?.images.length
     ? activeVariant.images
     : [{ idImagem: 0, url: "/hero-dress.png", ordem: 0, descricao: null }];
@@ -128,6 +130,9 @@ export default function ProductDetailPage() {
   const totalStock =
     (activeVariant?.stock.qtdOnline ?? 0) + (activeVariant?.stock.qtdLojaFisica ?? 0);
   const isLowStock = totalStock > 0 && totalStock <= 3;
+  const isOutOfStock = Boolean(
+    activeVariant && (!activeVariant.ativo || stockEcommerce <= 0),
+  );
 
   const categoryName = product.categories[0]?.nome || "Vestido";
   const activeVariantSku = activeVariant?.codigoSku || product.sku;
@@ -166,8 +171,13 @@ export default function ProductDetailPage() {
   });
 
   const handleAddToCart = () => {
-    if (product.variants.length === 0) {
+    if (product.variants.length === 0 || !activeVariant) {
       alert("Por favor, selecione o tamanho e a cor antes de adicionar ao carrinho.");
+      return;
+    }
+
+    if (!activeVariant.ativo) {
+      alert("Esta opção não está disponível no momento.");
       return;
     }
 
@@ -176,8 +186,8 @@ export default function ProductDetailPage() {
       return;
     }
 
-    if (!activeVariant) {
-      alert("Por favor, selecione o tamanho e a cor antes de adicionar ao carrinho.");
+    if (stockEcommerce <= 0) {
+      alert("Esta opção está esgotada no momento.");
       return;
     }
 
@@ -187,8 +197,13 @@ export default function ProductDetailPage() {
   };
 
   const handleBuyNow = () => {
-    if (product.variants.length === 0) {
+    if (product.variants.length === 0 || !activeVariant) {
       alert("Por favor, selecione o tamanho e a cor antes de continuar.");
+      return;
+    }
+
+    if (!activeVariant.ativo) {
+      alert("Esta opção não está disponível no momento.");
       return;
     }
 
@@ -197,8 +212,8 @@ export default function ProductDetailPage() {
       return;
     }
 
-    if (!activeVariant) {
-      alert("Por favor, selecione o tamanho e a cor antes de continuar.");
+    if (stockEcommerce <= 0) {
+      alert("Esta opção está esgotada no momento.");
       return;
     }
 
@@ -252,6 +267,7 @@ export default function ProductDetailPage() {
             quantity={quantity}
             onQuantityChange={setQuantity}
             stockEcommerce={stockEcommerce}
+            isOutOfStock={isOutOfStock}
             added={added}
             onAddToCart={handleAddToCart}
             onBuyNow={handleBuyNow}

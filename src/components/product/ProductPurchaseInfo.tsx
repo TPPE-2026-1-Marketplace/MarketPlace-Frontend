@@ -31,6 +31,7 @@ interface ProductPurchaseInfoProps {
   averageRating?: number;
   totalReviews?: number;
   className?: string;
+  isOutOfStock?: boolean;
 }
 
 export function ProductPurchaseInfo({
@@ -57,9 +58,9 @@ export function ProductPurchaseInfo({
   averageRating = 0,
   totalReviews = 0,
   className,
+  isOutOfStock: isOutOfStockProp,
 }: ProductPurchaseInfoProps) {
-  const hasVariants = colors.length > 0 || sizes.length > 0;
-  const isOutOfStock = hasVariants ? stockEcommerce <= 0 : false;
+  const isOutOfStock = isOutOfStockProp ?? (stockEcommerce <= 0);
   const installmentValue = price / 6;
 
   return (
@@ -150,35 +151,37 @@ export function ProductPurchaseInfo({
       />
 
       {/* Seletor de Tamanhos e Links de Apoio */}
-      <div className="mb-6">
-        <SizeSelector
-          sizes={sizes}
-          selectedSize={selectedSize}
-          onSelectSize={onSelectSize}
-          onOpenSizeGuide={onOpenSizeGuide}
-          error={sizeError}
-        />
+      {sizes.length > 0 && (
+        <div className="mb-6">
+          <SizeSelector
+            sizes={sizes}
+            selectedSize={selectedSize}
+            onSelectSize={onSelectSize}
+            onOpenSizeGuide={onOpenSizeGuide}
+            error={sizeError}
+          />
 
-        {/* Links de Apoio ao Tamanho (Figma Node 443:486: Encontre seu tamanho e Tabela de medidas) */}
-        <div className="flex items-center gap-4 mt-2.5 text-xs font-sans">
-          <button
-            type="button"
-            onClick={onOpenSizeGuide}
-            className="text-[var(--color-brand)] hover:underline inline-flex items-center gap-1 cursor-pointer"
-          >
-            <Ruler className="size-3.5" />
-            Encontre seu tamanho
-          </button>
-          <span className="text-[var(--border)]">|</span>
-          <button
-            type="button"
-            onClick={onOpenSizeGuide}
-            className="text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:underline cursor-pointer"
-          >
-            Tabela de medidas
-          </button>
+          {/* Links de Apoio ao Tamanho (Figma Node 443:486: Encontre seu tamanho e Tabela de medidas) */}
+          <div className="flex items-center gap-4 mt-2.5 text-xs font-sans">
+            <button
+              type="button"
+              onClick={onOpenSizeGuide}
+              className="text-[var(--color-brand)] hover:underline inline-flex items-center gap-1 cursor-pointer"
+            >
+              <Ruler className="size-3.5" />
+              Encontre seu tamanho
+            </button>
+            <span className="text-[var(--border)]">|</span>
+            <button
+              type="button"
+              onClick={onOpenSizeGuide}
+              className="text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:underline cursor-pointer"
+            >
+              Tabela de medidas
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Quantidade e Estoque (Figma: Typography/UI/Title nos botões) */}
       <div className="mb-6">

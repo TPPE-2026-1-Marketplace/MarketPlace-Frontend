@@ -18,7 +18,7 @@ export function MobileStickyPurchaseBar({
   isOutOfStock = false,
   className,
 }: MobileStickyPurchaseBarProps) {
-  const installments = Math.floor(price / 6);
+  const installments = price / 6;
 
   return (
     <div

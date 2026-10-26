@@ -20,7 +20,7 @@ interface ColorSelectorProps {
 // Mapeamento de cores conhecidas para visual swatch
 const COLOR_SWATCHES: Record<string, string> = {
   "rosa": "bg-pink-300",
-  "rosa antigo": "bg-[#e8b4b8]",
+  "rosa antigo": "bg-[var(--color-brand-light)]",
   "azul": "bg-blue-500",
   "azul marinho": "bg-blue-900",
   "preto": "bg-neutral-900",
