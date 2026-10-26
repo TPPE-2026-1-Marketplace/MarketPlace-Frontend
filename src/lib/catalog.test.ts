@@ -3,6 +3,7 @@ import { api } from "./api";
 import {
   fetchProduct,
   fetchProducts,
+  fetchProductReviews,
   findVariant,
   getDisplayVariant,
   normalizeProduct,
@@ -112,6 +113,9 @@ describe("normalizeProduct", () => {
       destaque: false,
       precoBase: 59.9,
       sku: "",
+      material: null,
+      composicao: null,
+      silhueta: null,
       categories: [],
       variants: [
         {
@@ -177,5 +181,41 @@ describe("fetchProducts / fetchProduct", () => {
 
     expect(getMock).toHaveBeenCalledWith("/products/9");
     expect(result.titulo).toBe("Calça");
+  });
+});
+
+describe("fetchProductReviews", () => {
+  beforeEach(() => {
+    getMock.mockReset();
+  });
+
+  it("retorna as avaliações e média da rota", async () => {
+    const mockReviews = {
+      data: [{ idProduto: 7, nota: 5, comentario: "Ótimo", dataAvaliacao: "2026-01-01", cliente: { nome: "Ana" } }],
+      meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      media: 5,
+      totalAvaliacoes: 1,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 1 },
+    };
+    getMock.mockResolvedValueOnce(mockReviews);
+
+    const result = await fetchProductReviews(7);
+
+    expect(getMock).toHaveBeenCalledWith("/reviews/product/7", { page: 1, limit: 10 });
+    expect(result).toEqual(mockReviews);
+  });
+
+  it("retorna estrutura vazia segura em caso de erro da API", async () => {
+    getMock.mockRejectedValueOnce(new Error("Network error"));
+
+    const result = await fetchProductReviews(7);
+
+    expect(result).toEqual({
+      data: [],
+      meta: { page: 1, limit: 10, total: 0, totalPages: 0 },
+      media: 0,
+      totalAvaliacoes: 0,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+    });
   });
 });
