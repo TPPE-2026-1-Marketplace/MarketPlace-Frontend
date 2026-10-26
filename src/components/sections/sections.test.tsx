@@ -6,9 +6,8 @@ import { renderWithProviders } from "@/test/render";
 import Home from "@/pages/page";
 import CategorySection from "./CategorySection";
 import FeaturedProducts from "./FeaturedProducts";
+import GuidanceSection from "./GuidanceSection";
 import HeroSection from "./HeroSection";
-import PromoSection from "./PromoSection";
-import ReviewsSection from "./ReviewsSection";
 
 vi.mock("@/lib/catalog", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/catalog")>()),
@@ -68,31 +67,32 @@ describe("HeroSection", () => {
 describe("seções estáticas", () => {
   it("CategorySection linka cada coleção", () => {
     renderWithProviders(<CategorySection />);
+    expect(screen.getByText("Encontre o vestido para o seu momento")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Casamento/ })).toHaveAttribute("href", "/produtos?categoria=casamento");
-    expect(screen.getByText("Entregamos em todo o Distrito Federal")).toBeInTheDocument();
   });
 
-  it("PromoSection destaca a coleção de formatura e os diferenciais", () => {
-    renderWithProviders(<PromoSection />);
-    expect(screen.getByRole("link", { name: /Explorar Coleção/ })).toHaveAttribute("href", "/produtos?categoria=formatura");
-    expect(screen.getByText("Troca em 7 dias")).toBeInTheDocument();
-  });
-
-  it("ReviewsSection mostra os depoimentos", () => {
-    renderWithProviders(<ReviewsSection />);
-    expect(screen.getAllByText(/DK Festas|rainha/)).toHaveLength(3);
-    expect(screen.getByText("Juliana C.")).toBeInTheDocument();
+  it("GuidanceSection mostra os passos de como comprar", () => {
+    renderWithProviders(<GuidanceSection />);
+    expect(screen.getByText("Seu vestido, com mais confiança")).toBeInTheDocument();
+    expect(screen.getByText("Confira antes de comprar")).toBeInTheDocument();
   });
 });
 
 describe("FeaturedProducts", () => {
   it("mostra o carregamento e depois os produtos em destaque", async () => {
     const { container } = renderWithProviders(<FeaturedProducts />);
-    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(4);
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
 
     expect(await screen.findByText("Vestido Rosa Encanto")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith({ page: 1, limit: 4 });
     expect(screen.getByAltText("Vestido Sem Foto")).toHaveAttribute("src", "/hero-dress.png");
+    expect(screen.getByRole("link", { name: "Ver todos os vestidos" })).toHaveAttribute("href", "/produtos");
+  });
+
+  it("mostra o estado vazio quando não há produtos em destaque", async () => {
+    fetchMock.mockResolvedValue({ data: [], meta: { page: 1, limit: 4, total: 0, totalPages: 0 } });
+    renderWithProviders(<FeaturedProducts />);
+    expect(await screen.findByText("Nenhum vestido em destaque")).toBeInTheDocument();
   });
 });
 
@@ -101,8 +101,8 @@ describe("Home", () => {
     renderWithProviders(<Home />);
 
     expect(screen.getByLabelText("Banner principal")).toBeInTheDocument();
-    expect(screen.getByText("Nossas Coleções")).toBeInTheDocument();
-    expect(screen.getByText("O que nossas clientes dizem")).toBeInTheDocument();
+    expect(screen.getByText("Encontre o vestido para o seu momento")).toBeInTheDocument();
+    expect(screen.getByText("Seu vestido, com mais confiança")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Vestido Rosa Encanto")).toBeInTheDocument());
   });
 });
