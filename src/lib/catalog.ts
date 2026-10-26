@@ -36,6 +36,9 @@ export interface Product {
   destaque: boolean;
   precoBase: number;
   sku: string;
+  material?: string | null;
+  composicao?: string | null;
+  silhueta?: string | null;
   categories: Array<{ idCategoria?: number; nome: string }>;
   variants: ProductVariant[];
 }
@@ -55,6 +58,9 @@ interface ProductResponse {
   destaque?: boolean;
   precoBase?: number | string;
   sku?: string;
+  material?: string | null;
+  composicao?: string | null;
+  silhueta?: string | null;
   categories?: Array<{ idCategoria?: number; nome: string }>;
   variants?: ProductVariantResponse[];
 }
@@ -135,6 +141,9 @@ export async function normalizeProduct(raw: ProductResponse): Promise<Product> {
     destaque: raw.destaque ?? false,
     precoBase: Number(raw.precoBase ?? 0),
     sku: raw.sku ?? "",
+    material: raw.material ?? null,
+    composicao: raw.composicao ?? null,
+    silhueta: raw.silhueta ?? null,
     categories: raw.categories ?? [],
     variants: variants.filter((variant): variant is ProductVariant => variant !== null),
   };

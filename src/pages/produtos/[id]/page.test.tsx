@@ -25,6 +25,9 @@ const vestido = makeProduct({
   titulo: "Vestido Gala",
   precoBase: 1000,
   descricao: "Longo bordado",
+  material: "Chiffon Nobre",
+  composicao: "100% Seda",
+  silhueta: "Princesa",
   variants: [
     makeVariant({ codigoSku: "ROSA-38", cor: "Rosa", tamanho: "38", precoVariante: 800, images: [img(1), img(2)], stock: { qtdOnline: 2, qtdLojaFisica: 1 } }),
     makeVariant({ codigoSku: "ROSA-40", cor: "Rosa", tamanho: "40", precoVariante: 800, images: [img(3)], stock: { qtdOnline: 0, qtdLojaFisica: 0 } }),
@@ -195,6 +198,9 @@ describe("ProductDetailPage", () => {
     expect(screen.getAllByRole("row").map((r) => r.firstChild?.textContent)).toEqual(["Tam.", "38", "40"]);
     await userEvent.click(screen.getByRole("button", { name: "Informações" }));
     expect(screen.queryByText("Busto (cm)")).not.toBeInTheDocument();
+    expect(screen.getByText("Chiffon Nobre")).toBeInTheDocument();
+    expect(screen.getByText("100% Seda")).toBeInTheDocument();
+    expect(screen.getByText("Princesa")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Ver medidas/ }));
     expect(screen.getByRole("heading", { name: "Guia de Medidas" })).toBeInTheDocument();

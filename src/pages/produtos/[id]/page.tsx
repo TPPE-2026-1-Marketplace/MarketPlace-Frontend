@@ -252,6 +252,9 @@ export default function ProductDetailPage() {
           colors={colors}
           sizes={sizes}
           stockEcommerce={stockEcommerce}
+          material={product.material}
+          composicao={product.composicao}
+          silhueta={product.silhueta}
           selectedSize={selectedSize}
         />
 

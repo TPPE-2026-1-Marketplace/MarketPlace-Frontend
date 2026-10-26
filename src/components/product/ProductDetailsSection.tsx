@@ -9,6 +9,9 @@ interface ProductDetailsSectionProps {
   colors: string[];
   sizes: string[];
   stockEcommerce: number;
+  material?: string | null;
+  composicao?: string | null;
+  silhueta?: string | null;
   selectedSize?: string;
   className?: string;
 }
@@ -22,6 +25,9 @@ export function ProductDetailsSection({
   colors,
   sizes,
   stockEcommerce,
+  material,
+  composicao,
+  silhueta,
   selectedSize,
   className,
 }: ProductDetailsSectionProps) {
@@ -125,6 +131,9 @@ export function ProductDetailsSection({
           {[
             ["SKU", sku],
             ["Categoria", categoryName ? categoryName.charAt(0).toUpperCase() + categoryName.slice(1) : "—"],
+            ["Material", material || "—"],
+            ["Composição", composicao || "—"],
+            ["Silhueta", silhueta || "—"],
             ["Cores disponíveis", colors.join(", ") || "—"],
             ["Tamanhos disponíveis", sizes.join(", ") || "—"],
             ["Estoque online", `${stockEcommerce} unidades`],
