@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cn, formatCurrency, formatDate, formatItemCount, maskCep, maskCpf, maskPhone, onlyDigits, truncate } from "./utils";
+import { cn, formatCurrency, formatDate, formatItemCount, maskCep, maskCpf, maskPhone, obscureCpf, onlyDigits, truncate } from "./utils";
 
 describe("onlyDigits", () => {
   it("remove tudo que não é dígito", () => {
@@ -72,5 +72,15 @@ describe("utils", () => {
   it("truncate corta textos longos com reticências", () => {
     expect(truncate("DK Fashion", 20)).toBe("DK Fashion");
     expect(truncate("DK Fashion", 2)).toBe("DK…");
+  });
+});
+
+describe("obscureCpf", () => {
+  it.each([
+    ["11144477735", "***.***.***-35"],
+    ["111.444.777-35", "***.***.***-35"],
+    ["", "***.***.***-**"],
+  ])("oculta %s como %s", (input, expected) => {
+    expect(obscureCpf(input)).toBe(expected);
   });
 });

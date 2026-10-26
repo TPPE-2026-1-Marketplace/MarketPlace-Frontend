@@ -39,6 +39,7 @@ beforeEach(() => {
 });
 
 const location = () => screen.getByTestId("location").textContent;
+const sidebar = () => within(screen.getByRole("navigation", { name: "Navegação administrativa" }));
 
 function renderPanel(route = "/painel", user = manager) {
   return renderWithProviders(<ManagerDashboard />, { route, path: "/painel/*", user });
@@ -48,104 +49,96 @@ describe("ManagerDashboard", () => {
   it("bloqueia quem não é funcionário", () => {
     renderPanel("/painel", customer);
 
-    expect(screen.getByText("Acesso Restrito")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Fazer Login" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("heading", { name: "Acesso restrito" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Fazer login" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "Voltar à loja" })).toHaveAttribute("href", "/");
   });
 
-  it("mostra a visão geral com KPIs, pedidos e alertas de estoque", async () => {
+  it("mostra o shell com usuário, contexto e a visão geral", async () => {
     renderPanel();
 
-    expect(await screen.findByText("1 produto(s)")).toBeInTheDocument();
-    expect(screen.getByText("R$ 350,00")).toBeInTheDocument();
-    expect(screen.getByText("Pedidos Recentes")).toBeInTheDocument();
-    expect(screen.getAllByText("Vestido Pouco Estoque").length).toBeGreaterThan(0);
-    expect(screen.getByText("Gerente · DK Fashion")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Cupons/ })).not.toBeInTheDocument();
+    expect(screen.getByText("PAINEL GERENCIAL")).toBeInTheDocument();
+    expect(screen.getAllByText("Gerente DK · Gerente").length).toBeGreaterThan(0);
+    expect(screen.getByText(/^Gerente · /)).toBeInTheDocument();
+    expect(sidebar().getByRole("button", { name: "Visão geral" })).toHaveAttribute("aria-current", "page");
+    expect(sidebar().queryByRole("button", { name: "Cupons" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Abrir PDV" })).toHaveAttribute("href", "/pdv");
+    expect(await screen.findByRole("heading", { level: 1, name: "Visão geral" })).toBeInTheDocument();
+    expect(await screen.findByText("Receita total")).toBeInTheDocument();
   });
 
-  it("navega pelas ações rápidas e pelo menu lateral", async () => {
+  it("navega pelo menu lateral", async () => {
     renderPanel();
-    await screen.findByText("Pedidos Recentes");
 
-    await userEvent.click(screen.getByRole("button", { name: /^Ver$/ }));
-    expect(location()).toBe("/painel/estoque");
-
-    await userEvent.click(screen.getByRole("button", { name: /Visão Geral/ }));
-    expect(location()).toBe("/painel");
     for (const [label, path] of [
+      ["Estoque", "/painel/estoque"],
       ["Pedidos", "/painel/pedidos"],
       ["Relatórios", "/painel/relatorios"],
       ["Usuários", "/painel/usuarios"],
+      ["Comissões", "/painel/comissoes"],
+      ["Clientes", "/painel/exportar"],
+      ["Visão geral", "/painel"],
     ]) {
-      await userEvent.click(screen.getByRole("button", { name: /Visão Geral/ }));
-      const quick = screen.getAllByRole("button", { name: new RegExp(`^${label}$`) }).slice(-1)[0];
-      await userEvent.click(quick);
+      await userEvent.click(sidebar().getByRole("button", { name: label }));
       expect(location()).toBe(path);
+      expect(sidebar().getByRole("button", { name: label })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByText(/^Painel \//)).toHaveTextContent(`Painel / ${label}`);
     }
-
-    await userEvent.click(screen.getByRole("button", { name: /Visão Geral/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Ver detalhes/ }));
-    expect(location()).toBe("/painel/comissoes");
   });
 
   it.each([
     ["estoque", /Estoque/],
-    ["pedidos", "Gerenciamento de Pedidos"],
+    ["pedidos", /Pedidos/],
     ["vendas-pdv", "Vendas Presenciais (PDV)"],
     ["relatorios", "Relatórios e Análises"],
     ["comissoes", /Comiss/],
     ["exportar", "Clientes"],
     ["usuarios", /Usuários|Funcionários/],
-    ["banners", /Banners/],
   ])("abre a aba %s", async (tab, heading) => {
     renderPanel(`/painel/${tab}`);
 
     await waitFor(() => expect(screen.getAllByRole("heading", { name: heading }).length).toBeGreaterThan(0));
   });
 
+  it("abre a aba de banners", () => {
+    renderPanel("/painel/banners");
+
+    expect(screen.getByText(/^Painel \//)).toHaveTextContent("Painel / Banners");
+  });
+
   it("super admin vê a aba de cupons", async () => {
     renderPanel("/painel/cupons", superadmin);
 
-    expect(screen.getByText("Super Admin · DK Fashion")).toBeInTheDocument();
+    expect(screen.getByText(/^Administrador · /)).toBeInTheDocument();
+    expect(sidebar().getByRole("button", { name: "Cupons" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByRole("heading", { name: /Cupons/ }).length).toBeGreaterThan(0));
   });
 
   it("funcionário vê só as abas permitidas", () => {
     renderPanel("/painel", employee);
-    const nav = within(document.querySelector("nav")!);
 
-    expect(nav.getByRole("button", { name: /Estoque/ })).toBeInTheDocument();
-    expect(nav.getByRole("button", { name: /Comissões/ })).toBeInTheDocument();
-    expect(nav.queryByRole("button", { name: /Relatórios/ })).not.toBeInTheDocument();
-    expect(nav.queryByRole("button", { name: /Usuários/ })).not.toBeInTheDocument();
+    expect(sidebar().getByRole("button", { name: "Estoque" })).toBeInTheDocument();
+    expect(sidebar().getByRole("button", { name: "Comissões" })).toBeInTheDocument();
+    expect(sidebar().queryByRole("button", { name: "Relatórios" })).not.toBeInTheDocument();
+    expect(sidebar().queryByRole("button", { name: "Usuários" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Ana Vendas · Vendedor").length).toBeGreaterThan(0);
   });
 
-  it("abre a barra lateral e o seletor de módulos e sai do sistema", async () => {
+  it("abre o menu mobile, navega e sai do painel", async () => {
     renderPanel();
 
-    await userEvent.click(screen.getByRole("button", { name: /Trocar Módulo/ }));
-    expect(screen.getByText("Navegação")).toBeInTheDocument();
-    await userEvent.click(document.querySelector(".fixed.inset-0.z-40") as HTMLElement);
-    expect(screen.queryByText("Navegação")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const menu = within(screen.getByRole("dialog", { name: "Painel gerencial" }));
+    await userEvent.click(menu.getByRole("button", { name: "Pedidos" }));
+    expect(location()).toBe("/painel/pedidos");
+    expect(screen.queryByRole("dialog", { name: "Painel gerencial" })).not.toBeInTheDocument();
 
-    const [openSidebar] = screen.getAllByRole("button").filter((b) => b.className.includes("lg:hidden"));
-    await userEvent.click(openSidebar);
-    expect(document.querySelector("aside")).toHaveClass("translate-x-0");
-    await userEvent.click(document.querySelector(".bg-black\\/60") as HTMLElement);
-    expect(document.querySelector("aside")).toHaveClass("-translate-x-full");
+    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
+    await userEvent.click(screen.getByRole("button", { name: "Fechar menu" }));
+    expect(screen.queryByRole("dialog", { name: "Painel gerencial" })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Trocar Módulo/ }));
-    const sair = screen.getAllByRole("button", { name: /Sair/ });
-    await userEvent.click(sair[sair.length - 1]);
+    await userEvent.click(screen.getByRole("button", { name: "Sair do painel" }));
     expect(location()).toBe("/");
     expect(localStorage.getItem("dk_user")).toBeNull();
-  });
-
-  it("registra erro quando os pedidos não carregam", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.mocked(api.get).mockImplementation(apiRouter({ "/products": emptyPage }) as never);
-    renderPanel();
-
-    await waitFor(() => expect(error).toHaveBeenCalledWith("Erro ao carregar pedidos do dashboard", expect.any(Error)));
   });
 });
