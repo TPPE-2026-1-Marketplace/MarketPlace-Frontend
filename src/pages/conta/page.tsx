@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, Heart, LogOut, Package, User } from "lucide-react";
+import { User } from "lucide-react";
 import { buttonClassName } from "@/components/ui/button-variants";
 import EmptyState from "@/components/ui/EmptyState";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { PHONE_INVALID_MESSAGE, isValidPhone } from "@/lib/br-validators";
 import { maskCpf, maskPhone, onlyDigits } from "@/lib/utils";
 import AccountHeader from "./components/AccountHeader";
+import AccountNav, { type AccountTabKey } from "./components/AccountNav";
 import MeusDados from "./components/MeusDados";
 import MeusFavoritos from "./components/MeusFavoritos";
 import MeusPedidos from "./components/MeusPedidos";
@@ -28,18 +28,10 @@ interface AccountForm {
   cpf: string;
 }
 
-type TabKey = "dados" | "pedidos" | "favoritos";
-
-const TABS: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
-  { key: "dados", label: "Meus Dados", icon: <User className="w-4 h-4" /> },
-  { key: "pedidos", label: "Meus Pedidos", icon: <Package className="w-4 h-4" /> },
-  { key: "favoritos", label: "Favoritos", icon: <Heart className="w-4 h-4" /> },
-];
-
 export default function ContaPage() {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<TabKey>("dados");
+  const [tab, setTab] = useState<AccountTabKey>("dados");
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -77,7 +69,7 @@ export default function ContaPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 font-sans">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] font-sans">
         <EmptyState
           icon={<User className="size-7" />}
           title="Você precisa estar logada"
@@ -219,65 +211,43 @@ export default function ContaPage() {
   const displayCpf = profile?.cpf || "";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AccountHeader displayName={displayName} displayEmail={displayEmail} />
+    <div className="min-h-screen bg-[var(--background)] font-sans">
+      <AccountHeader />
 
-      <div className="mx-auto max-w-4xl px-4 py-8 font-sans sm:px-6 lg:px-8">
-        <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)} orientation="vertical">
-          <div className="flex flex-col gap-6 sm:flex-row">
-            <aside className="shrink-0 sm:w-56">
-              <div className="overflow-hidden border border-gray-100 bg-white">
-                <TabsList className="h-auto w-full flex-col items-stretch justify-start gap-0 rounded-none bg-transparent p-0">
-                  {TABS.map((t) => (
-                    <TabsTrigger
-                      key={t.key}
-                      value={t.key}
-                      className="h-auto w-full justify-start gap-3 rounded-none border-b border-gray-50 px-4 py-3 text-sm last:border-0 data-[state=active]:bg-gray-100 data-[state=active]:text-[var(--action-primary)] data-[state=active]:shadow-none"
-                    >
-                      {t.icon}
-                      {t.label}
-                      <ChevronRight className="ml-auto w-4 h-4" />
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                <button
-                  onClick={handleLogout}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-500 transition-colors hover:bg-red-50"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sair
-                </button>
-              </div>
-            </aside>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as AccountTabKey)} orientation="vertical">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:px-8">
+          <aside className="shrink-0 lg:w-60">
+            <AccountNav displayName={displayName} onLogout={handleLogout} />
+          </aside>
 
-            <div className="flex-1">
-              <TabsContent value="dados">
-                <MeusDados
-                  isEditing={isEditing}
-                  saving={saving}
-                  message={message}
-                  telefoneError={telefoneError}
-                  form={form}
-                  displayName={displayName}
-                  displayEmail={displayEmail}
-                  displayPhone={displayPhone}
-                  displayCpf={displayCpf}
-                  onEdit={handleEdit}
-                  onCancel={handleCancel}
-                  onSave={handleSave}
-                  onFieldChange={handleFieldChange}
-                />
-              </TabsContent>
-              <TabsContent value="pedidos">
-                <MeusPedidos />
-              </TabsContent>
-              <TabsContent value="favoritos">
-                <MeusFavoritos />
-              </TabsContent>
-            </div>
+          <div className="flex-1">
+            <TabsContent value="dados">
+              <MeusDados
+                isEditing={isEditing}
+                saving={saving}
+                message={message}
+                telefoneError={telefoneError}
+                form={form}
+                displayName={displayName}
+                displayEmail={displayEmail}
+                displayPhone={displayPhone}
+                displayCpf={displayCpf}
+                onEdit={handleEdit}
+                onCancel={handleCancel}
+                onSave={handleSave}
+                onFieldChange={handleFieldChange}
+                onSelectTab={setTab}
+              />
+            </TabsContent>
+            <TabsContent value="pedidos">
+              <MeusPedidos />
+            </TabsContent>
+            <TabsContent value="favoritos">
+              <MeusFavoritos />
+            </TabsContent>
           </div>
-        </Tabs>
-      </div>
+        </div>
+      </Tabs>
     </div>
   );
 }
