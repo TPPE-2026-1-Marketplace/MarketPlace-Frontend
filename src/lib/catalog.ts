@@ -36,6 +36,9 @@ export interface Product {
   destaque: boolean;
   precoBase: number;
   sku: string;
+  material?: string | null;
+  composicao?: string | null;
+  silhueta?: string | null;
   categories: Array<{ idCategoria?: number; nome: string }>;
   variants: ProductVariant[];
 }
@@ -55,6 +58,9 @@ interface ProductResponse {
   destaque?: boolean;
   precoBase?: number | string;
   sku?: string;
+  material?: string | null;
+  composicao?: string | null;
+  silhueta?: string | null;
   categories?: Array<{ idCategoria?: number; nome: string }>;
   variants?: ProductVariantResponse[];
 }
@@ -135,6 +141,9 @@ export async function normalizeProduct(raw: ProductResponse): Promise<Product> {
     destaque: raw.destaque ?? false,
     precoBase: Number(raw.precoBase ?? 0),
     sku: raw.sku ?? "",
+    material: raw.material ?? null,
+    composicao: raw.composicao ?? null,
+    silhueta: raw.silhueta ?? null,
     categories: raw.categories ?? [],
     variants: variants.filter((variant): variant is ProductVariant => variant !== null),
   };
@@ -155,3 +164,48 @@ export async function fetchProduct(idProduto: number): Promise<Product> {
   const response = await api.get<ProductResponse>(`/products/${idProduto}`);
   return normalizeProduct(response);
 }
+
+export interface ProductReview {
+  idProduto: number;
+  nota: number;
+  comentario: string | null;
+  dataAvaliacao: string;
+  cliente: { nome: string };
+  compraVerificada?: boolean;
+}
+
+export interface ProductReviewsResponse {
+  data: ProductReview[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+  media: number;
+  totalAvaliacoes: number;
+  distribuicao: {
+    "1": number;
+    "2": number;
+    "3": number;
+    "4": number;
+    "5": number;
+  };
+}
+
+export async function fetchProductReviews(
+  productId: number,
+  page = 1,
+  limit = 10,
+): Promise<ProductReviewsResponse> {
+  try {
+    return await api.get<ProductReviewsResponse>(
+      `/reviews/product/${productId}`,
+      { page, limit },
+    );
+  } catch {
+    return {
+      data: [],
+      meta: { page, limit, total: 0, totalPages: 0 },
+      media: 0,
+      totalAvaliacoes: 0,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+    };
+  }
+}
+

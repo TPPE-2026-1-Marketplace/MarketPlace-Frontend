@@ -2,7 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
-import { fetchProduct, fetchProducts } from "@/lib/catalog";
+import { fetchProduct, fetchProducts, fetchProductReviews } from "@/lib/catalog";
 import { makeProduct, makeVariant } from "@/test/factories";
 import { renderWithProviders } from "@/test/render";
 import ProductDetailPage from "./page";
@@ -11,6 +11,7 @@ vi.mock("@/lib/catalog", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/catalog")>()),
   fetchProduct: vi.fn(),
   fetchProducts: vi.fn(),
+  fetchProductReviews: vi.fn(),
 }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
@@ -24,6 +25,9 @@ const vestido = makeProduct({
   titulo: "Vestido Gala",
   precoBase: 1000,
   descricao: "Longo bordado",
+  material: "Chiffon Nobre",
+  composicao: "100% Seda",
+  silhueta: "Princesa",
   variants: [
     makeVariant({ codigoSku: "ROSA-38", cor: "Rosa", tamanho: "38", precoVariante: 800, images: [img(1), img(2)], stock: { qtdOnline: 2, qtdLojaFisica: 1 } }),
     makeVariant({ codigoSku: "ROSA-40", cor: "Rosa", tamanho: "40", precoVariante: 800, images: [img(3)], stock: { qtdOnline: 0, qtdLojaFisica: 0 } }),
@@ -47,6 +51,21 @@ describe("ProductDetailPage", () => {
     vi.mocked(fetchProducts).mockResolvedValue({
       data: [vestido, makeProduct({ idProduto: 8, titulo: "Relacionado" })],
       meta: { page: 1, limit: 4, total: 2, totalPages: 1 },
+    });
+    vi.mocked(fetchProductReviews).mockResolvedValue({
+      data: [
+        {
+          idProduto: 7,
+          nota: 5,
+          comentario: "Vestido maravilhoso!",
+          dataAvaliacao: "2026-03-10T12:00:00Z",
+          cliente: { nome: "Mariana L." },
+        },
+      ],
+      meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      media: 4.8,
+      totalAvaliacoes: 327,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 15, "5": 312 },
     });
   });
 
@@ -179,6 +198,9 @@ describe("ProductDetailPage", () => {
     expect(screen.getAllByRole("row").map((r) => r.firstChild?.textContent)).toEqual(["Tam.", "38", "40"]);
     await userEvent.click(screen.getByRole("button", { name: "Informações" }));
     expect(screen.queryByText("Busto (cm)")).not.toBeInTheDocument();
+    expect(screen.getByText("Chiffon Nobre")).toBeInTheDocument();
+    expect(screen.getByText("100% Seda")).toBeInTheDocument();
+    expect(screen.getByText("Princesa")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Ver medidas/ }));
     expect(screen.getByRole("heading", { name: "Guia de Medidas" })).toBeInTheDocument();
@@ -187,5 +209,197 @@ describe("ProductDetailPage", () => {
     expect(screen.queryByRole("heading", { name: "Guia de Medidas" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Voltar/ }));
+  });
+
+  it("abre o modal de foto ampliada, alterna zoom e navega pelas imagens", async () => {
+    await renderProduct();
+
+    await userEvent.click(screen.getByRole("button", { name: /Toque na imagem para ampliar/i }));
+    expect(screen.getByRole("dialog", { name: /Foto ampliada de Vestido Gala/i })).toBeInTheDocument();
+
+    const zoomToggle = screen.getByRole("button", { name: /Ativar zoom 2.5x/i });
+    expect(zoomToggle).toBeInTheDocument();
+    await userEvent.click(zoomToggle);
+    expect(screen.getByRole("button", { name: /Desativar zoom/i })).toBeInTheDocument();
+
+    const nextModalBtn = screen.getByRole("button", { name: "Próxima foto" });
+    await userEvent.click(nextModalBtn);
+
+    await userEvent.click(screen.getByRole("button", { name: "Fechar imagem" }));
+    expect(screen.queryByRole("dialog", { name: /Foto ampliada de Vestido Gala/i })).not.toBeInTheDocument();
+  });
+
+  it("exibe avaliações e nota média carregadas via API", async () => {
+    await renderProduct();
+
+    expect(screen.getByText("Mariana L.")).toBeInTheDocument();
+    expect(screen.getByText("Vestido maravilhoso!")).toBeInTheDocument();
+    expect(screen.getByText("Avaliações dos clientes (327)")).toBeInTheDocument();
+  });
+
+  it("busca produtos relacionados filtrando pela categoria do produto", async () => {
+    await renderProduct();
+
+    expect(fetchProducts).toHaveBeenCalledWith({
+      page: 1,
+      limit: 5,
+      categoryId: 1,
+    });
+  });
+
+  it("desabilita compra para produto de tamanho unico sem cor com estoque zerado", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 99,
+        titulo: "Vestido Tamanho Unico Esgotado",
+        variants: [
+          makeVariant({
+            codigoSku: "UNICO-ZERO",
+            cor: null,
+            tamanho: null,
+            ativo: true,
+            stock: { qtdOnline: 0, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Comprar Agora" })).toBeDisabled();
+    expect(screen.getByTestId("add-to-cart")).toBeDisabled();
+    expect(screen.getByText("0 disponível online")).toBeInTheDocument();
+  });
+
+  it("desabilita compra quando todas as variantes estao inativas", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 98,
+        titulo: "Vestido Variantes Inativas",
+        variants: [
+          makeVariant({
+            codigoSku: "INATIVO-1",
+            cor: "Azul",
+            tamanho: "38",
+            ativo: false,
+            stock: { qtdOnline: 10, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Comprar Agora" })).toBeDisabled();
+    expect(screen.getByTestId("add-to-cart")).toBeDisabled();
+  });
+
+  it("exibe tamanhos numericos plus size (48 a 58) no guia de medidas quando presentes no produto", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 97,
+        titulo: "Vestido Plus Size",
+        variants: [
+          makeVariant({
+            codigoSku: "PLUS-48",
+            tamanho: "48",
+            ativo: true,
+            stock: { qtdOnline: 5, qtdLojaFisica: 0 },
+          }),
+          makeVariant({
+            codigoSku: "PLUS-50",
+            tamanho: "50",
+            ativo: true,
+            stock: { qtdOnline: 5, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Guia de Medidas" }));
+    expect(screen.getAllByRole("row").map((r) => r.firstChild?.textContent)).toEqual(["Tam.", "48", "50"]);
+  });
+
+  it("marca cor como indisponivel quando todas as suas variantes ativas estao com estoque zerado", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 96,
+        titulo: "Vestido Cores",
+        variants: [
+          makeVariant({
+            codigoSku: "AZUL-DISP",
+            cor: "Azul",
+            tamanho: "38",
+            ativo: true,
+            stock: { qtdOnline: 5, qtdLojaFisica: 0 },
+          }),
+          makeVariant({
+            codigoSku: "VERMELHO-ESGOTADO",
+            cor: "Vermelho",
+            tamanho: "38",
+            ativo: true,
+            stock: { qtdOnline: 0, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    const redButton = screen.getByRole("button", { name: "Vermelho" });
+    expect(redButton).toBeDisabled();
+    expect(redButton).toHaveClass("cursor-not-allowed");
+
+    const blueButton = screen.getByRole("button", { name: "Azul" });
+    expect(blueButton).not.toBeDisabled();
+  });
+
+  it("exibe badge de compra verificada apenas quando compraVerificada for true", async () => {
+    vi.mocked(fetchProductReviews).mockResolvedValueOnce({
+      data: [
+        {
+          idProduto: 7,
+          nota: 5,
+          comentario: "Avaliação normal",
+          dataAvaliacao: "2026-03-10T12:00:00Z",
+          cliente: { nome: "Cliente 1" },
+          compraVerificada: false,
+        },
+        {
+          idProduto: 7,
+          nota: 4,
+          comentario: "Avaliação verificada",
+          dataAvaliacao: "2026-03-11T12:00:00Z",
+          cliente: { nome: "Cliente 2" },
+          compraVerificada: true,
+        },
+      ],
+      meta: { page: 1, limit: 10, total: 2, totalPages: 1 },
+      media: 4.5,
+      totalAvaliacoes: 2,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 1, "5": 1 },
+    });
+
+    await renderProduct();
+
+    expect(screen.getByText("Cliente 1")).toBeInTheDocument();
+    expect(screen.getByText("Cliente 2")).toBeInTheDocument();
+    expect(screen.getAllByText("Compra verificada")).toHaveLength(1);
+  });
+
+  it("alinha estado desabilitado da barra mobile com a variante ativa inativa", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 95,
+        titulo: "Vestido Variante Inativa Com Estoque",
+        variants: [
+          makeVariant({
+            codigoSku: "INATIVA-COM-ESTOQUE",
+            cor: "Azul",
+            tamanho: "38",
+            ativo: false,
+            stock: { qtdOnline: 10, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    const mobileButtons = screen.getAllByRole("button", { name: "Esgotado" });
+    expect(mobileButtons.length).toBeGreaterThanOrEqual(1);
+    expect(mobileButtons[mobileButtons.length - 1]).toBeDisabled();
   });
 });

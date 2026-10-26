@@ -29,6 +29,7 @@ help:
 	@echo "  make install          Instala dependencias localmente com pnpm"
 	@echo "  make dev              Sobe o Next.js localmente em modo desenvolvimento"
 	@echo "  make lint             Executa o lint do projeto"
+	@echo "  make test             Executa os testes localmente com pnpm"
 	@echo "  make build            Gera o build local de producao"
 	@echo "  make start            Inicia a aplicacao local usando o build"
 	@echo "  make selenium         Executa Selenium contra SELENIUM_BASE_URL (producao)"
@@ -41,6 +42,9 @@ help:
 	@echo "  make dev-down         Derruba o ambiente Docker de desenvolvimento"
 	@echo "  make dev-logs         Exibe logs do ambiente Docker de desenvolvimento"
 	@echo "  make dev-shell        Abre um shell no container da aplicacao"
+	@echo "  make dev-test         Executa os testes no container (path=<pattern> para filtrar)"
+	@echo "  make dev-test-cov     Executa os testes com relatorio de cobertura no container"
+	@echo "  make dev-lint         Executa o lint dentro do container"
 	@echo "  make dev-build        Apenas constroi a imagem de desenvolvimento"
 	@echo "  make dev-rebuild      Constroi e sobe o ambiente Docker de desenvolvimento"
 	@echo "  make dev-reset        Derruba o ambiente e REMOVE OS VOLUMES (apaga banco!)"
@@ -81,6 +85,9 @@ dev:
 
 lint:
 	pnpm lint
+
+test:
+	pnpm test
 
 build:
 	pnpm build
@@ -165,6 +172,15 @@ dev-logs:
 
 dev-shell:
 	$(COMPOSE_DEV) exec $(SERVICE) sh
+
+dev-test:
+	$(COMPOSE_DEV) exec $(SERVICE) pnpm test $(path)
+
+dev-test-cov:
+	$(COMPOSE_DEV) exec $(SERVICE) pnpm test:coverage
+
+dev-lint:
+	$(COMPOSE_DEV) exec $(SERVICE) pnpm lint
 
 dev-build:
 	$(COMPOSE_DEV) build $(SERVICE)
