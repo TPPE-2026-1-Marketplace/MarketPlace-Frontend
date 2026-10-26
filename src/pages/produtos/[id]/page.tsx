@@ -6,9 +6,11 @@ import { useFavorites } from "@/context/FavoritesContext";
 import {
   fetchProduct,
   fetchProducts,
+  fetchProductReviews,
   findVariant,
   getDisplayVariant,
   type Product,
+  type ProductReview,
 } from "@/lib/catalog";
 import ImageGallery from "@/components/ui/ImageGallery";
 import { ProductBreadcrumb } from "@/components/product/ProductBreadcrumb";
@@ -29,6 +31,9 @@ export default function ProductDetailPage() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [selectedSize, setSelectedSize] = useState("");
@@ -43,9 +48,10 @@ export default function ProductDetailPage() {
     window.scrollTo(0, 0);
     async function loadData() {
       try {
-        const [loadedProduct, relatedResponse] = await Promise.all([
+        const [loadedProduct, relatedResponse, reviewsResponse] = await Promise.all([
           fetchProduct(Number(id)),
           fetchProducts({ page: 1, limit: 4 }),
+          fetchProductReviews(Number(id)),
         ]);
         const initialVariant = getDisplayVariant(loadedProduct);
         setProduct(loadedProduct);
@@ -57,6 +63,9 @@ export default function ProductDetailPage() {
             (relatedProduct) => relatedProduct.idProduto !== loadedProduct.idProduto,
           ),
         );
+        setReviews(reviewsResponse.data);
+        setAverageRating(reviewsResponse.media);
+        setTotalReviews(reviewsResponse.totalAvaliacoes);
       } catch (loadError) {
         console.error(loadError);
       } finally {
@@ -230,6 +239,8 @@ export default function ProductDetailPage() {
             added={added}
             onAddToCart={handleAddToCart}
             onBuyNow={handleBuyNow}
+            averageRating={averageRating}
+            totalReviews={totalReviews}
           />
         </div>
 
@@ -244,8 +255,12 @@ export default function ProductDetailPage() {
           selectedSize={selectedSize}
         />
 
-        {/* Seção de Avaliações dos Clientes (Figma 4.8 / 327 avaliações) */}
-        <ProductReviewsSection />
+        {/* Seção de Avaliações dos Clientes */}
+        <ProductReviewsSection
+          reviews={reviews}
+          averageRating={averageRating}
+          totalReviews={totalReviews}
+        />
 
         {/* Vitrine de Produtos Relacionados */}
         <ProductRelatedSection products={related} />

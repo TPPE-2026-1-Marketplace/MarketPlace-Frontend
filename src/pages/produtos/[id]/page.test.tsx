@@ -2,7 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
-import { fetchProduct, fetchProducts } from "@/lib/catalog";
+import { fetchProduct, fetchProducts, fetchProductReviews } from "@/lib/catalog";
 import { makeProduct, makeVariant } from "@/test/factories";
 import { renderWithProviders } from "@/test/render";
 import ProductDetailPage from "./page";
@@ -11,6 +11,7 @@ vi.mock("@/lib/catalog", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/catalog")>()),
   fetchProduct: vi.fn(),
   fetchProducts: vi.fn(),
+  fetchProductReviews: vi.fn(),
 }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
@@ -47,6 +48,21 @@ describe("ProductDetailPage", () => {
     vi.mocked(fetchProducts).mockResolvedValue({
       data: [vestido, makeProduct({ idProduto: 8, titulo: "Relacionado" })],
       meta: { page: 1, limit: 4, total: 2, totalPages: 1 },
+    });
+    vi.mocked(fetchProductReviews).mockResolvedValue({
+      data: [
+        {
+          idProduto: 7,
+          nota: 5,
+          comentario: "Vestido maravilhoso!",
+          dataAvaliacao: "2026-03-10T12:00:00Z",
+          cliente: { nome: "Mariana L." },
+        },
+      ],
+      meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      media: 4.8,
+      totalAvaliacoes: 327,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 15, "5": 312 },
     });
   });
 
@@ -205,5 +221,13 @@ describe("ProductDetailPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Fechar imagem" }));
     expect(screen.queryByRole("dialog", { name: /Foto ampliada de Vestido Gala/i })).not.toBeInTheDocument();
+  });
+
+  it("exibe avaliações e nota média carregadas via API", async () => {
+    await renderProduct();
+
+    expect(screen.getByText("Mariana L.")).toBeInTheDocument();
+    expect(screen.getByText("Vestido maravilhoso!")).toBeInTheDocument();
+    expect(screen.getByText("Avaliações dos clientes (327)")).toBeInTheDocument();
   });
 });

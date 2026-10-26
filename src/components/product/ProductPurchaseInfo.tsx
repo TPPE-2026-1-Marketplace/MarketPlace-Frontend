@@ -28,6 +28,8 @@ interface ProductPurchaseInfoProps {
   added: boolean;
   onAddToCart: () => void;
   onBuyNow: () => void;
+  averageRating?: number;
+  totalReviews?: number;
   className?: string;
 }
 
@@ -52,6 +54,8 @@ export function ProductPurchaseInfo({
   added,
   onAddToCart,
   onBuyNow,
+  averageRating = 0,
+  totalReviews = 0,
   className,
 }: ProductPurchaseInfoProps) {
   const hasVariants = colors.length > 0 || sizes.length > 0;
@@ -73,15 +77,36 @@ export function ProductPurchaseInfo({
         {title}
       </h1>
 
-      {/* Avaliação em estrelas (Figma: ★★★★★ 4,8 · 327 avaliações) */}
+      {/* Avaliação em estrelas dinâmica */}
       <div className="flex items-center gap-2 mb-4">
         <div className="flex items-center gap-0.5 text-[var(--action-primary)]">
-          {[1, 2, 3, 4, 5].map((s) => (
-            <Star key={s} className="size-3.5 fill-[var(--action-primary)] text-[var(--action-primary)]" />
-          ))}
+          {[1, 2, 3, 4, 5].map((s) => {
+            const isFilled = s <= Math.round(averageRating);
+            return (
+              <Star
+                key={s}
+                className={cn(
+                  "size-3.5",
+                  isFilled
+                    ? "fill-[var(--action-primary)] text-[var(--action-primary)]"
+                    : "text-[var(--border-control)]",
+                )}
+              />
+            );
+          })}
         </div>
         <span className="text-xs font-sans text-[var(--foreground-secondary)]">
-          4,8 · 327 avaliações
+          {totalReviews > 0 ? (
+            <>
+              {averageRating.toLocaleString("pt-BR", {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              })}{" "}
+              · {totalReviews} {totalReviews === 1 ? "avaliação" : "avaliações"}
+            </>
+          ) : (
+            "Sem avaliações ainda"
+          )}
         </span>
       </div>
 

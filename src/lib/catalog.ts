@@ -155,3 +155,47 @@ export async function fetchProduct(idProduto: number): Promise<Product> {
   const response = await api.get<ProductResponse>(`/products/${idProduto}`);
   return normalizeProduct(response);
 }
+
+export interface ProductReview {
+  idProduto: number;
+  nota: number;
+  comentario: string | null;
+  dataAvaliacao: string;
+  cliente: { nome: string };
+}
+
+export interface ProductReviewsResponse {
+  data: ProductReview[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+  media: number;
+  totalAvaliacoes: number;
+  distribuicao: {
+    "1": number;
+    "2": number;
+    "3": number;
+    "4": number;
+    "5": number;
+  };
+}
+
+export async function fetchProductReviews(
+  productId: number,
+  page = 1,
+  limit = 10,
+): Promise<ProductReviewsResponse> {
+  try {
+    return await api.get<ProductReviewsResponse>(
+      `/reviews/product/${productId}`,
+      { page, limit },
+    );
+  } catch {
+    return {
+      data: [],
+      meta: { page: 1, limit, total: 0, totalPages: 0 },
+      media: 0,
+      totalAvaliacoes: 0,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+    };
+  }
+}
+
