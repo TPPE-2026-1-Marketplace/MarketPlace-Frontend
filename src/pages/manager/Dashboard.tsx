@@ -53,7 +53,7 @@ function RestrictedAccess() {
 }
 
 export function ManagerDashboard() {
-  const { user, logout, isManager, isSuperAdmin, isInternalUser, canEditUsers, canEditStock } = useAuth();
+  const { user, logout, isManager, isSuperAdmin, isInternalUser, canEditUsers, canEditStock, canEditOrders } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const pathPart = location.pathname.split("/")[2];
@@ -101,7 +101,7 @@ export function ManagerDashboard() {
     >
       {tab === "dashboard" && <Overview />}
       {tab === "estoque" && <Inventory readOnly={!canEditStock} />}
-      {tab === "pedidos" && <Orders />}
+      {tab === "pedidos" && <Orders readOnly={!canEditOrders} />}
       {tab === "vendas-pdv" && <POSSales />}
       {tab === "relatorios" && <Reports />}
       {tab === "comissoes" && <Commissions />}
