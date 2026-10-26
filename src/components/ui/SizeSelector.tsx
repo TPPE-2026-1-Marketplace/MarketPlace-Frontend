@@ -34,10 +34,14 @@ export default function SizeSelector({
   const activeSize = selectedSize ?? selectedSku ?? "";
 
   return (
-    <div className={cn("mb-5", className)}>
+    <div
+      role="group"
+      aria-label="Seleção de tamanho"
+      className={cn("mb-5", className)}
+    >
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
-          <label className="text-[var(--foreground-secondary)] text-sm font-medium">Tamanho:</label>
+          <span className="text-[var(--foreground-secondary)] text-sm font-medium">Tamanho:</span>
           {activeSize && (
             <span className="text-[var(--foreground)] text-sm font-semibold">{activeSize}</span>
           )}

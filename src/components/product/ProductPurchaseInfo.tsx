@@ -182,10 +182,10 @@ export function ProductPurchaseInfo({
 
       {/* Quantidade e Estoque (Figma: Typography/UI/Title nos botões) */}
       <div className="mb-6">
-        <label className="text-[var(--foreground-secondary)] text-sm mb-2.5 block font-medium font-sans">
+        <span className="text-[var(--foreground-secondary)] text-sm mb-2.5 block font-medium font-sans">
           Quantidade:
-        </label>
-        <div className="flex items-center gap-3">
+        </span>
+        <div className="flex items-center gap-3" role="group" aria-label="Controle de quantidade">
           <div className="flex items-center border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--background-card)] overflow-hidden">
             <button
               type="button"

@@ -40,10 +40,7 @@ export function SizeGuideModal({
         aria-modal="true"
         aria-labelledby="size-guide-modal-title"
       >
-        <div
-          className="bg-[var(--background-card)] rounded-[var(--radius-xl)] max-w-lg w-full p-6 shadow-xl relative border border-[var(--border)]"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="bg-[var(--background-card)] rounded-[var(--radius-xl)] max-w-lg w-full p-6 shadow-xl relative border border-[var(--border)]">
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-[var(--border)] mb-5">
             <h2

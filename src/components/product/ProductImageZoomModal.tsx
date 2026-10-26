@@ -157,10 +157,7 @@ export function ProductImageZoomModal({
         aria-modal="true"
         aria-label={`Foto ampliada de ${productName}`}
       >
-        <div
-          className="bg-[var(--background-card)] rounded-[var(--radius-xl)] max-w-4xl w-full p-4 sm:p-5 shadow-2xl relative border border-[var(--border)] flex flex-col gap-3 my-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="bg-[var(--background-card)] rounded-[var(--radius-xl)] max-w-4xl w-full p-4 sm:p-5 shadow-2xl relative border border-[var(--border)] flex flex-col gap-3 my-auto">
           {/* Header Superior do Modal */}
           <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
             <div className="flex items-center gap-2 text-xs font-sans text-[var(--foreground-secondary)]">
@@ -212,8 +209,15 @@ export function ProductImageZoomModal({
           {/* Área da Imagem Ampliada com Lupa / Zoom Interativo */}
           <div className="relative w-full h-[55vh] sm:h-[65vh] md:h-[70vh] flex items-center justify-center overflow-hidden rounded-[var(--radius-lg)] bg-[var(--background-secondary)] select-none">
             <div
+              role="button"
+              tabIndex={0}
+              aria-label={
+                showZoom
+                  ? "Reduzir zoom dos detalhes da imagem"
+                  : "Ampliar detalhes da imagem"
+              }
               className={cn(
-                "relative w-full h-full flex items-center justify-center overflow-hidden",
+                "relative w-full h-full flex items-center justify-center overflow-hidden focus:outline-hidden",
                 showZoom ? "cursor-zoom-out" : "cursor-zoom-in",
               )}
               onMouseMove={handleMouseMove}
@@ -221,6 +225,12 @@ export function ProductImageZoomModal({
               onMouseLeave={handleMouseLeave}
               onTouchMove={handleTouchMove}
               onClick={toggleZoom}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleZoom();
+                }
+              }}
             >
               <img
                 src={currentImageUrl}

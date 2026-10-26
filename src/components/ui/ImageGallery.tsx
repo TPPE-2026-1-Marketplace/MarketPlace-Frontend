@@ -104,8 +104,17 @@ export default function ImageGallery({
       {/* Main Image Container (Figma: Desktop 544x632px, Mobile 343x420px) */}
       <div className="flex-1 relative">
         <div
+          role="button"
+          tabIndex={0}
+          aria-label={`Ampliar imagem de ${productName}`}
           onClick={() => setIsZoomOpen(true)}
-          className="relative aspect-[3/4] rounded-[var(--radius-lg)] overflow-hidden bg-[var(--background-secondary)] border border-[var(--border)] shadow-sm cursor-zoom-in group"
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setIsZoomOpen(true);
+            }
+          }}
+          className="relative aspect-[3/4] rounded-[var(--radius-lg)] overflow-hidden bg-[var(--background-secondary)] border border-[var(--border)] shadow-sm cursor-zoom-in group focus:outline-hidden"
         >
           <img
             src={currentImageUrl}

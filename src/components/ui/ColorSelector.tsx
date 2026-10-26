@@ -45,9 +45,13 @@ export default function ColorSelector({
   const activeColor = selectedColor ?? selectedColorCode ?? "";
 
   return (
-    <div className={cn("mb-5", className)}>
+    <div
+      role="group"
+      aria-label="Seleção de cor"
+      className={cn("mb-5", className)}
+    >
       <div className="flex items-center gap-2 mb-2.5">
-        <label className="text-[var(--foreground-secondary)] text-sm font-medium">Cor:</label>
+        <span className="text-[var(--foreground-secondary)] text-sm font-medium">Cor:</span>
         {activeColor && (
           <span className="text-[var(--foreground)] text-sm font-semibold">{activeColor}</span>
         )}
