@@ -1,6 +1,5 @@
 import { Package } from "lucide-react";
 import Badge from "@/components/ui/Badge";
-import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrders, type OrderStatus } from "@/hooks/useOrders";
@@ -26,38 +25,44 @@ export default function MeusPedidos() {
   const { orders, isLoading } = useOrders();
 
   return (
-    <Card className="gap-5 rounded-none border-[var(--border)] p-6">
-      <h2 className="font-serif text-xl text-gray-900">Meus Pedidos</h2>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-xl font-semibold text-[var(--foreground)]">Meus pedidos</h2>
+        <p className="mt-1 text-sm text-[var(--foreground-secondary)]">Acompanhe o andamento das suas compras.</p>
+      </div>
 
       {isLoading ? (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           {[1, 2].map((i) => (
-            <Skeleton key={i} className="h-20 rounded-none" />
+            <Skeleton key={i} className="h-28 rounded-[var(--radius-lg)]" />
           ))}
         </div>
       ) : orders.length === 0 ? (
         <EmptyState icon={<Package className="size-7" />} title="Você ainda não tem pedidos." />
       ) : (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           {orders.map((order) => (
             <div
               key={order.idPedido}
-              className="flex items-center justify-between border border-gray-100 p-4"
+              className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-card)] p-6"
             >
-              <div>
-                <p className="text-sm text-gray-900">Pedido #{order.idPedido}</p>
-                <p className="mt-0.5 text-xs text-gray-400">
-                  {formatDate(order.dataPedido)} · {formatItemCount(order.itemCount)}
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  Pedido #DK{String(order.idPedido).padStart(4, "0")}
                 </p>
-              </div>
-              <div className="flex items-center gap-3">
                 <Badge variant={STATUS_VARIANT[order.status]}>{STATUS_LABEL[order.status]}</Badge>
-                <span className="text-sm text-gray-900">{formatCurrency(order.valorTotal)}</span>
+              </div>
+              <p className="text-xs text-[var(--foreground-secondary)]">
+                Realizado em {formatDate(order.dataPedido)}
+              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-[var(--foreground-secondary)]">{formatItemCount(order.itemCount)}</p>
+                <p className="text-sm font-semibold text-[var(--foreground)]">{formatCurrency(order.valorTotal)}</p>
               </div>
             </div>
           ))}
         </div>
       )}
-    </Card>
+    </div>
   );
 }

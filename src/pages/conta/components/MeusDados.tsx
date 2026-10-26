@@ -1,7 +1,7 @@
-import { Edit2, Save, X } from "lucide-react";
 import Button from "@/components/ui/Button";
-import { Card } from "@/components/ui/card";
+import { buttonClassName } from "@/components/ui/button-variants";
 import Input from "@/components/ui/Input";
+import type { AccountTabKey } from "./AccountNav";
 
 interface MeusDadosForm {
   name: string;
@@ -24,26 +24,17 @@ interface MeusDadosProps {
   onCancel: () => void;
   onSave: () => void;
   onFieldChange: (key: keyof MeusDadosForm, value: string) => void;
+  onSelectTab: (tab: AccountTabKey) => void;
 }
 
-const FIELDS: Array<{ label: string; key: keyof MeusDadosForm; type: string }> = [
-  { label: "Nome", key: "name", type: "text" },
-  { label: "E-mail", key: "email", type: "email" },
-  { label: "Telefone", key: "telefone", type: "tel" },
-  { label: "CPF", key: "cpf", type: "text" },
-];
-
-const DISPLAY_ROWS = (
-  displayName: string,
-  displayEmail: string,
-  displayPhone: string,
-  displayCpf: string,
-): Array<[string, string]> => [
-  ["Nome", displayName],
-  ["E-mail", displayEmail],
-  ["Telefone", displayPhone || "Não informado"],
-  ["CPF", displayCpf ? `***.***.***-${displayCpf.slice(-2)}` : "Não informado"],
-];
+function DadoDeLeitura({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <div className="flex flex-1 flex-col gap-2">
+      <p className="text-xs text-[var(--foreground-secondary)]">{rotulo}</p>
+      <p className="text-sm font-medium text-[var(--foreground)]">{valor}</p>
+    </div>
+  );
+}
 
 export default function MeusDados({
   isEditing,
@@ -59,72 +50,130 @@ export default function MeusDados({
   onCancel,
   onSave,
   onFieldChange,
+  onSelectTab,
 }: MeusDadosProps) {
   return (
-    <Card className="gap-5 rounded-none border-[var(--border)] p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="font-serif text-xl text-gray-900">Meus Dados</h2>
-        {!isEditing ? (
-          <button
-            onClick={onEdit}
-            className="flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-gray-800"
+    <div className="flex flex-col gap-6" data-testid="meus-dados">
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <button
+          onClick={() => onSelectTab("pedidos")}
+          className="flex flex-1 flex-col items-start gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-card)] p-6 text-left transition-colors hover:border-[var(--border-hover)]"
+        >
+          <p className="text-sm font-semibold text-[var(--foreground)]">Meus pedidos →</p>
+          <p className="text-xs text-[var(--foreground-secondary)]">Acompanhe suas compras</p>
+        </button>
+        <button
+          onClick={() => onSelectTab("favoritos")}
+          className="flex flex-1 flex-col items-start gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-card)] p-6 text-left transition-colors hover:border-[var(--border-hover)]"
+        >
+          <p className="text-sm font-semibold text-[var(--foreground)]">Meus favoritos →</p>
+          <p className="text-xs text-[var(--foreground-secondary)]">Veja os vestidos que você salvou</p>
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-6 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-card)] p-6">
+        {message && (
+          <div
+            className={
+              message.type === "success"
+                ? "border border-green-200 bg-green-50 p-3 text-sm text-green-700"
+                : "border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            }
           >
-            <Edit2 className="w-4 h-4" /> Editar
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onCancel}
-              className="flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-gray-800"
-            >
-              <X className="w-4 h-4" /> Cancelar
-            </button>
-            <Button onClick={onSave} disabled={saving} loading={saving} size="sm" className="gap-1">
-              {!saving && <Save className="w-4 h-4" />}
-              Salvar
-            </Button>
+            {message.text}
           </div>
+        )}
+
+        {isEditing ? (
+          <>
+            <div>
+              <h2 className="text-xl font-semibold text-[var(--foreground)]">Editar dados pessoais</h2>
+              <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+                Mantenha seus dados atualizados para facilitar suas compras.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <Input
+                label="Nome completo"
+                value={form.name}
+                onChange={(e) => onFieldChange("name", e.target.value)}
+                placeholder="Informe seu nome"
+                containerClassName="flex-1"
+              />
+              <Input
+                label="E-mail"
+                type="email"
+                value={form.email}
+                onChange={(e) => onFieldChange("email", e.target.value)}
+                placeholder="Informe seu e-mail"
+                containerClassName="flex-1"
+              />
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <Input
+                label="Telefone"
+                type="tel"
+                inputMode="tel"
+                value={form.telefone}
+                error={telefoneError ?? undefined}
+                onChange={(e) => onFieldChange("telefone", e.target.value)}
+                placeholder="Informe seu telefone"
+                containerClassName="flex-1"
+              />
+              <Input
+                label="CPF"
+                value={form.cpf}
+                disabled
+                helper="O CPF é a chave da sua conta e não pode ser alterado."
+                placeholder="Informe seu cpf"
+                containerClassName="flex-1"
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button onClick={onSave} disabled={saving} loading={saving} variant="action" size="touch">
+                Salvar alterações
+              </Button>
+              <button onClick={onCancel} className={buttonClassName({ variant: "outline-neutral", size: "touch" })}>
+                Cancelar
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--foreground)]">Dados pessoais</h2>
+                <p className="mt-1 text-sm text-[var(--foreground-secondary)]">Confira as informações da sua conta.</p>
+              </div>
+              <button onClick={onEdit} className={buttonClassName({ variant: "outline-neutral", size: "touch" })}>
+                Editar dados
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4 sm:flex-row">
+              <DadoDeLeitura rotulo="Nome completo" valor={displayName} />
+              <DadoDeLeitura rotulo="E-mail" valor={displayEmail} />
+            </div>
+            <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4 sm:flex-row">
+              <DadoDeLeitura rotulo="Telefone" valor={displayPhone || "Não informado"} />
+              <DadoDeLeitura
+                rotulo="CPF"
+                valor={displayCpf ? `***.***.***-${displayCpf.slice(-2)}` : "Não informado"}
+              />
+            </div>
+          </>
         )}
       </div>
 
-      {message && (
-        <div
-          className={
-            message.type === "success"
-              ? "border border-green-200 bg-green-50 p-3 text-sm text-green-700"
-              : "border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-          }
-        >
-          {message.text}
-        </div>
-      )}
-
-      {isEditing ? (
-        <div className="space-y-4">
-          {FIELDS.map((field) => (
-            <Input
-              key={field.key}
-              label={field.label}
-              type={field.type}
-              inputMode={field.key === "telefone" ? "tel" : undefined}
-              disabled={field.key === "cpf"}
-              value={form[field.key]}
-              error={field.key === "telefone" ? (telefoneError ?? undefined) : undefined}
-              onChange={(e) => onFieldChange(field.key, e.target.value)}
-              placeholder={`Informe seu ${field.label.toLowerCase()}`}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-1">
-          {DISPLAY_ROWS(displayName, displayEmail, displayPhone, displayCpf).map(([label, value]) => (
-            <div key={label} className="flex gap-4 border-b border-gray-50 py-3 last:border-0">
-              <span className="w-36 shrink-0 text-sm text-gray-400">{label}</span>
-              <span className="text-sm text-gray-900">{value || "Não informado"}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
+      <div className="rounded-[var(--radius-lg)] bg-[var(--background-secondary)] p-6">
+        <p className="text-sm font-semibold text-[var(--foreground)]">Seus dados, com cuidado</p>
+        <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+          Seus dados são usados para processar pedidos, entregas e o atendimento da sua conta.
+        </p>
+      </div>
+    </div>
   );
 }

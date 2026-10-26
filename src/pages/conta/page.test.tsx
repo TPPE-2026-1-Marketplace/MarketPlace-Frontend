@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
@@ -25,8 +25,12 @@ function renderConta(u = user) {
   return renderWithProviders(<ContaPage />, { user: u });
 }
 
+function meusDados() {
+  return within(screen.getByTestId("meus-dados"));
+}
+
 async function startEditing() {
-  await screen.findByText("Cliente Perfil", { selector: "h1" });
+  await meusDados().findByText("Cliente Perfil");
   await userEvent.click(screen.getByRole("button", { name: /Editar/ }));
 }
 
@@ -56,7 +60,7 @@ describe("ContaPage", () => {
   it("carrega o perfil do backend e mascara o CPF", async () => {
     renderConta();
 
-    expect(await screen.findByText("Cliente Perfil", { selector: "h1" })).toBeInTheDocument();
+    expect(await meusDados().findByText("Cliente Perfil")).toBeInTheDocument();
     expect(getMock).toHaveBeenCalledWith("/people/12345678900");
     expect(screen.getByText("***.***.***-00")).toBeInTheDocument();
     expect(screen.getByText("61999990000")).toBeInTheDocument();
@@ -67,7 +71,7 @@ describe("ContaPage", () => {
     renderConta({ ...customer, id: "abc" });
     await waitFor(() => expect(getMock).toHaveBeenCalled());
 
-    expect(screen.getByText("Cliente DK", { selector: "h1" })).toBeInTheDocument();
+    expect(await meusDados().findByText("Cliente DK")).toBeInTheDocument();
     expect(screen.getAllByText("Não informado")).toHaveLength(2);
 
     await userEvent.click(screen.getByRole("button", { name: /Editar/ }));
@@ -93,7 +97,7 @@ describe("ContaPage", () => {
     expect(await screen.findByText("Dados atualizados com sucesso!")).toBeInTheDocument();
     expect(patchMock).toHaveBeenCalledWith("/people/12345678900", { nome: "Nome Novo", telefone: null });
     expect(JSON.parse(localStorage.getItem("dk_user")!).name).toBe("Nome Novo");
-    expect(screen.getByText("Nome Novo", { selector: "h1" })).toBeInTheDocument();
+    expect(await meusDados().findByText("Nome Novo")).toBeInTheDocument();
   });
 
   it("cancela a edição restaurando os dados", async () => {
@@ -130,7 +134,7 @@ describe("ContaPage", () => {
     localStorage.setItem("dk_favorites", JSON.stringify(["1", "2"]));
     renderConta();
 
-    await userEvent.click(screen.getByRole("tab", { name: /Meus Pedidos/ }));
+    await userEvent.click(screen.getByRole("tab", { name: /Meus pedidos/ }));
     expect(await screen.findByText("Você ainda não tem pedidos.")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("tab", { name: /Favoritos/ }));
@@ -147,6 +151,14 @@ describe("ContaPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Sair/ }));
     expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
+  });
+
+  it("navega para pedidos e favoritos pelos atalhos de Meus Dados", async () => {
+    renderConta();
+    await meusDados().findByText("Cliente Perfil");
+
+    await userEvent.click(screen.getByRole("button", { name: /Meus pedidos →/ }));
+    expect(await screen.findByText("Você ainda não tem pedidos.")).toBeInTheDocument();
   });
 
   it("não salva telefone inválido", async () => {

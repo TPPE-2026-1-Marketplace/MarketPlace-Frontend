@@ -1,7 +1,6 @@
 import { Heart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { buttonClassName } from "@/components/ui/button-variants";
-import { Card } from "@/components/ui/card";
 import EmptyState from "@/components/ui/EmptyState";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useProducts } from "@/hooks/useProducts";
@@ -14,8 +13,13 @@ export default function MeusFavoritos() {
   const favProducts = products.filter((product) => favorites.includes(String(product.idProduto)));
 
   return (
-    <Card className="gap-5 rounded-none border-[var(--border)] p-6">
-      <h2 className="font-serif text-xl text-gray-900">Meus Favoritos</h2>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-xl font-semibold text-[var(--foreground)]">Meus favoritos</h2>
+        <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+          Os vestidos que você salvou para comparar depois.
+        </p>
+      </div>
 
       {favProducts.length === 0 ? (
         <EmptyState
@@ -23,10 +27,7 @@ export default function MeusFavoritos() {
           title="Nenhum favorito ainda"
           body="Salve seus vestidos favoritos para não perder!"
           action={
-            <Link
-              to="/produtos"
-              className={buttonClassName({ variant: "outline-neutral", size: "sm" })}
-            >
+            <Link to="/produtos" className={buttonClassName({ variant: "outline-neutral", size: "sm" })}>
               Explorar vestidos
             </Link>
           }
@@ -44,23 +45,23 @@ export default function MeusFavoritos() {
               <Link
                 key={id}
                 to={`/produtos/${id}`}
-                className="group flex gap-4 border border-gray-100 p-3 transition-colors hover:border-gray-300"
+                className="group flex gap-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-card)] p-3 transition-colors hover:border-[var(--border-hover)]"
               >
-                <div className="h-28 w-20 shrink-0 overflow-hidden bg-gray-50">
+                <div className="h-28 w-20 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-gray-50">
                   {image && <img src={image} alt={nome} className="h-full w-full object-cover" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs tracking-widest text-gray-400 uppercase">{cat}</p>
-                  <h4 className="truncate text-sm text-gray-900 transition-colors group-hover:text-gray-600">
+                  <p className="text-xs tracking-widest text-[var(--foreground-muted)] uppercase">{cat}</p>
+                  <h4 className="truncate text-sm text-[var(--foreground)] transition-colors group-hover:text-gray-600">
                     {nome}
                   </h4>
-                  <p className="mt-1 text-sm text-gray-900">{formatCurrency(price)}</p>
+                  <p className="mt-1 text-sm font-medium text-[var(--foreground)]">{formatCurrency(price)}</p>
                 </div>
               </Link>
             );
           })}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
