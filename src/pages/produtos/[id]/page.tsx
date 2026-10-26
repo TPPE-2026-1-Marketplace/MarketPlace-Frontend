@@ -48,9 +48,8 @@ export default function ProductDetailPage() {
     window.scrollTo(0, 0);
     async function loadData() {
       try {
-        const [loadedProduct, relatedResponse, reviewsResponse] = await Promise.all([
+        const [loadedProduct, reviewsResponse] = await Promise.all([
           fetchProduct(Number(id)),
-          fetchProducts({ page: 1, limit: 4 }),
           fetchProductReviews(Number(id)),
         ]);
         const initialVariant = getDisplayVariant(loadedProduct);
@@ -58,14 +57,31 @@ export default function ProductDetailPage() {
         setSelectedColor(initialVariant?.cor ?? "");
         setSelectedSize(initialVariant?.tamanho ?? "");
         setActiveImage(0);
-        setRelated(
-          relatedResponse.data.filter(
-            (relatedProduct) => relatedProduct.idProduto !== loadedProduct.idProduto,
-          ),
-        );
         setReviews(reviewsResponse.data);
         setAverageRating(reviewsResponse.media);
         setTotalReviews(reviewsResponse.totalAvaliacoes);
+
+        const primaryCategoryId = loadedProduct.categories[0]?.idCategoria;
+        const relatedResponse = await fetchProducts({
+          page: 1,
+          limit: 5,
+          categoryId: primaryCategoryId,
+        });
+
+        const filteredRelated = (relatedResponse.data || []).filter(
+          (relatedProduct) => relatedProduct.idProduto !== loadedProduct.idProduto,
+        );
+
+        if (filteredRelated.length > 0) {
+          setRelated(filteredRelated.slice(0, 4));
+        } else {
+          const fallbackResponse = await fetchProducts({ page: 1, limit: 5 });
+          setRelated(
+            (fallbackResponse.data || [])
+              .filter((relatedProduct) => relatedProduct.idProduto !== loadedProduct.idProduto)
+              .slice(0, 4),
+          );
+        }
       } catch (loadError) {
         console.error(loadError);
       } finally {

@@ -236,4 +236,14 @@ describe("ProductDetailPage", () => {
     expect(screen.getByText("Vestido maravilhoso!")).toBeInTheDocument();
     expect(screen.getByText("Avaliações dos clientes (327)")).toBeInTheDocument();
   });
+
+  it("busca produtos relacionados filtrando pela categoria do produto", async () => {
+    await renderProduct();
+
+    expect(fetchProducts).toHaveBeenCalledWith({
+      page: 1,
+      limit: 5,
+      categoryId: 1,
+    });
+  });
 });
