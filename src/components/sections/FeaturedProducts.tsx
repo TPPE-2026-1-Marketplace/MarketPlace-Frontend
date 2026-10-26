@@ -5,6 +5,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useProducts } from "@/hooks/useProducts";
 import { getDisplayVariant } from "@/lib/catalog";
 
@@ -33,7 +34,7 @@ export default function FeaturedProducts() {
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="aspect-[3/4] bg-gray-100 animate-pulse border border-gray-200"></div>
+            <Skeleton key={i} className="aspect-[3/4] rounded-none border border-[var(--border)]" />
           ))}
         </div>
       ) : (

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useBanners } from "@/context/BannerContext";
 import { categoryToPath } from "@/context/BannerContext";
+import { buttonClassName } from "@/components/ui/button-variants";
 
 const FALLBACK_SLIDES = [
   {
@@ -52,7 +53,7 @@ export default function HeroSection() {
             alt={s.title}
             className="w-full h-full object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/80 via-[#0a0a0a]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
         </div>
       ))}
 
@@ -84,7 +85,11 @@ export default function HeroSection() {
               {slides[current].primaryCta && (
                 <Link
                   to={categoryToPath(slides[current].primaryCategory)}
-                  className="bg-white text-[#1a1a1a] px-8 py-3.5 hover:bg-gray-100 transition-colors text-sm tracking-widest uppercase font-medium text-center"
+                  className={buttonClassName({
+                    variant: "outline-neutral",
+                    size: "lg",
+                    className: "text-sm uppercase tracking-widest text-center",
+                  })}
                 >
                   {slides[current].primaryCta}
                 </Link>
