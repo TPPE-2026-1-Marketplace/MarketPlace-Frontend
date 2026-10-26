@@ -171,6 +171,7 @@ export interface ProductReview {
   comentario: string | null;
   dataAvaliacao: string;
   cliente: { nome: string };
+  compraVerificada?: boolean;
 }
 
 export interface ProductReviewsResponse {
@@ -200,7 +201,7 @@ export async function fetchProductReviews(
   } catch {
     return {
       data: [],
-      meta: { page: 1, limit, total: 0, totalPages: 0 },
+      meta: { page, limit, total: 0, totalPages: 0 },
       media: 0,
       totalAvaliacoes: 0,
       distribuicao: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },

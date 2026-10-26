@@ -218,4 +218,12 @@ describe("fetchProductReviews", () => {
       distribuicao: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
     });
   });
+
+  it("preserva a página solicitada no meta em caso de erro", async () => {
+    getMock.mockRejectedValueOnce(new Error("Network error"));
+
+    const result = await fetchProductReviews(7, 3, 5);
+
+    expect(result.meta).toEqual({ page: 3, limit: 5, total: 0, totalPages: 0 });
+  });
 });

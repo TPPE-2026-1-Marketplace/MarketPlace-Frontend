@@ -43,7 +43,7 @@ describe("MobileStickyPurchaseBar", () => {
       />,
     );
 
-    const button = screen.getByRole("button", { name: "Adicionar" });
+    const button = screen.getByRole("button", { name: "Adicionar ao carrinho" });
     await userEvent.click(button);
     expect(handleAddToCart).toHaveBeenCalledTimes(1);
   });

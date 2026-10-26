@@ -32,6 +32,8 @@ interface ProductPurchaseInfoProps {
   totalReviews?: number;
   className?: string;
   isOutOfStock?: boolean;
+  unavailableColors?: string[];
+  unavailableSizes?: string[];
 }
 
 export function ProductPurchaseInfo({
@@ -59,6 +61,8 @@ export function ProductPurchaseInfo({
   totalReviews = 0,
   className,
   isOutOfStock: isOutOfStockProp,
+  unavailableColors = [],
+  unavailableSizes = [],
 }: ProductPurchaseInfoProps) {
   const isOutOfStock = isOutOfStockProp ?? (stockEcommerce <= 0);
   const installmentValue = price / 6;
@@ -148,6 +152,7 @@ export function ProductPurchaseInfo({
         colors={colors}
         selectedColor={selectedColor}
         onSelectColor={onSelectColor}
+        unavailableColors={unavailableColors}
       />
 
       {/* Seletor de Tamanhos e Links de Apoio */}
@@ -158,6 +163,7 @@ export function ProductPurchaseInfo({
             selectedSize={selectedSize}
             onSelectSize={onSelectSize}
             onOpenSizeGuide={onOpenSizeGuide}
+            unavailableSizes={unavailableSizes}
             error={sizeError}
           />
 

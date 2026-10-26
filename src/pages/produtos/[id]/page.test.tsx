@@ -315,4 +315,91 @@ describe("ProductDetailPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Guia de Medidas" }));
     expect(screen.getAllByRole("row").map((r) => r.firstChild?.textContent)).toEqual(["Tam.", "48", "50"]);
   });
+
+  it("marca cor como indisponivel quando todas as suas variantes ativas estao com estoque zerado", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 96,
+        titulo: "Vestido Cores",
+        variants: [
+          makeVariant({
+            codigoSku: "AZUL-DISP",
+            cor: "Azul",
+            tamanho: "38",
+            ativo: true,
+            stock: { qtdOnline: 5, qtdLojaFisica: 0 },
+          }),
+          makeVariant({
+            codigoSku: "VERMELHO-ESGOTADO",
+            cor: "Vermelho",
+            tamanho: "38",
+            ativo: true,
+            stock: { qtdOnline: 0, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    const redButton = screen.getByRole("button", { name: "Vermelho" });
+    expect(redButton).toBeDisabled();
+    expect(redButton).toHaveClass("cursor-not-allowed");
+
+    const blueButton = screen.getByRole("button", { name: "Azul" });
+    expect(blueButton).not.toBeDisabled();
+  });
+
+  it("exibe badge de compra verificada apenas quando compraVerificada for true", async () => {
+    vi.mocked(fetchProductReviews).mockResolvedValueOnce({
+      data: [
+        {
+          idProduto: 7,
+          nota: 5,
+          comentario: "Avaliação normal",
+          dataAvaliacao: "2026-03-10T12:00:00Z",
+          cliente: { nome: "Cliente 1" },
+          compraVerificada: false,
+        },
+        {
+          idProduto: 7,
+          nota: 4,
+          comentario: "Avaliação verificada",
+          dataAvaliacao: "2026-03-11T12:00:00Z",
+          cliente: { nome: "Cliente 2" },
+          compraVerificada: true,
+        },
+      ],
+      meta: { page: 1, limit: 10, total: 2, totalPages: 1 },
+      media: 4.5,
+      totalAvaliacoes: 2,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 1, "5": 1 },
+    });
+
+    await renderProduct();
+
+    expect(screen.getByText("Cliente 1")).toBeInTheDocument();
+    expect(screen.getByText("Cliente 2")).toBeInTheDocument();
+    expect(screen.getAllByText("Compra verificada")).toHaveLength(1);
+  });
+
+  it("alinha estado desabilitado da barra mobile com a variante ativa inativa", async () => {
+    await renderProduct(
+      makeProduct({
+        idProduto: 95,
+        titulo: "Vestido Variante Inativa Com Estoque",
+        variants: [
+          makeVariant({
+            codigoSku: "INATIVA-COM-ESTOQUE",
+            cor: "Azul",
+            tamanho: "38",
+            ativo: false,
+            stock: { qtdOnline: 10, qtdLojaFisica: 0 },
+          }),
+        ],
+      }),
+    );
+
+    const mobileButtons = screen.getAllByRole("button", { name: "Esgotado" });
+    expect(mobileButtons.length).toBeGreaterThanOrEqual(1);
+    expect(mobileButtons[mobileButtons.length - 1]).toBeDisabled();
+  });
 });

@@ -62,7 +62,7 @@ export function MobileStickyPurchaseBar({
           ) : (
             <>
               <ShoppingCart className="size-4" />
-              Adicionar
+              Adicionar ao carrinho
             </>
           )}
         </Button>

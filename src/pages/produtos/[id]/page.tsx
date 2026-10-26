@@ -112,6 +112,11 @@ export default function ProductDetailPage() {
     ),
   ) as string[];
 
+  const unavailableColors = colors.filter((color) => {
+    const colorVariants = selectableVariants.filter((variant) => variant.cor === color);
+    return colorVariants.length === 0 || colorVariants.every((variant) => variant.stock.qtdOnline <= 0);
+  });
+
   const activeVariant =
     findVariant(product, selectedColor || undefined, selectedSize || undefined) ??
     findVariant(product, selectedColor || undefined) ??
@@ -273,6 +278,7 @@ export default function ProductDetailPage() {
             onBuyNow={handleBuyNow}
             averageRating={averageRating}
             totalReviews={totalReviews}
+            unavailableColors={unavailableColors}
           />
         </div>
 
@@ -306,7 +312,7 @@ export default function ProductDetailPage() {
         price={price}
         added={added}
         onAddToCart={handleAddToCart}
-        isOutOfStock={stockEcommerce <= 0}
+        isOutOfStock={isOutOfStock}
       />
 
       {/* Modal Guia e Tabela de Medidas */}

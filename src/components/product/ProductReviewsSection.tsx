@@ -87,9 +87,11 @@ export function ProductReviewsSection({
                     <span className="text-sm font-medium font-sans text-[var(--foreground)]">
                       {author}
                     </span>
-                    <span className="text-xs font-sans text-[var(--foreground-muted)]">
-                      Compra verificada
-                    </span>
+                    {review.compraVerificada && (
+                      <span className="text-xs font-sans text-[var(--foreground-muted)]">
+                        Compra verificada
+                      </span>
+                    )}
                   </div>
                   {formattedDate && (
                     <span className="text-xs font-sans text-[var(--foreground-subtle)]">
