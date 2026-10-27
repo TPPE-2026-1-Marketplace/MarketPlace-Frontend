@@ -160,6 +160,39 @@ describe("ProdutosPage", () => {
     expect(screen.getByText(/Preço: R\$ 400 - R\$ 1\.000/)).toBeInTheDocument();
   });
 
+  it("extrai cores dinamicamente das variantes e filtra de forma case-insensitive", async () => {
+    vi.mocked(fetchProducts).mockResolvedValue({
+      data: [
+        makeProduct({
+          idProduto: 10,
+          titulo: "Vestido Gala Azul",
+          variants: [makeVariant({ codigoSku: "VG-AZUL", cor: "azul marinho", tamanho: "M" })],
+        }),
+        makeProduct({
+          idProduto: 11,
+          titulo: "Vestido Gala Preto",
+          variants: [makeVariant({ codigoSku: "VG-PRETO", cor: "preto", tamanho: "G" })],
+        }),
+      ],
+      meta: { page: 1, limit: 20, total: 2, totalPages: 1 },
+    });
+
+    renderWithProviders(<ProdutosPage />, { route: "/produtos" });
+    await screen.findByText("Vestido Gala Azul");
+
+    // As opções de cores devem ser derivadas dinamicamente dos vestidos (Azul Marinho e Preto)
+    expect(screen.getByRole("checkbox", { name: "Azul Marinho" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Preto" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Lilás" })).not.toBeInTheDocument();
+
+    // Clicar em "Azul Marinho" deve filtrar com case-insensitivity ("azul marinho" no backend)
+    await userEvent.click(screen.getByRole("checkbox", { name: "Azul Marinho" }));
+    expect(screen.getByText("1 vestido encontrado")).toBeInTheDocument();
+    expect(screen.getByText("Vestido Gala Azul")).toBeInTheDocument();
+    expect(screen.queryByText("Vestido Gala Preto")).not.toBeInTheDocument();
+    expect(screen.getByText("Cor: Azul Marinho")).toBeInTheDocument();
+  });
+
   it("renderiza empty state de erro quando a API falha", async () => {
     vi.mocked(fetchProducts).mockRejectedValue(new Error("Falha no servidor"));
     renderWithProviders(<ProdutosPage />, { route: "/produtos" });

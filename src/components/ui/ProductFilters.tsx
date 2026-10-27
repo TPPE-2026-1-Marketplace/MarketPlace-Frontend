@@ -16,22 +16,54 @@ export const ALL_COLORS = [
 export const COLOR_SWATCHES: Record<string, string> = {
   "rosa": "bg-pink-300",
   "rosa antigo": "bg-[var(--color-brand-light)]",
+  "rose gold": "bg-rose-200",
+  "rose": "bg-rose-300",
   "azul": "bg-blue-500",
   "azul marinho": "bg-blue-900",
   "azul safira": "bg-blue-600",
+  "azul royal": "bg-blue-700",
+  "navy": "bg-slate-900",
   "preto": "bg-neutral-900",
   "branco": "bg-white border-neutral-300",
+  "off white": "bg-neutral-100 border-neutral-300",
+  "off-white": "bg-neutral-100 border-neutral-300",
   "verde": "bg-emerald-600",
   "verde esmeralda": "bg-emerald-700",
+  "verde menta": "bg-teal-200",
+  "oliva": "bg-lime-800",
   "vermelho": "bg-red-600",
   "dourado": "bg-amber-300",
+  "ouro": "bg-amber-400",
+  "prata": "bg-slate-300",
   "marsala": "bg-rose-900",
   "lilás": "bg-purple-300",
+  "lilas": "bg-purple-300",
   "champagne": "bg-amber-100",
   "nude": "bg-amber-50",
   "bordô": "bg-red-950",
+  "bordo": "bg-red-950",
   "lavanda": "bg-purple-200",
+  "coral": "bg-rose-400",
+  "chumbo": "bg-stone-700",
+  "grafite": "bg-neutral-700",
+  "terracota": "bg-amber-700",
+  "fúcsia": "bg-fuchsia-600",
+  "fucsia": "bg-fuchsia-600",
+  "magenta": "bg-pink-600",
 };
+
+export function getColorSwatch(color: string): string {
+  const normalized = color.toLowerCase().trim();
+  if (COLOR_SWATCHES[normalized]) return COLOR_SWATCHES[normalized];
+
+  const noAccents = normalized.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (COLOR_SWATCHES[noAccents]) return COLOR_SWATCHES[noAccents];
+
+  const firstWord = normalized.split(/\s+/)[0];
+  if (COLOR_SWATCHES[firstWord]) return COLOR_SWATCHES[firstWord];
+
+  return "bg-neutral-400";
+}
 
 export interface ProductFiltersProps {
   category?: string;
@@ -253,7 +285,7 @@ export default function ProductFilters({
         <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
           {colors.map((color) => {
             const isSelected = selectedColors.includes(color);
-            const swatch = COLOR_SWATCHES[color.toLowerCase()] ?? "bg-neutral-400";
+            const swatch = getColorSwatch(color);
             return (
               <label
                 key={color}

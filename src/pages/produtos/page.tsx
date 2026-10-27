@@ -2,7 +2,7 @@ import React, { useState, useMemo, Suspense } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { SlidersHorizontal, X, AlertCircle } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
-import ProductFilters from "@/components/ui/ProductFilters";
+import ProductFilters, { ALL_COLORS } from "@/components/ui/ProductFilters";
 import Pagination from "@/components/ui/Pagination";
 import {
   Select,
@@ -93,6 +93,33 @@ function ProdutosContent() {
 
   const { products, isLoading, error, refetch } = useProducts(apiFilters);
 
+  // Cores dinâmicas extraídas dos produtos cadastrados
+  const availableColors = useMemo(() => {
+    const colorMap = new Map<string, string>();
+
+    products.forEach((p: Product) => {
+      p.variants?.forEach((v) => {
+        if (v.cor && v.cor.trim()) {
+          const raw = v.cor.trim();
+          const key = raw.toLowerCase();
+          if (!colorMap.has(key)) {
+            const formatted = raw
+              .split(/\s+/)
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(" ");
+            colorMap.set(key, formatted);
+          }
+        }
+      });
+    });
+
+    if (colorMap.size === 0) {
+      return ALL_COLORS;
+    }
+
+    return Array.from(colorMap.values()).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [products]);
+
   const productPrice = (p: Product) => getDisplayVariant(p)?.precoVariante ?? p.precoBase;
 
   // Filtragem e ordenação no cliente
@@ -106,11 +133,12 @@ function ProdutosContent() {
       ) {
         return false;
       }
-      if (
-        selectedColors.length > 0 &&
-        !p.variants?.some((v) => v.cor && selectedColors.includes(v.cor))
-      ) {
-        return false;
+      if (selectedColors.length > 0) {
+        const selectedLowers = selectedColors.map((c) => c.trim().toLowerCase());
+        const matchesColor = p.variants?.some(
+          (v) => v.cor && selectedLowers.includes(v.cor.trim().toLowerCase()),
+        );
+        if (!matchesColor) return false;
       }
       if (selectedTipo !== "all" && p.tipo && p.tipo !== selectedTipo) {
         return false;
@@ -144,9 +172,13 @@ function ProdutosContent() {
   };
 
   const toggleColor = (color: string) => {
-    setSelectedColors((prev) =>
-      prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color],
-    );
+    setSelectedColors((prev) => {
+      const lower = color.trim().toLowerCase();
+      const exists = prev.some((c) => c.trim().toLowerCase() === lower);
+      return exists
+        ? prev.filter((c) => c.trim().toLowerCase() !== lower)
+        : [...prev, color];
+    });
     setCurrentPage(1);
   };
 
@@ -229,6 +261,7 @@ function ProdutosContent() {
                 onToggleColor={toggleColor}
                 hasActiveFilters={hasActiveFilters}
                 onClearFilters={clearFilters}
+                colors={availableColors}
               />
             </div>
           </aside>
@@ -257,6 +290,7 @@ function ProdutosContent() {
                   onToggleColor={toggleColor}
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={clearFilters}
+                  colors={availableColors}
                   isMobile
                 />
               </div>
