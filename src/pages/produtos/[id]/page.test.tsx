@@ -2,7 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
-import { fetchProduct, fetchProducts, fetchProductReviews } from "@/lib/catalog";
+import { fetchProduct, fetchProducts, getProductReviews } from "@/lib/catalog";
 import { makeProduct, makeVariant } from "@/test/factories";
 import { renderWithProviders } from "@/test/render";
 import ProductDetailPage from "./page";
@@ -11,7 +11,7 @@ vi.mock("@/lib/catalog", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/catalog")>()),
   fetchProduct: vi.fn(),
   fetchProducts: vi.fn(),
-  fetchProductReviews: vi.fn(),
+  getProductReviews: vi.fn(),
 }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
@@ -52,7 +52,7 @@ describe("ProductDetailPage", () => {
       data: [vestido, makeProduct({ idProduto: 8, titulo: "Relacionado" })],
       meta: { page: 1, limit: 4, total: 2, totalPages: 1 },
     });
-    vi.mocked(fetchProductReviews).mockResolvedValue({
+    vi.mocked(getProductReviews).mockResolvedValue({
       data: [
         {
           idProduto: 7,
@@ -349,7 +349,7 @@ describe("ProductDetailPage", () => {
   });
 
   it("exibe badge de compra verificada apenas quando compraVerificada for true", async () => {
-    vi.mocked(fetchProductReviews).mockResolvedValueOnce({
+    vi.mocked(getProductReviews).mockResolvedValueOnce({
       data: [
         {
           idProduto: 7,
