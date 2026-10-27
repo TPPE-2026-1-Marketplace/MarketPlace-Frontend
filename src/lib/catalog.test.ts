@@ -116,6 +116,8 @@ describe("normalizeProduct", () => {
       material: null,
       composicao: null,
       silhueta: null,
+      mediaAvaliacao: 0,
+      totalAvaliacoes: 0,
       categories: [],
       variants: [
         {
@@ -150,6 +152,21 @@ describe("normalizeProduct", () => {
   it("rejeita produto sem idProduto válido", async () => {
     await expect(normalizeProduct({ titulo: "Sem id" })).rejects.toThrow("idProduto válido");
     await expect(normalizeProduct({ idProduto: -1 })).rejects.toThrow();
+  });
+
+  it("converte a média (numeric do Postgres vem como string) e o total de avaliações", async () => {
+    const result = await normalizeProduct({ idProduto: 1, mediaAvaliacao: "4.50", totalAvaliacoes: "12" });
+
+    expect(result.mediaAvaliacao).toBe(4.5);
+    expect(result.totalAvaliacoes).toBe(12);
+  });
+
+  it("usa zero quando o produto não traz média nem total", async () => {
+    const semCampos = await normalizeProduct({ idProduto: 1 });
+    const nulos = await normalizeProduct({ idProduto: 1, mediaAvaliacao: null, totalAvaliacoes: null });
+
+    expect(semCampos).toMatchObject({ mediaAvaliacao: 0, totalAvaliacoes: 0 });
+    expect(nulos).toMatchObject({ mediaAvaliacao: 0, totalAvaliacoes: 0 });
   });
 });
 

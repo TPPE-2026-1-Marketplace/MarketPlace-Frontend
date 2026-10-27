@@ -39,6 +39,9 @@ export interface Product {
   material?: string | null;
   composicao?: string | null;
   silhueta?: string | null;
+  /** Nota média das avaliações (0 quando o produto não tem avaliações). */
+  mediaAvaliacao?: number;
+  totalAvaliacoes?: number;
   categories: Array<{ idCategoria?: number; nome: string }>;
   variants: ProductVariant[];
 }
@@ -61,6 +64,9 @@ interface ProductResponse {
   material?: string | null;
   composicao?: string | null;
   silhueta?: string | null;
+  // A média vem do Postgres como numeric, ou seja, como string ("4.50").
+  mediaAvaliacao?: number | string | null;
+  totalAvaliacoes?: number | string | null;
   categories?: Array<{ idCategoria?: number; nome: string }>;
   variants?: ProductVariantResponse[];
 }
@@ -144,6 +150,8 @@ export async function normalizeProduct(raw: ProductResponse): Promise<Product> {
     material: raw.material ?? null,
     composicao: raw.composicao ?? null,
     silhueta: raw.silhueta ?? null,
+    mediaAvaliacao: Number(raw.mediaAvaliacao) || 0,
+    totalAvaliacoes: Number(raw.totalAvaliacoes) || 0,
     categories: raw.categories ?? [],
     variants: variants.filter((variant): variant is ProductVariant => variant !== null),
   };
