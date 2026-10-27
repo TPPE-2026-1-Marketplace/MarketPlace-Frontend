@@ -276,8 +276,8 @@ describe("Inventory - cadastro de produto", () => {
       material: "Tule",
       tags: ["festa"],
     }));
-    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigo_sku: "NOVO-PRETO-M", preco_variante: 300 }));
-    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigo_sku: "NOVO-BRANCO-M", preco_variante: 320 }));
+    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigoSku: "NOVO-PRETO-M", precoVariante: 300 }));
+    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigoSku: "NOVO-BRANCO-M", precoVariante: 320 }));
     expect(api.patch).toHaveBeenCalledWith("/inventory/NOVO-PRETO-M", expect.objectContaining({ qtdOnline: 3, qtdLojaFisica: 1 }));
     expect(api.patch).toHaveBeenCalledWith("/inventory/NOVO-BRANCO-M", expect.objectContaining({ qtdOnline: 0, qtdLojaFisica: 0 }));
     // URL registrada uma vez e reaproveitada na segunda variante; data URI vai por upload.
@@ -295,7 +295,10 @@ describe("Inventory - cadastro de produto", () => {
     await userEvent.click(screen.getByRole("button", { name: "Salvar cadastro" }));
 
     await waitFor(() => expect(window.alert).toHaveBeenCalledWith("Produto cadastrado com sucesso no banco de dados!"));
-    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigo_sku: "DK-NOVO", cor: "Único", tamanho: "U" }));
+    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigoSku: "DK-NOVO", cor: "Único", tamanho: "U" }));
+    // Contrato do backend (#161): os nomes em snake_case foram removidos do DTO e dariam 400.
+    expect(api.post).not.toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigo_sku: expect.anything() }));
+    expect(api.post).not.toHaveBeenCalledWith("/product-variants", expect.objectContaining({ preco_variante: expect.anything() }));
   });
 
   it("avisa quando as imagens falham mas mantém o produto", async () => {

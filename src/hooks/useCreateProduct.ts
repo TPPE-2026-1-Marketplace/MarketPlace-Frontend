@@ -45,8 +45,8 @@ export function useCreateProduct(onCreated: () => void) {
 
           await api.post("/product-variants", {
             idProduto: createdProduct.idProduto,
-            codigo_sku: codigoSku,
-            preco_variante: variant.price || form.basePrice,
+            codigoSku,
+            precoVariante: variant.price || form.basePrice,
             ativo: true,
             cor: variant.color,
             tamanho: variant.size,
