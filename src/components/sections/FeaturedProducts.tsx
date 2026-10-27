@@ -56,6 +56,8 @@ export default function FeaturedProducts() {
                     imagem={variant?.images[0]?.url || "/hero-dress.png"}
                     categoria={product.categories[0]?.nome}
                     variant={variant}
+                    nota={product.mediaAvaliacao}
+                    totalAvaliacoes={product.totalAvaliacoes}
                   />
                 );
               })}

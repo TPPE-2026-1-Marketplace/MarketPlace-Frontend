@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Heart } from "lucide-react";
+import { Heart, Star } from "lucide-react";
 import { buttonClassName } from "@/components/ui/button-variants";
 import { formatCurrency } from "@/lib/utils";
 import { useFavorites } from "@/context/FavoritesContext";
@@ -13,9 +13,16 @@ interface ProductCardProps {
   precoOriginal?: number;
   imagem: string;
   categoria?: string;
+  /** Nota média (0 a 5). A linha de avaliação só aparece com `totalAvaliacoes` maior que zero. */
+  nota?: number;
+  totalAvaliacoes?: number;
   className?: string;
   style?: React.CSSProperties;
   variant?: ProductVariant;
+}
+
+function formatRating(value: number): string {
+  return value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 /**
@@ -30,6 +37,8 @@ export default function ProductCard({
   precoOriginal,
   imagem,
   categoria,
+  nota,
+  totalAvaliacoes = 0,
   className,
   style,
 }: ProductCardProps) {
@@ -79,6 +88,29 @@ export default function ProductCard({
         <Link to={href} className="truncate text-base font-medium text-[var(--foreground)] hover:text-gray-600">
           {titulo}
         </Link>
+        {nota !== undefined && totalAvaliacoes > 0 && (
+          <div
+            className="flex items-center gap-1.5"
+            aria-label={`Nota ${formatRating(nota)} de 5, ${totalAvaliacoes} ${totalAvaliacoes === 1 ? "avaliação" : "avaliações"}`}
+          >
+            <div className="flex items-center gap-0.5" aria-hidden="true">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  data-filled={star <= Math.round(nota)}
+                  className={`size-3 ${
+                    star <= Math.round(nota)
+                      ? "fill-[var(--action-primary)] text-[var(--action-primary)]"
+                      : "text-[var(--border-control)]"
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-[var(--foreground-secondary)]" aria-hidden="true">
+              {formatRating(nota)} ({totalAvaliacoes})
+            </span>
+          </div>
+        )}
         <p className="text-base font-semibold text-[var(--foreground)]">
           {formatCurrency(preco)}
           {precoOriginal && (
