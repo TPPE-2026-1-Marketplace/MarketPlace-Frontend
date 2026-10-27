@@ -170,6 +170,8 @@ export interface ProductReview {
   nota: number;
   comentario: string | null;
   dataAvaliacao: string;
+  /** Preenchida quando o cliente edita a avaliação; nula enquanto não editada. */
+  dataEdicao?: string | null;
   cliente: { nome: string };
   compraVerificada?: boolean;
 }
@@ -188,16 +190,23 @@ export interface ProductReviewsResponse {
   };
 }
 
+/** Busca uma página de avaliações. Rejeita quando a API falha. */
+export async function getProductReviews(
+  productId: number,
+  page = 1,
+  limit = 10,
+): Promise<ProductReviewsResponse> {
+  return api.get<ProductReviewsResponse>(`/reviews/product/${productId}`, { page, limit });
+}
+
+/** Como `getProductReviews`, mas uma falha da API vira uma lista vazia. */
 export async function fetchProductReviews(
   productId: number,
   page = 1,
   limit = 10,
 ): Promise<ProductReviewsResponse> {
   try {
-    return await api.get<ProductReviewsResponse>(
-      `/reviews/product/${productId}`,
-      { page, limit },
-    );
+    return await getProductReviews(productId, page, limit);
   } catch {
     return {
       data: [],

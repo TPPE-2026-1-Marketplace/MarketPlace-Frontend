@@ -6,12 +6,11 @@ import { useFavorites } from "@/context/FavoritesContext";
 import {
   fetchProduct,
   fetchProducts,
-  fetchProductReviews,
   findVariant,
   getDisplayVariant,
   type Product,
-  type ProductReview,
 } from "@/lib/catalog";
+import { useProductReviews } from "@/hooks/useProductReviews";
 import ImageGallery from "@/components/ui/ImageGallery";
 import { ProductBreadcrumb } from "@/components/product/ProductBreadcrumb";
 import { ProductPurchaseInfo } from "@/components/product/ProductPurchaseInfo";
@@ -31,10 +30,10 @@ export default function ProductDetailPage() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
-  const [reviews, setReviews] = useState<ProductReview[]>([]);
-  const [averageRating, setAverageRating] = useState(0);
-  const [totalReviews, setTotalReviews] = useState(0);
   const [loading, setLoading] = useState(true);
+  const reviewsState = useProductReviews(Number(id));
+  const averageRating = reviewsState.media;
+  const totalReviews = reviewsState.totalAvaliacoes;
 
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
@@ -48,18 +47,12 @@ export default function ProductDetailPage() {
     window.scrollTo(0, 0);
     async function loadData() {
       try {
-        const [loadedProduct, reviewsResponse] = await Promise.all([
-          fetchProduct(Number(id)),
-          fetchProductReviews(Number(id)),
-        ]);
+        const loadedProduct = await fetchProduct(Number(id));
         const initialVariant = getDisplayVariant(loadedProduct);
         setProduct(loadedProduct);
         setSelectedColor(initialVariant?.cor ?? "");
         setSelectedSize(initialVariant?.tamanho ?? "");
         setActiveImage(0);
-        setReviews(reviewsResponse.data);
-        setAverageRating(reviewsResponse.media);
-        setTotalReviews(reviewsResponse.totalAvaliacoes);
 
         const primaryCategoryId = loadedProduct.categories[0]?.idCategoria;
         const relatedResponse = await fetchProducts({
@@ -298,9 +291,16 @@ export default function ProductDetailPage() {
 
         {/* Seção de Avaliações dos Clientes */}
         <ProductReviewsSection
-          reviews={reviews}
+          reviews={reviewsState.reviews}
           averageRating={averageRating}
           totalReviews={totalReviews}
+          distribution={reviewsState.distribuicao}
+          isLoading={reviewsState.isLoading}
+          error={reviewsState.error}
+          onRetry={reviewsState.refetch}
+          hasMore={reviewsState.hasMore}
+          isLoadingMore={reviewsState.isLoadingMore}
+          onLoadMore={reviewsState.loadMore}
         />
 
         {/* Vitrine de Produtos Relacionados */}
