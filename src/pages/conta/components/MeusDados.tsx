@@ -3,10 +3,17 @@ import { buttonClassName } from "@/components/ui/button-variants";
 import Input from "@/components/ui/Input";
 import type { AccountTabKey } from "./AccountNav";
 
+/** Formata "AAAA-MM-DD" como "DD/MM/AAAA" sem passar por Date (evita deslocamento de fuso). */
+function formatIsoDate(iso: string): string {
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 interface MeusDadosForm {
   name: string;
   email: string;
   telefone: string;
+  dataNascimento: string;
   cpf: string;
 }
 
@@ -19,6 +26,7 @@ interface MeusDadosProps {
   displayName: string;
   displayEmail: string;
   displayPhone: string;
+  displayBirthdate: string | null;
   displayCpf: string;
   onEdit: () => void;
   onCancel: () => void;
@@ -45,6 +53,7 @@ export default function MeusDados({
   displayName,
   displayEmail,
   displayPhone,
+  displayBirthdate,
   displayCpf,
   onEdit,
   onCancel,
@@ -63,11 +72,11 @@ export default function MeusDados({
           <p className="text-xs text-[var(--foreground-secondary)]">Acompanhe suas compras</p>
         </button>
         <button
-          onClick={() => onSelectTab("favoritos")}
+          onClick={() => onSelectTab("enderecos")}
           className="flex flex-1 flex-col items-start gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-card)] p-6 text-left transition-colors hover:border-[var(--border-hover)]"
         >
-          <p className="text-sm font-semibold text-[var(--foreground)]">Meus favoritos →</p>
-          <p className="text-xs text-[var(--foreground-secondary)]">Veja os vestidos que você salvou</p>
+          <p className="text-sm font-semibold text-[var(--foreground)]">Meus endereços →</p>
+          <p className="text-xs text-[var(--foreground-secondary)]">Consulte seus locais de entrega</p>
         </button>
       </div>
 
@@ -123,14 +132,22 @@ export default function MeusDados({
                 containerClassName="flex-1"
               />
               <Input
-                label="CPF"
-                value={form.cpf}
-                disabled
-                helper="O CPF é a chave da sua conta e não pode ser alterado."
-                placeholder="Informe seu cpf"
+                label="Data de nascimento"
+                type="date"
+                value={form.dataNascimento}
+                onChange={(e) => onFieldChange("dataNascimento", e.target.value)}
+                placeholder="Informe sua data de nascimento"
                 containerClassName="flex-1"
               />
             </div>
+
+            <Input
+              label="CPF"
+              value={form.cpf}
+              disabled
+              helper="O CPF é a chave da sua conta e não pode ser alterado."
+              placeholder="Informe seu cpf"
+            />
 
             <div className="flex items-center gap-3">
               <Button onClick={onSave} disabled={saving} loading={saving} variant="action" size="touch">
@@ -159,6 +176,12 @@ export default function MeusDados({
             </div>
             <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4 sm:flex-row">
               <DadoDeLeitura rotulo="Telefone" valor={displayPhone || "Não informado"} />
+              <DadoDeLeitura
+                rotulo="Nascimento"
+                valor={displayBirthdate ? formatIsoDate(displayBirthdate) : "Não informado"}
+              />
+            </div>
+            <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4 sm:flex-row">
               <DadoDeLeitura
                 rotulo="CPF"
                 valor={displayCpf ? `***.***.***-${displayCpf.slice(-2)}` : "Não informado"}

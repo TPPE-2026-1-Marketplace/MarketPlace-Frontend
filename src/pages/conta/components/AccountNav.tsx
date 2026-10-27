@@ -1,13 +1,14 @@
-import { Heart, Package, User } from "lucide-react";
+import { MapPin, Package, Shield, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export type AccountTabKey = "dados" | "pedidos" | "favoritos";
+export type AccountTabKey = "dados" | "pedidos" | "enderecos" | "seguranca";
 
 const TABS: Array<{ key: AccountTabKey; label: string; icon: ReactNode }> = [
   { key: "dados", label: "Meus dados", icon: <User className="size-4" /> },
   { key: "pedidos", label: "Meus pedidos", icon: <Package className="size-4" /> },
-  { key: "favoritos", label: "Favoritos", icon: <Heart className="size-4" /> },
+  { key: "enderecos", label: "Endereços", icon: <MapPin className="size-4" /> },
+  { key: "seguranca", label: "Segurança", icon: <Shield className="size-4" /> },
 ];
 
 interface AccountNavProps {

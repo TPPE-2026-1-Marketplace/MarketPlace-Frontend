@@ -11,20 +11,23 @@ import { maskCpf, maskPhone, onlyDigits } from "@/lib/utils";
 import AccountHeader from "./components/AccountHeader";
 import AccountNav, { type AccountTabKey } from "./components/AccountNav";
 import MeusDados from "./components/MeusDados";
-import MeusFavoritos from "./components/MeusFavoritos";
+import MeusEnderecos from "./components/MeusEnderecos";
 import MeusPedidos from "./components/MeusPedidos";
+import MeusSeguranca from "./components/MeusSeguranca";
 
 interface UserProfile {
   cpf: string;
   nome: string | null;
   email: string;
   telefone?: string | null;
+  dataNascimento?: string | null;
 }
 
 interface AccountForm {
   name: string;
   email: string;
   telefone: string;
+  dataNascimento: string;
   cpf: string;
 }
 
@@ -39,7 +42,13 @@ export default function ContaPage() {
 
   // Profile data from the backend (may have more fields than the auth context)
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [form, setForm] = useState<AccountForm>({ name: "", email: "", telefone: "", cpf: "" });
+  const [form, setForm] = useState<AccountForm>({
+    name: "",
+    email: "",
+    telefone: "",
+    dataNascimento: "",
+    cpf: "",
+  });
 
   // Fetch full profile from backend on mount
   useEffect(() => {
@@ -53,6 +62,7 @@ export default function ContaPage() {
           name: data.nome || "",
           email: data.email || "",
           telefone: maskPhone(data.telefone ?? ""),
+          dataNascimento: data.dataNascimento ?? "",
           cpf: maskCpf(data.cpf ?? ""),
         });
       })
@@ -62,6 +72,7 @@ export default function ContaPage() {
           name: user.name || "",
           email: user.email || "",
           telefone: maskPhone(user.phone ?? ""),
+          dataNascimento: "",
           cpf: user.id || "",
         });
       });
@@ -104,6 +115,7 @@ export default function ContaPage() {
       name: profile?.nome || user?.name || "",
       email: profile?.email || user?.email || "",
       telefone: maskPhone(profile?.telefone || user?.phone || ""),
+      dataNascimento: profile?.dataNascimento ?? "",
       cpf: maskCpf(profile?.cpf ?? ""),
     });
   };
@@ -138,9 +150,13 @@ export default function ContaPage() {
       const currentName = profile?.nome || user?.name || "";
       const currentEmail = profile?.email || user?.email || "";
       const currentTelefone = profile?.telefone || "";
+      const currentBirthdate = profile?.dataNascimento || "";
 
       if (form.name !== currentName) updatePayload.nome = form.name;
       if (form.email !== currentEmail) updatePayload.email = form.email;
+      if (form.dataNascimento !== currentBirthdate) {
+        updatePayload.dataNascimento = form.dataNascimento || null;
+      }
       // O CPF é a chave da conta (PK) e não pode ser alterado por aqui.
       const newTelefone = onlyDigits(form.telefone);
       const telefoneChanged = newTelefone !== onlyDigits(currentTelefone);
@@ -167,6 +183,7 @@ export default function ContaPage() {
         name: updated.nome || "",
         email: updated.email || "",
         telefone: maskPhone(updated.telefone ?? ""),
+        dataNascimento: updated.dataNascimento ?? "",
         cpf: maskCpf(updated.cpf ?? ""),
       });
 
@@ -208,6 +225,7 @@ export default function ContaPage() {
   const displayName = profile?.nome || user?.name || "Usuário";
   const displayEmail = profile?.email || user?.email || "";
   const displayPhone = profile?.telefone || user?.phone || "";
+  const displayBirthdate = profile?.dataNascimento ?? null;
   const displayCpf = profile?.cpf || "";
 
   return (
@@ -231,6 +249,7 @@ export default function ContaPage() {
                 displayName={displayName}
                 displayEmail={displayEmail}
                 displayPhone={displayPhone}
+                displayBirthdate={displayBirthdate}
                 displayCpf={displayCpf}
                 onEdit={handleEdit}
                 onCancel={handleCancel}
@@ -242,8 +261,11 @@ export default function ContaPage() {
             <TabsContent value="pedidos">
               <MeusPedidos />
             </TabsContent>
-            <TabsContent value="favoritos">
-              <MeusFavoritos />
+            <TabsContent value="enderecos">
+              <MeusEnderecos />
+            </TabsContent>
+            <TabsContent value="seguranca">
+              <MeusSeguranca cpf={displayCpf} onLogout={handleLogout} />
             </TabsContent>
           </div>
         </div>
