@@ -2,7 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
-import { fetchProduct, fetchProducts, getProductReviews } from "@/lib/catalog";
+import { createReview, fetchMyReviewStatus, fetchProduct, fetchProducts, getProductReviews } from "@/lib/catalog";
 import { makeProduct, makeVariant } from "@/test/factories";
 import { renderWithProviders } from "@/test/render";
 import ProductDetailPage from "./page";
@@ -12,6 +12,8 @@ vi.mock("@/lib/catalog", async (importOriginal) => ({
   fetchProduct: vi.fn(),
   fetchProducts: vi.fn(),
   getProductReviews: vi.fn(),
+  fetchMyReviewStatus: vi.fn(),
+  createReview: vi.fn(),
 }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
@@ -227,6 +229,57 @@ describe("ProductDetailPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Fechar imagem" }));
     expect(screen.queryByRole("dialog", { name: /Foto ampliada de Vestido Gala/i })).not.toBeInTheDocument();
+  });
+
+  it("convida a entrar para avaliar quando não há login", async () => {
+    await renderProduct();
+
+    expect(screen.getByRole("link", { name: "Entre na sua conta" })).toHaveAttribute("href", "/login");
+    expect(fetchMyReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it("depois de publicar a avaliação, a lista e a nota média da página são recarregadas", async () => {
+    vi.mocked(fetchProduct).mockResolvedValueOnce(vestido);
+    vi.mocked(fetchMyReviewStatus)
+      .mockResolvedValueOnce({ avaliacao: null, podeAvaliar: true, motivo: "PODE_AVALIAR" })
+      .mockResolvedValue({
+        avaliacao: { idProduto: 7, nota: 5, comentario: "Amei", dataAvaliacao: "2026-10-05T12:00:00Z", dataEdicao: null },
+        podeAvaliar: false,
+        motivo: "JA_AVALIOU",
+      });
+    vi.mocked(createReview).mockResolvedValueOnce(undefined);
+    vi.mocked(getProductReviews).mockResolvedValueOnce({
+      data: [],
+      meta: { page: 1, limit: 10, total: 0, totalPages: 1 },
+      media: 0,
+      totalAvaliacoes: 0,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 },
+    });
+    vi.mocked(getProductReviews).mockResolvedValueOnce({
+      data: [
+        { idProduto: 7, nota: 5, comentario: "Amei", dataAvaliacao: "2026-10-05T12:00:00Z", cliente: { nome: "Mariana L." } },
+      ],
+      meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      media: 5,
+      totalAvaliacoes: 1,
+      distribuicao: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 1 },
+    });
+    renderWithProviders(<ProductDetailPage />, {
+      route: "/produtos/7",
+      path: "/produtos/:id",
+      user: { id: "11144477735", name: "Mariana Lima", email: "mariana@email.com", role: "customer" },
+    });
+    await screen.findByTestId("product-detail");
+    expect(await screen.findByText("Este produto ainda não possui avaliações.")).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("radio", { name: /^5 estrelas/ }));
+    await userEvent.type(screen.getByLabelText(/Comentário/), "Amei");
+    await userEvent.click(screen.getByRole("button", { name: "Publicar avaliação" }));
+
+    expect(createReview).toHaveBeenCalledWith(7, { nota: 5, comentario: "Amei" });
+    expect(await screen.findByText("Avaliações dos clientes (1)")).toBeInTheDocument();
+    expect(screen.getAllByText("Amei").length).toBeGreaterThan(0);
+    expect(screen.getByText("de 5 · 1 avaliações")).toBeInTheDocument();
   });
 
   it("exibe avaliações e nota média carregadas via API", async () => {

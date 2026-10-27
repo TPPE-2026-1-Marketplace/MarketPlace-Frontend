@@ -16,6 +16,8 @@ interface ProductReviewsSectionProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  /** Conteúdo entre o resumo e a lista (ex.: o painel "Sua avaliação"). */
+  children?: React.ReactNode;
   className?: string;
 }
 
@@ -32,6 +34,7 @@ export function ProductReviewsSection({
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
+  children,
   className,
 }: ProductReviewsSectionProps) {
   const hasReviews = totalReviews > 0 && reviews.length > 0;
@@ -98,7 +101,7 @@ export function ProductReviewsSection({
             const percent = totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0;
             return (
               <li key={stars} className="flex items-center gap-3 text-xs font-sans">
-                <span className="w-10 shrink-0 text-[var(--foreground-secondary)]">
+                <span className="w-[4.75rem] shrink-0 whitespace-nowrap text-[var(--foreground-secondary)]">
                   {stars} {stars === 1 ? "estrela" : "estrelas"}
                 </span>
                 <div
@@ -118,6 +121,8 @@ export function ProductReviewsSection({
           })}
         </ul>
       )}
+
+      {children}
 
       {/* Lista de Avaliações Conforme a API */}
       {isLoading ? (
