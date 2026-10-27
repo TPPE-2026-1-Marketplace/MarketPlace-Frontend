@@ -64,7 +64,7 @@ export function useOrders(): UseOrdersResult {
   }, []);
 
   useEffect(() => {
-    fetchOrders();
+    void fetchOrders();
   }, [fetchOrders]);
 
   return { orders, isLoading, error };
