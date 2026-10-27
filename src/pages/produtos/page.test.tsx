@@ -58,8 +58,8 @@ describe("ProdutosPage", () => {
   it("filtra pela categoria da URL e marca o comprimento da URL", async () => {
     vi.mocked(fetchProducts).mockResolvedValue({
       data: [
-        { ...catalog[0], categories: [{ idCategoria: 2, nome: "Festa" }] },
-        { ...catalog[1], categories: [{ idCategoria: 2, nome: "Festa" }] },
+        { ...catalog[0], categories: [{ idCategoria: 2, nome: "Festa" }], tipo: "midi" },
+        { ...catalog[1], categories: [{ idCategoria: 2, nome: "Festa" }], tipo: "midi" },
         catalog[2],
       ],
       meta: { page: 1, limit: 20, total: 3, totalPages: 1 },
@@ -199,5 +199,44 @@ describe("ProdutosPage", () => {
 
     await screen.findByText("Erro ao carregar vestidos");
     expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeInTheDocument();
+  });
+
+  it("filtra vestidos pelo comprimento selecionado (midi, longo, longuete)", async () => {
+    vi.mocked(fetchProducts).mockResolvedValue({
+      data: [
+        { ...catalog[0], idProduto: 1, titulo: "Vestido Midi Charm", tipo: "midi" },
+        { ...catalog[1], idProduto: 2, titulo: "Vestido Longo Noite", tipo: "longo" },
+        { ...catalog[2], idProduto: 3, titulo: "Vestido Longuete Flor", tipo: "longuete" },
+      ],
+      meta: { page: 1, limit: 20, total: 3, totalPages: 1 },
+    });
+
+    renderWithProviders(<ProdutosPage />, { route: "/produtos?tipo=midi" });
+    await screen.findByText("Vestido Midi Charm");
+
+    expect(screen.getByText("Vestido Midi Charm")).toBeInTheDocument();
+    expect(screen.queryByText("Vestido Longo Noite")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vestido Longuete Flor")).not.toBeInTheDocument();
+
+    // Trocar para longo
+    await userEvent.click(screen.getByRole("radio", { name: "Longo" }));
+    expect(screen.getByText("Vestido Longo Noite")).toBeInTheDocument();
+    expect(screen.queryByText("Vestido Midi Charm")).not.toBeInTheDocument();
+  });
+
+  it("filtra vestidos por categoria via tags mesmo com categories vazio", async () => {
+    vi.mocked(fetchProducts).mockResolvedValue({
+      data: [
+        { ...catalog[0], idProduto: 1, titulo: "Vestido Rosa Clássico", descricao: "Modelo festa", categories: [], tags: ["festa"] },
+        { ...catalog[1], idProduto: 2, titulo: "Vestido Azul Dia", descricao: "Modelo casual para o dia a dia", categories: [], tags: ["casual"] },
+      ],
+      meta: { page: 1, limit: 20, total: 2, totalPages: 1 },
+    });
+
+    renderWithProviders(<ProdutosPage />, { route: "/produtos?categoria=festa" });
+    await screen.findByText("Vestido Rosa Clássico");
+
+    expect(screen.getByText("Vestido Rosa Clássico")).toBeInTheDocument();
+    expect(screen.queryByText("Vestido Azul Dia")).not.toBeInTheDocument();
   });
 });

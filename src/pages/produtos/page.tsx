@@ -140,8 +140,20 @@ function ProdutosContent() {
         );
         if (!matchesColor) return false;
       }
-      if (selectedTipo !== "all" && p.tipo && p.tipo !== selectedTipo) {
-        return false;
+      if (selectedTipo !== "all") {
+        const lowerTipo = selectedTipo.toLowerCase();
+        const matchesTipo =
+          p.tipo?.toLowerCase() === lowerTipo ||
+          p.tags?.some((t) => t.trim().toLowerCase() === lowerTipo) ||
+          (lowerTipo === "midi" &&
+            (p.qualMedida?.toLowerCase() === "midi" ||
+              p.qualMedida?.toLowerCase() === "médio" ||
+              p.qualMedida?.toLowerCase() === "medio")) ||
+          (lowerTipo === "longo" &&
+            (p.qualMedida?.toLowerCase() === "longo" ||
+              p.qualMedida?.toLowerCase() === "maxi")) ||
+          (lowerTipo === "longuete" && p.qualMedida?.toLowerCase() === "longuete");
+        if (!matchesTipo) return false;
       }
       return true;
     });
@@ -230,20 +242,28 @@ function ProdutosContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-sans">
         {/* Category Tabs Rápidas */}
         <div className="flex gap-2 flex-wrap mb-6">
-          {CATEGORIES.map((cat) => (
-            <Link
-              key={cat.value}
-              to={cat.value === "all" ? "/produtos" : `/produtos?categoria=${cat.value}`}
-              className={cn(
-                "px-4 py-2 text-sm font-sans font-medium rounded-[var(--radius-full)] border transition-all duration-[var(--transition-fast)] cursor-pointer select-none",
-                category === cat.value
-                  ? "bg-[var(--action-primary)] text-[var(--color-white)] border-[var(--action-primary)] shadow-xs"
-                  : "bg-[var(--background-card)] text-[var(--foreground-secondary)] border-[var(--border)] hover:border-[var(--border-control)] hover:text-[var(--foreground)]",
-              )}
-            >
-              {cat.label}
-            </Link>
-          ))}
+          {CATEGORIES.map((cat) => {
+            const nextParams = new URLSearchParams(searchParams);
+            if (cat.value === "all") nextParams.delete("categoria");
+            else nextParams.set("categoria", cat.value);
+            const query = nextParams.toString();
+            const targetUrl = query ? `/produtos?${query}` : "/produtos";
+
+            return (
+              <Link
+                key={cat.value}
+                to={targetUrl}
+                className={cn(
+                  "px-4 py-2 text-sm font-sans font-medium rounded-[var(--radius-full)] border transition-all duration-[var(--transition-fast)] cursor-pointer select-none",
+                  category === cat.value
+                    ? "bg-[var(--action-primary)] text-[var(--color-white)] border-[var(--action-primary)] shadow-xs"
+                    : "bg-[var(--background-card)] text-[var(--foreground-secondary)] border-[var(--border)] hover:border-[var(--border-control)] hover:text-[var(--foreground)]",
+                )}
+              >
+                {cat.label}
+              </Link>
+            );
+          })}
         </div>
 
         <div className="flex gap-8">

@@ -58,7 +58,14 @@ export function useProducts(initialFilters?: ProductFilters): UseProductsResult 
           categoria === "all" ||
           product.categories.some(
             (item) => item.nome.toLocaleLowerCase("pt-BR") === categoria,
-          );
+          ) ||
+          Boolean(
+            product.tags?.some(
+              (tag) => tag.trim().toLocaleLowerCase("pt-BR") === categoria,
+            ),
+          ) ||
+          product.titulo.toLocaleLowerCase("pt-BR").includes(categoria) ||
+          Boolean(product.descricao?.toLocaleLowerCase("pt-BR").includes(categoria));
         return matchesSearch && matchesCategory;
       });
 
