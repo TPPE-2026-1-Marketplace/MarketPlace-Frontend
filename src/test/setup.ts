@@ -20,6 +20,13 @@ class ResizeObserverStub {
 }
 globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver
 
+if (typeof window !== 'undefined') {
+  window.Element.prototype.scrollIntoView ??= () => {}
+  window.HTMLElement.prototype.hasPointerCapture ??= () => false
+  window.HTMLElement.prototype.setPointerCapture ??= () => {}
+  window.HTMLElement.prototype.releasePointerCapture ??= () => {}
+}
+
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()

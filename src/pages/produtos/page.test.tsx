@@ -52,7 +52,7 @@ describe("ProdutosPage", () => {
     });
     await renderPage("/produtos?categoria=formatura");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Formatura");
-    expect(screen.getByRole("link", { name: "Formatura" })).toHaveClass("bg-[#1a1a1a]");
+    expect(screen.getByRole("link", { name: "Formatura" })).toHaveClass("bg-[var(--action-primary)]");
   });
 
   it("filtra pela categoria da URL e marca o comprimento da URL", async () => {
@@ -75,15 +75,18 @@ describe("ProdutosPage", () => {
 
   it("ordena por preço e por novidade", async () => {
     await renderPage();
-    const select = screen.getByRole("combobox");
+    const combobox = screen.getByRole("combobox");
 
-    await userEvent.selectOptions(select, "menor-preco");
+    await userEvent.click(combobox);
+    await userEvent.click(screen.getByRole("option", { name: "Menor Preço" }));
     expect(titles()).toEqual(["Vestido Rosa", "Vestido Preto", "Vestido Azul"]);
 
-    await userEvent.selectOptions(select, "maior-preco");
+    await userEvent.click(combobox);
+    await userEvent.click(screen.getByRole("option", { name: "Maior Preço" }));
     expect(titles()).toEqual(["Vestido Azul", "Vestido Preto", "Vestido Rosa"]);
 
-    await userEvent.selectOptions(select, "novidade");
+    await userEvent.click(combobox);
+    await userEvent.click(screen.getByRole("option", { name: "Novidade" }));
     expect(titles()).toEqual(["Vestido Preto", "Vestido Azul", "Vestido Rosa"]);
   });
 
@@ -118,9 +121,32 @@ describe("ProdutosPage", () => {
     const toggle = screen.getByRole("button", { name: /Filtros/ });
     expect(within(toggle).getByText("!")).toBeInTheDocument();
 
-    const aside = document.querySelector("aside")!;
-    expect(aside).toHaveClass("hidden");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await userEvent.click(toggle);
-    expect(aside).toHaveClass("block");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByText("Aplicar filtros")).toBeInTheDocument();
+  });
+
+  it("exibe chips de filtros ativos e permite remoção individual", async () => {
+    vi.mocked(fetchProducts).mockResolvedValue({
+      data: [
+        { ...catalog[0], categories: [{ idCategoria: 2, nome: "Festa" }], tipo: "midi" },
+      ],
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
+    await renderPage("/produtos?categoria=festa&tipo=midi");
+    expect(screen.getByText("Categoria: Festa")).toBeInTheDocument();
+    expect(screen.getByText("Comprimento: Midi")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Remover filtro de comprimento" }));
+    expect(screen.getByTestId("location").textContent).toBe("/produtos?categoria=festa");
+  });
+
+  it("renderiza empty state de erro quando a API falha", async () => {
+    vi.mocked(fetchProducts).mockRejectedValue(new Error("Falha no servidor"));
+    renderWithProviders(<ProdutosPage />, { route: "/produtos" });
+
+    await screen.findByText("Erro ao carregar vestidos");
+    expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeInTheDocument();
   });
 });

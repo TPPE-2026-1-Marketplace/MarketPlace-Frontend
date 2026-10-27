@@ -39,6 +39,7 @@ export interface Product {
   material?: string | null;
   composicao?: string | null;
   silhueta?: string | null;
+  tipo?: string | null;
   categories: Array<{ idCategoria?: number; nome: string }>;
   variants: ProductVariant[];
 }
