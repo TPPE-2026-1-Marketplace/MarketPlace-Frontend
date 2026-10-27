@@ -16,6 +16,7 @@ import { ProductBreadcrumb } from "@/components/product/ProductBreadcrumb";
 import { ProductPurchaseInfo } from "@/components/product/ProductPurchaseInfo";
 import { ProductDetailsSection } from "@/components/product/ProductDetailsSection";
 import { ProductReviewsSection } from "@/components/product/ProductReviewsSection";
+import { MyReviewPanel } from "@/components/product/MyReviewPanel";
 import { ProductRelatedSection } from "@/components/product/ProductRelatedSection";
 import { MobileStickyPurchaseBar } from "@/components/product/MobileStickyPurchaseBar";
 import { SizeGuideModal } from "@/components/product/SizeGuideModal";
@@ -301,7 +302,9 @@ export default function ProductDetailPage() {
           hasMore={reviewsState.hasMore}
           isLoadingMore={reviewsState.isLoadingMore}
           onLoadMore={reviewsState.loadMore}
-        />
+        >
+          <MyReviewPanel productId={product.idProduto} onChanged={reviewsState.refetch} />
+        </ProductReviewsSection>
 
         {/* Vitrine de Produtos Relacionados */}
         <ProductRelatedSection products={related} />
