@@ -23,6 +23,8 @@ import { useAuth } from "../../context/AuthContext";
 import { usePOS } from "../../context/POSContext";
 import { ApiProduct, POSSaleItem } from "../../data/pos-types";
 import { api } from "../../lib/api";
+import { CPF_INVALID_MESSAGE, isValidCpf } from "../../lib/br-validators";
+import { maskCpf } from "../../lib/utils";
 
 export function Cashier() {
   const navigate = useNavigate();
@@ -133,6 +135,12 @@ export function Cashier() {
 
     if (!customerName.trim()) {
       setMessage({ type: "error", text: "O nome do cliente é obrigatório." });
+      return;
+    }
+
+    // CPF do cliente é opcional, mas se foi informado precisa ser válido.
+    if (customerCpf.trim() && !isValidCpf(customerCpf)) {
+      setMessage({ type: "error", text: CPF_INVALID_MESSAGE });
       return;
     }
 
@@ -484,8 +492,9 @@ export function Cashier() {
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
                         type="text"
+                        inputMode="numeric"
                         value={customerCpf}
-                        onChange={(e) => setCustomerCpf(e.target.value)}
+                        onChange={(e) => setCustomerCpf(maskCpf(e.target.value))}
                         placeholder="CPF do cliente"
                         className="w-full border border-gray-200 pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#1a1a1a]"
                       />

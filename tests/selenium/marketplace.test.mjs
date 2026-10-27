@@ -606,13 +606,13 @@ test("gestao exige autenticacao e oferece acesso ao login", async () => {
   await driver.get(url("/painel"));
 
   const restricted = await driver.wait(
-    until.elementLocated(By.xpath("//*[normalize-space()='Acesso Restrito']")),
+    until.elementLocated(By.xpath("//*[normalize-space()='Acesso restrito']")),
     timeout,
   );
   assert.equal(await restricted.isDisplayed(), true);
 
   const loginLink = await driver.findElement(By.css('a[href="/login"]'));
-  assert.match(await loginLink.getText(), /Fazer Login/);
+  assert.match(await loginLink.getText(), /Fazer login/);
 });
 
 test("PDV sem sessao redireciona para autenticacao sem criar venda", async () => {
@@ -645,11 +645,11 @@ test("administrador navega pelos modulos gerenciais sem alterar dados", async (t
     ),
   );
   await driver.wait(until.urlContains("/painel"), timeout);
-  assert.equal(await (await waitForHeading("Visão Geral")).isDisplayed(), true);
+  assert.equal(await (await waitForHeading("Visão geral")).isDisplayed(), true);
 
   const sections = [
-    ["/painel/estoque", "Controle de Estoque"],
-    ["/painel/pedidos", "Gerenciamento de Pedidos"],
+    ["/painel/estoque", "Estoque"],
+    ["/painel/pedidos", "Pedidos"],
     ["/painel/relatorios", "Relatórios e Análises"],
     ["/painel/comissoes", "Comissões e Metas"],
     ["/painel/cupons", "Cupons e Campanhas"],
@@ -705,7 +705,7 @@ if (allowAdminMutations) {
       ),
     );
     await driver.wait(until.urlContains("/painel"), timeout);
-    assert.equal(await (await waitForHeading("Visão Geral")).isDisplayed(), true);
+    assert.equal(await (await waitForHeading("Visão geral")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
 
     const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
@@ -721,10 +721,10 @@ if (allowAdminMutations) {
     const productImagePath = `${process.cwd()}/public/hero-dress.png`;
 
     await clickPanelNav("Estoque");
-    assert.equal(await (await waitForHeading("Controle de Estoque")).isDisplayed(), true);
+    assert.equal(await (await waitForHeading("Estoque")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
 
-    await clickVisible(await findButtonByText("Novo Produto"));
+    await clickVisible(await findButtonByText("Adicionar produto"));
     assert.equal(await (await waitForHeading("Informação Básica")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
 
@@ -793,8 +793,9 @@ if (allowAdminMutations) {
     await acceptAlertIfPresent();
     await visualPause(adminMutationStepDelayMs);
 
-    assert.equal(await (await waitForHeading("Controle de Estoque")).isDisplayed(), true);
-    await fillInput('input[placeholder="Buscar por produto, SKU base ou SKU da variante..."]', sku);
+    assert.equal(await (await waitForHeading("Estoque")).isDisplayed(), true);
+    await fillInput("#inventory-search", sku);
+    await clickVisible(await findButtonByText("Aplicar filtros"));
     await driver.wait(
       until.elementLocated(By.xpath(`//*[contains(normalize-space(.), "${variantSku}")]`)),
       timeout,
@@ -850,7 +851,7 @@ test("gerente acessa gestão quando credenciais locais estão configuradas", asy
     ),
   );
   await driver.wait(until.urlContains("/painel"), timeout);
-  assert.equal(await (await waitForHeading("Visão Geral")).isDisplayed(), true);
+  assert.equal(await (await waitForHeading("Visão geral")).isDisplayed(), true);
 
   const couponButtons = await driver.findElements(
     By.xpath("//nav//button[contains(normalize-space(.), 'Cupons')]"),

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { CPF_INVALID_MESSAGE, PHONE_INVALID_MESSAGE, isValidCpf, isValidPhone } from "@/lib/br-validators";
 import { formatCurrency, maskCep, maskCpf, maskPhone, onlyDigits, roundCents } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useCart, type Cart } from "@/hooks/useCart";
@@ -46,8 +47,11 @@ export function validateContact(form: CheckoutForm): CheckoutErrors {
   const cpf = onlyDigits(form.cpf);
   if (!cpf) errors.cpf = "Informe seu CPF.";
   else if (cpf.length !== 11) errors.cpf = "O CPF deve ter 11 dígitos.";
+  else if (!isValidCpf(cpf)) errors.cpf = CPF_INVALID_MESSAGE;
 
-  if (onlyDigits(form.telefone).length < 10) errors.telefone = "Informe um telefone com DDD.";
+  const telefone = onlyDigits(form.telefone);
+  if (telefone.length < 10) errors.telefone = "Informe um telefone com DDD.";
+  else if (!isValidPhone(telefone)) errors.telefone = PHONE_INVALID_MESSAGE;
 
   return errors;
 }

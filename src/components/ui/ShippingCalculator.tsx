@@ -1,9 +1,14 @@
-
 import React, { useState } from "react";
 import { MapPin, Check } from "lucide-react";
 import { api } from "@/lib/api";
+import { cn, formatCurrency } from "@/lib/utils";
 
-export default function ShippingCalculator() {
+interface ShippingCalculatorProps {
+  onQuoteCalculated?: (quote: { valor: number; prazo_dias: number } | null) => void;
+  className?: string;
+}
+
+export default function ShippingCalculator({ onQuoteCalculated, className }: ShippingCalculatorProps = {}) {
   const [cep, setCep] = useState("");
   const [quote, setQuote] = useState<{ valor: number; prazo_dias: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -15,6 +20,7 @@ export default function ShippingCalculator() {
     if (cleanCep.length !== 8) {
       setQuote(null);
       setError("CEP inválido. Use 8 dígitos.");
+      onQuoteCalculated?.(null);
       return;
     }
 
@@ -25,17 +31,24 @@ export default function ShippingCalculator() {
         cep_destino: cleanCep,
       });
       setQuote(response);
+      onQuoteCalculated?.(response);
     } catch (requestError) {
       setQuote(null);
       setError(requestError instanceof Error ? requestError.message : "Erro ao calcular frete.");
+      onQuoteCalculated?.(null);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="mb-6 p-4 rounded-[var(--radius-lg)] bg-[var(--background-secondary)] border border-[var(--border)]">
-      <p className="text-sm font-medium text-[var(--foreground)] mb-3 flex items-center gap-2">
+    <div
+      className={cn(
+        "mb-6 p-4 rounded-[var(--radius-lg)] bg-[var(--background-secondary)] border border-[var(--border)]",
+        className,
+      )}
+    >
+      <p className="text-sm font-medium text-[var(--foreground)] mb-2.5 flex items-center gap-2">
         <MapPin size={16} className="text-[var(--foreground-muted)]" />
         Simular Entrega
       </p>
@@ -50,35 +63,33 @@ export default function ShippingCalculator() {
           }}
           placeholder="Digite seu CEP"
           maxLength={9}
-          className="flex-1 rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-brand)] bg-[var(--background)] text-[var(--foreground)] transition-colors"
+          className="flex-1 rounded-[var(--radius-sm)] border border-[var(--border)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-brand)] bg-[var(--background-card)] text-[var(--foreground)] transition-colors"
         />
         <button
           type="submit"
-          className="rounded-[var(--radius-md)] bg-[var(--color-brand)] text-white px-4 py-2 text-sm hover:bg-[var(--color-brand-dark)] transition-colors font-medium"
+          className="rounded-[var(--radius-sm)] bg-[var(--action-primary)] text-[var(--color-white)] px-4 py-2 text-sm hover:bg-[var(--action-primary-hover)] transition-colors font-medium cursor-pointer"
         >
           OK
         </button>
       </form>
 
       {loading && (
-        <p className="mt-3 text-xs text-[var(--foreground-muted)]">Calculando frete...</p>
+        <p className="mt-2.5 text-xs text-[var(--foreground-muted)]">Calculando frete...</p>
       )}
 
       {quote && !loading && (
-        <div className="mt-3 p-3 rounded bg-[var(--color-success)]/10 border border-[var(--color-success)]/20">
-          <p className="text-[var(--color-success)] text-xs flex items-start gap-1.5 font-medium leading-relaxed">
-            <Check size={14} className="shrink-0 mt-0.5" />
-            Frete {quote.valor.toLocaleString("pt-BR", {
-              style: "currency",
-              currency: "BRL",
-            })} · prazo de {quote.prazo_dias} dia{quote.prazo_dias !== 1 ? "s" : ""} útil
+        <div className="mt-2.5 p-2.5 rounded-[var(--radius-sm)] bg-[var(--color-success)]/10 border border-[var(--color-success)]/20">
+          <p className="text-[var(--color-success-text)] text-xs flex items-center gap-1.5 font-medium leading-relaxed">
+            <Check size={14} className="shrink-0 text-[var(--color-success)]" />
+            Frete {formatCurrency(quote.valor)} · prazo de {quote.prazo_dias} dia
+            {quote.prazo_dias !== 1 ? "s" : ""} útil
           </p>
         </div>
       )}
 
       {error && !loading && (
-        <div className="mt-3 p-3 rounded bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20">
-          <p className="text-[var(--color-warning)] text-xs font-medium leading-relaxed">
+        <div className="mt-2.5 p-2.5 rounded-[var(--radius-sm)] bg-[var(--background-error-subtle)] border border-[var(--color-error)]/20">
+          <p className="text-[var(--color-error-text)] text-xs font-medium leading-relaxed">
             {error}
           </p>
         </div>

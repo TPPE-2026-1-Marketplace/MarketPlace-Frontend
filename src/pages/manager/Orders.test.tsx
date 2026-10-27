@@ -13,9 +13,8 @@ vi.mock("@/lib/api", () => ({ api: { patch: vi.fn() } }));
 const fetchMock = vi.mocked(fetchManagementOrders);
 const patchMock = vi.mocked(api.patch);
 
-const base: Omit<ApiOrder, "idPedido" | "status" | "tipoRetirada"> = {
+const base: Omit<ApiOrder, "idPedido" | "status" | "tipoRetirada" | "dataPedido"> = {
   idUsuario: null,
-  dataPedido: "2026-09-10T12:00:00",
   subtotal: 100,
   valorFrete: 0,
   valorTotal: "100",
@@ -27,128 +26,194 @@ const orders: ApiOrder[] = [
   {
     ...base,
     idPedido: 10,
+    dataPedido: "2026-09-13T12:00:00",
     status: "paid",
     tipoRetirada: "entrega",
+    idUsuario: "12345678900",
     user: { nome: "Maria Online" },
+    valorTotal: "899.9",
     items: [{ idItemPedido: 1, idVariante: "ROSA-P", quantidade: 2, precoUnitario: "50" }],
   },
-  { ...base, idPedido: 20, status: "pending", tipoRetirada: "loja", clienteNomeAvulso: "Joana Balcão" },
-  { ...base, idPedido: 30, status: "delivered", tipoRetirada: "entrega", clienteCpfAvulso: "99988877766" },
-  { ...base, idPedido: 40, status: "cancelled", tipoRetirada: "loja" },
+  { ...base, idPedido: 20, dataPedido: "2026-09-12T12:00:00", status: "pending", tipoRetirada: "loja", clienteNomeAvulso: "Joana Balcão" },
+  { ...base, idPedido: 30, dataPedido: "2026-09-11T12:00:00", status: "delivered", tipoRetirada: "entrega", clienteCpfAvulso: "99988877766" },
+  { ...base, idPedido: 40, dataPedido: "2026-09-10T12:00:00", status: "cancelled", tipoRetirada: "loja" },
+  { ...base, idPedido: 50, dataPedido: "2026-09-14T12:00:00", status: "shipped", tipoRetirada: "entrega", codigoRastreamento: "BR999" },
 ];
 
-const meta = { page: 1, limit: 100, total: 4, totalPages: 1 };
+const meta = { page: 1, limit: 100, total: orders.length, totalPages: 1 };
 const rows = () => screen.getAllByRole("row").slice(1);
+const row = (id: number) => screen.getByText(`#${id}`).closest("tr") as HTMLElement;
+const kpi = (label: string) => screen.getByText(label, { selector: "p" }).nextElementSibling;
+
+async function renderOrders(readOnly = false) {
+  render(<Orders readOnly={readOnly} />);
+  await screen.findByText("#10");
+}
+
+async function applyFilters(values: { search?: string; status?: string; pickup?: string }) {
+  const search = screen.getByLabelText("Buscar pedido, CPF ou SKU");
+  await userEvent.clear(search);
+  if (values.search) await userEvent.type(search, values.search);
+  await userEvent.selectOptions(screen.getByLabelText(/^Status:/), values.status ?? "all");
+  await userEvent.selectOptions(screen.getByLabelText(/^Modalidade:/), values.pickup ?? "all");
+  await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+}
+
+async function openOrder(id: number) {
+  await userEvent.click(screen.getByRole("button", { name: `Ver pedido #${id}` }));
+  return screen.getByRole("dialog");
+}
 
 describe("Orders", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     patchMock.mockReset();
     fetchMock.mockResolvedValue({ data: orders, meta });
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  it("lista os pedidos com cliente, modalidade e status", async () => {
+  it("lista os pedidos do mais recente com indicadores e CPF mascarado", async () => {
     render(<Orders />);
-    expect(screen.getByText("Carregando pedidos...")).toBeInTheDocument();
+    expect(screen.getByText("Carregando dados")).toBeInTheDocument();
+    await screen.findByText("#10");
 
-    expect(await screen.findByText("Maria Online")).toBeInTheDocument();
-    expect(screen.getByText("4 pedido(s) carregado(s) do backend")).toBeInTheDocument();
-    expect(screen.getByText("Joana Balcão")).toBeInTheDocument();
-    expect(screen.getByText("99988877766")).toBeInTheDocument();
-    expect(screen.getByText("Não identificado")).toBeInTheDocument();
-    expect(within(rows()[0]).getByText("Entrega")).toBeInTheDocument();
-    expect(within(rows()[1]).getByText("Retirada")).toBeInTheDocument();
-    expect(screen.getAllByTitle("Atualizar rastreamento")).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 1, name: "Pedidos" })).toBeInTheDocument();
+    expect(kpi("Pendentes")).toHaveTextContent("01");
+    expect(kpi("Em separação")).toHaveTextContent("01");
+    expect(kpi("Enviados")).toHaveTextContent("01");
+    // Retirada na loja: só a que ainda não foi entregue nem cancelada.
+    expect(kpi("Retirada na loja")).toHaveTextContent("01");
+
+    expect(rows().map((tr) => within(tr).getAllByRole("cell")[0].textContent)).toEqual([
+      "Pedido: #50",
+      "Pedido: #10",
+      "Pedido: #20",
+      "Pedido: #30",
+      "Pedido: #40",
+    ]);
+    expect(within(row(10)).getByText("Maria · ***.***.***-00")).toBeInTheDocument();
+    expect(within(row(10)).getByText("13 set")).toBeInTheDocument();
+    expect(within(row(10)).getByText("R$ 899,90")).toBeInTheDocument();
+    expect(within(row(10)).getByText("Pago")).toBeInTheDocument();
+    expect(within(row(20)).getByText("Joana")).toBeInTheDocument();
+    expect(within(row(20)).getByText("Loja")).toBeInTheDocument();
+    expect(within(row(30)).getByText("Cliente não identificado · ***.***.***-66")).toBeInTheDocument();
   });
 
-  it("filtra por busca, status e modalidade", async () => {
-    render(<Orders />);
-    await screen.findByText("Maria Online");
-    const search = screen.getByPlaceholderText("Buscar por pedido, CPF ou SKU da variante...");
+  it("filtra por busca, status e modalidade e limpa os filtros", async () => {
+    await renderOrders();
 
-    await userEvent.type(search, "rosa-p");
+    await applyFilters({ search: "rosa-p" });
     expect(rows()).toHaveLength(1);
-    await userEvent.clear(search);
-    await userEvent.type(search, "joana");
-    expect(screen.getByText("Joana Balcão")).toBeInTheDocument();
-    await userEvent.clear(search);
-    await userEvent.type(search, "999888");
+    await applyFilters({ search: "joana" });
+    expect(screen.getByText("#20")).toBeInTheDocument();
+    await applyFilters({ search: "999.888" });
+    expect(screen.getByText("#30")).toBeInTheDocument();
     expect(rows()).toHaveLength(1);
-    await userEvent.clear(search);
-
-    await userEvent.selectOptions(screen.getByRole("combobox"), "cancelled");
+    await applyFilters({ search: "#40" });
     expect(rows()).toHaveLength(1);
-    await userEvent.selectOptions(screen.getByRole("combobox"), "all");
-
-    await userEvent.click(screen.getByRole("button", { name: "Loja" }));
+    await applyFilters({ status: "cancelled" });
+    expect(rows()).toHaveLength(1);
+    await applyFilters({ pickup: "loja" });
     expect(rows()).toHaveLength(2);
-    await userEvent.click(screen.getByRole("button", { name: "Entrega" }));
-    expect(rows()).toHaveLength(2);
-    await userEvent.click(screen.getByRole("button", { name: "Todos" }));
-    expect(rows()).toHaveLength(4);
+    await applyFilters({ pickup: "entrega" });
+    expect(rows()).toHaveLength(3);
 
-    await userEvent.type(search, "nada");
-    expect(screen.getByText("Nenhum pedido real encontrado.")).toBeInTheDocument();
+    // O filtro só vale depois de "Aplicar filtros".
+    await userEvent.type(screen.getByLabelText("Buscar pedido, CPF ou SKU"), "nada");
+    expect(rows()).toHaveLength(3);
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    expect(screen.getByText("Nenhum resultado encontrado")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(rows()).toHaveLength(5);
   });
 
-  it("atualiza o código de rastreamento", async () => {
-    const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("  ").mockReturnValueOnce(" BR123 ");
-    patchMock.mockResolvedValue(undefined);
-    render(<Orders />);
-    await screen.findByText("Maria Online");
+  it("'Buscar pedido' leva o foco ao campo de busca", async () => {
+    await renderOrders();
 
-    await userEvent.click(screen.getByTitle("Atualizar rastreamento"));
-    expect(patchMock).not.toHaveBeenCalled();
-
-    await userEvent.click(screen.getByTitle("Atualizar rastreamento"));
-    expect(prompt).toHaveBeenLastCalledWith("Informe o código de rastreamento", "");
-    expect(patchMock).toHaveBeenCalledWith("/orders/10/tracking", { codigo_rastreamento: "BR123" });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await userEvent.click(screen.getByRole("button", { name: "Buscar pedido" }));
+    expect(screen.getByLabelText("Buscar pedido, CPF ou SKU")).toHaveFocus();
   });
 
-  it("mostra erro ao falhar o rastreamento", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(window, "prompt").mockReturnValue("BR1");
-    patchMock.mockRejectedValueOnce(new Error("500"));
-    render(<Orders />);
-    await screen.findByText("Maria Online");
+  it("abre o pedido, salva o status e mostra a confirmação", async () => {
+    patchMock.mockRejectedValueOnce(new Error("500")).mockResolvedValueOnce(undefined);
+    await renderOrders();
 
-    await userEvent.click(screen.getByTitle("Atualizar rastreamento"));
+    const dialog = await openOrder(10);
+    expect(within(dialog).getByRole("heading", { name: "Pedido #10" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Maria Online · ***.***.***-00")).toBeInTheDocument();
+    expect(within(dialog).getByText("ROSA-P · 2 unidades")).toBeInTheDocument();
+    expect(within(dialog).getByText("Entrega em casa")).toBeInTheDocument();
+    const status = within(dialog).getByLabelText("Status do pedido");
+    // "Pago" aparece só por ser o status atual; a gestão não marca pedidos como pagos.
+    expect(within(status).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Pago",
+      "Pendente",
+      "Enviado",
+      "Entregue",
+      "Cancelado",
+    ]);
+    expect(within(dialog).getByRole("button", { name: "Salvar alterações" })).toBeDisabled();
 
-    expect(await screen.findByText("Não foi possível atualizar o rastreamento deste pedido.")).toBeInTheDocument();
+    await userEvent.selectOptions(status, "delivered");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar alterações" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Não foi possível atualizar o status deste pedido.");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar alterações" }));
+    expect(patchMock).toHaveBeenLastCalledWith("/orders/10/status", { status: "delivered" });
+    expect(await screen.findByRole("heading", { name: "Alterações salvas" })).toBeInTheDocument();
+    expect(screen.getByText("Pedido #10 marcado como entregue")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(within(row(10)).getByText("Entregue")).toBeInTheDocument();
   });
 
-  it("abre os detalhes, muda o status e fecha o modal", async () => {
-    patchMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("500"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    render(<Orders />);
-    await screen.findByText("Maria Online");
+  it("atualiza o rastreio e o pedido passa a enviado", async () => {
+    patchMock.mockRejectedValueOnce(new Error("500")).mockResolvedValueOnce(undefined);
+    await renderOrders();
 
-    await userEvent.click(within(rows()[0]).getByTitle("Ver detalhes"));
-    expect(screen.getByText("Pedido #10")).toBeInTheDocument();
-    expect(screen.getByText("Quantidade: 2")).toBeInTheDocument();
-    const statusSelect = screen.getAllByRole("combobox")[1];
-    expect(within(statusSelect).queryByRole("option", { name: "Pago" })).not.toBeInTheDocument();
+    const dialog = await openOrder(10);
+    const tracking = within(dialog).getByLabelText("Rastreio");
+    expect(within(dialog).getByRole("button", { name: "Atualizar rastreio" })).toBeDisabled();
+    await userEvent.type(tracking, " BR123 ");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Atualizar rastreio" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Não foi possível atualizar o rastreio deste pedido.");
 
-    await userEvent.selectOptions(statusSelect, "shipped");
-    expect(patchMock).toHaveBeenCalledWith("/orders/10/status", { status: "shipped" });
-
-    await userEvent.selectOptions(statusSelect, "delivered");
-    expect(await screen.findByText("Não foi possível atualizar o status deste pedido.")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByText("Pedido #10").nextElementSibling as HTMLElement);
-    expect(screen.queryByText("Pedido #10")).not.toBeInTheDocument();
-
-    await userEvent.click(within(rows()[1]).getByTitle("Ver detalhes"));
-    expect(screen.getByText("Pedido sem itens retornados pela API.")).toBeInTheDocument();
-    expect(screen.getAllByRole("combobox")).toHaveLength(1);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Atualizar rastreio" }));
+    expect(patchMock).toHaveBeenLastCalledWith("/orders/10/tracking", { codigo_rastreamento: "BR123" });
+    expect(await screen.findByText("Rastreio do pedido #10 atualizado")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
+    expect(within(row(10)).getByText("Enviado")).toBeInTheDocument();
+    expect(kpi("Enviados")).toHaveTextContent("02");
   });
 
-  it("mostra erro quando a lista não carrega", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("retirada na loja e perfil somente leitura não editam o pedido", async () => {
+    await renderOrders(true);
+
+    let dialog = await openOrder(10);
+    expect(within(dialog).getByText("Pago")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("combobox")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Salvar alterações" })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+    dialog = await openOrder(50);
+    expect(within(dialog).getByText("BR999")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+    dialog = await openOrder(20);
+    expect(within(dialog).getByText("Retirada na loja")).toBeInTheDocument();
+    expect(within(dialog).getByText("Pedido sem itens retornados pela API")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Rastreio")).not.toBeInTheDocument();
+  });
+
+  it("mostra erro quando a lista não carrega e tenta de novo", async () => {
     fetchMock.mockRejectedValueOnce(new Error("500"));
     render(<Orders />);
 
-    expect(await screen.findByText("Não foi possível carregar os pedidos do backend.")).toBeInTheDocument();
+    expect(await screen.findByText("Não foi possível carregar os pedidos.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByText("#10")).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 });

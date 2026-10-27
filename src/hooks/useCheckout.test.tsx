@@ -87,6 +87,18 @@ describe("validateCheckoutForm", () => {
     const semEndereco = { ...validForm, cep: "", rua: "", numero: "", bairro: "", cidade: "", estado: "" };
     expect(validateCheckoutForm(semEndereco, "loja", { hasShippingQuote: false })).toEqual({});
   });
+
+  it("rejeita CPF com dígito verificador errado e telefone com DDD inexistente", () => {
+    const errors = validateCheckoutForm(
+      { ...validForm, cpf: "123.456.789-00", telefone: "(00) 99999-0000" },
+      "entrega",
+      { hasShippingQuote: true },
+    );
+    expect(errors).toEqual({
+      cpf: "CPF inválido. Confira os números digitados.",
+      telefone: "Telefone inválido. Use DDD + número, ex.: (61) 99999-0000.",
+    });
+  });
 });
 
 describe("getFirstInvalidField", () => {

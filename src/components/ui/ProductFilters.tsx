@@ -1,160 +1,312 @@
-
 import React from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Button from "@/components/ui/Button";
+import { CATEGORIAS, TIPOS as TIPOS_CATALOGO } from "@/lib/categories";
 
-interface ProductFiltersProps {
-  filters: {
-    categoria?: string;
-    busca?: string;
-    minPrice?: number;
-    maxPrice?: number;
-  };
-  onFiltersChange: (filters: ProductFiltersProps["filters"]) => void;
-  categories?: string[];
+export const ALL_SIZES = [
+  "PP", "P", "M", "G", "GG", "XG",
+  "38", "40", "42", "44", "46", "48", "50", "52", "54", "56", "58",
+];
+
+export const ALL_COLORS = [
+  "Rosa", "Branco", "Azul Safira", "Vermelho", "Dourado", "Lilás",
+  "Verde Esmeralda", "Preto", "Champagne", "Nude", "Bordô", "Lavanda",
+];
+
+export const COLOR_SWATCHES: Record<string, string> = {
+  "rosa": "bg-pink-300",
+  "rosa antigo": "bg-[var(--color-brand-light)]",
+  "rose gold": "bg-rose-200",
+  "rose": "bg-rose-300",
+  "azul": "bg-blue-500",
+  "azul marinho": "bg-blue-900",
+  "azul safira": "bg-blue-600",
+  "azul royal": "bg-blue-700",
+  "navy": "bg-slate-900",
+  "preto": "bg-neutral-900",
+  "branco": "bg-white border-neutral-300",
+  "off white": "bg-neutral-100 border-neutral-300",
+  "off-white": "bg-neutral-100 border-neutral-300",
+  "verde": "bg-emerald-600",
+  "verde esmeralda": "bg-emerald-700",
+  "verde menta": "bg-teal-200",
+  "oliva": "bg-lime-800",
+  "vermelho": "bg-red-600",
+  "dourado": "bg-amber-300",
+  "ouro": "bg-amber-400",
+  "prata": "bg-slate-300",
+  "marsala": "bg-rose-900",
+  "lilás": "bg-purple-300",
+  "lilas": "bg-purple-300",
+  "champagne": "bg-amber-100",
+  "nude": "bg-amber-50",
+  "bordô": "bg-red-950",
+  "bordo": "bg-red-950",
+  "lavanda": "bg-purple-200",
+  "coral": "bg-rose-400",
+  "chumbo": "bg-stone-700",
+  "grafite": "bg-neutral-700",
+  "terracota": "bg-amber-700",
+  "fúcsia": "bg-fuchsia-600",
+  "fucsia": "bg-fuchsia-600",
+  "magenta": "bg-pink-600",
+};
+
+export function getColorSwatch(color: string): string {
+  const normalized = color.toLowerCase().trim();
+  if (COLOR_SWATCHES[normalized]) return COLOR_SWATCHES[normalized];
+
+  const noAccents = normalized.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (COLOR_SWATCHES[noAccents]) return COLOR_SWATCHES[noAccents];
+
+  const firstWord = normalized.split(/\s+/)[0];
+  if (COLOR_SWATCHES[firstWord]) return COLOR_SWATCHES[firstWord];
+
+  return "bg-neutral-400";
 }
 
-const DEFAULT_CATEGORIES = ["debutante", "formatura", "casamento", "festa"];
+export interface ProductFiltersProps {
+  category?: string;
+  onSelectCategory?: (category: string) => void;
+  tipo?: string;
+  onSelectTipo?: (tipo: string) => void;
+  priceRange?: [number, number];
+  onPriceRangeChange?: (range: [number, number]) => void;
+  selectedSizes?: string[];
+  onToggleSize?: (size: string) => void;
+  selectedColors?: string[];
+  onToggleColor?: (color: string) => void;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
+  categories?: Array<{ value: string; label: string }>;
+  tipos?: Array<{ value: string; label: string }>;
+  sizes?: string[];
+  colors?: string[];
+  className?: string;
+  isMobile?: boolean;
+}
 
 export default function ProductFilters({
-  filters,
-  onFiltersChange,
-  categories = DEFAULT_CATEGORIES,
+  tipo = "all",
+  onSelectTipo = () => {},
+  priceRange = [0, 5000],
+  onPriceRangeChange = () => {},
+  selectedSizes = [],
+  onToggleSize = () => {},
+  selectedColors = [],
+  onToggleColor = () => {},
+  hasActiveFilters = false,
+  onClearFilters = () => {},
+  tipos = [{ value: "all", label: "Todos" }, ...TIPOS_CATALOGO],
+  sizes = ALL_SIZES,
+  colors = ALL_COLORS,
+  className,
+  isMobile = false,
 }: ProductFiltersProps) {
-  const [showMobileFilters, setShowMobileFilters] = React.useState(false);
-
-  const hasActiveFilters = filters.categoria || filters.busca || filters.minPrice || filters.maxPrice;
-
-  const clearFilters = () => {
-    onFiltersChange({});
-  };
-
-  const filtersContent = (
-    <div className="space-y-6">
-      {/* Search */}
-      <div className="relative">
-        <Search
-          size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--foreground-subtle)]"
-        />
-        <input
-          type="text"
-          placeholder="Buscar vestidos..."
-          value={filters.busca ?? ""}
-          onChange={(e) =>
-            onFiltersChange({ ...filters, busca: e.target.value || undefined })
-          }
-          className="w-full pl-10 pr-4 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none focus:border-[var(--color-brand)] transition-colors"
-        />
-      </div>
-
-      {/* Categories */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--foreground-muted)] mb-3">
-          Categoria
-        </h3>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
+  return (
+    <div
+      className={cn(
+        "bg-[var(--background-card)] font-sans",
+        !isMobile && "p-5 border border-[var(--border)] rounded-[var(--radius-lg)] shadow-xs",
+        className,
+      )}
+    >
+      {/* Título e Ação de Limpeza */}
+      {!isMobile && (
+        <div className="flex items-center justify-between mb-5 pb-3 border-b border-[var(--border)]">
+          <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+            <SlidersHorizontal className="size-4 text-[var(--color-brand)]" />
+            Filtros
+          </h3>
+          {hasActiveFilters && (
             <button
-              key={cat}
-              onClick={() =>
-                onFiltersChange({
-                  ...filters,
-                  categoria: filters.categoria === cat ? undefined : cat,
-                })
-              }
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-[var(--radius-full)] border transition-all duration-[var(--transition-fast)] capitalize",
-                filters.categoria === cat
-                  ? "bg-[var(--color-brand)] border-[var(--color-brand)] text-[var(--foreground)]"
-                  : "bg-transparent border-[var(--border)] text-[var(--foreground-muted)] hover:border-[var(--border-hover)] hover:text-[var(--foreground)]",
-              )}
+              type="button"
+              onClick={onClearFilters}
+              className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)] flex items-center gap-1 transition-colors cursor-pointer"
             >
-              {cat}
+              <X className="size-3" /> Limpar
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Seção: Comprimento */}
+      <div className="mb-6">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)] mb-3">
+          Comprimento
+        </h4>
+        <div className="space-y-2">
+          {tipos.map((t) => (
+            <label
+              key={t.value}
+              className="flex items-center gap-2.5 cursor-pointer text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors select-none"
+            >
+              <input
+                type="radio"
+                name={isMobile ? "tipo-mobile" : "tipo"}
+                value={t.value}
+                checked={tipo === t.value}
+                onChange={() => onSelectTipo(t.value)}
+                className="accent-[var(--action-primary)] size-4 cursor-pointer"
+              />
+              <span>{t.label}</span>
+            </label>
           ))}
         </div>
       </div>
 
-      {/* Price range */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--foreground-muted)] mb-3">
-          Faixa de preço
-        </h3>
-        <div className="flex items-center gap-2">
+      {/* Seção: Faixa de Preço */}
+      <div className="mb-6 pt-5 border-t border-[var(--border)]">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)] mb-3">
+          Preço
+        </h4>
+        <div className="space-y-3">
           <input
-            type="number"
-            placeholder="Min"
-            value={filters.minPrice ?? ""}
-            onChange={(e) =>
-              onFiltersChange({
-                ...filters,
-                minPrice: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-            className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none focus:border-[var(--color-brand)] transition-colors"
+            type="range"
+            min={0}
+            max={5000}
+            step={50}
+            value={priceRange[1]}
+            onChange={(e) => onPriceRangeChange([priceRange[0], Math.max(priceRange[0], Number(e.target.value))])}
+            className="w-full accent-[var(--action-primary)] cursor-pointer"
+            aria-label="Filtrar por preço máximo na barra"
           />
-          <span className="text-[var(--foreground-subtle)] text-sm">—</span>
-          <input
-            type="number"
-            placeholder="Max"
-            value={filters.maxPrice ?? ""}
-            onChange={(e) =>
-              onFiltersChange({
-                ...filters,
-                maxPrice: e.target.value ? Number(e.target.value) : undefined,
-              })
-            }
-            className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none focus:border-[var(--color-brand)] transition-colors"
-          />
+          <div className="flex justify-between items-center text-xs font-medium text-[var(--foreground-secondary)]">
+            <span>R$ {priceRange[0].toLocaleString("pt-BR")}</span>
+            <span>R$ {priceRange[1].toLocaleString("pt-BR")}</span>
+          </div>
+
+          {/* Entradas manuais de intervalo específico */}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <div>
+              <label
+                htmlFor={isMobile ? "price-min-mobile" : "price-min"}
+                className="text-[11px] font-medium text-[var(--foreground-muted)] block mb-1"
+              >
+                Mínimo
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-2.5 text-xs text-[var(--foreground-muted)] pointer-events-none select-none">
+                  R$
+                </span>
+                <input
+                  id={isMobile ? "price-min-mobile" : "price-min"}
+                  type="number"
+                  min={0}
+                  step={10}
+                  value={priceRange[0] === 0 ? "" : priceRange[0]}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const val = raw === "" ? 0 : Math.max(0, Number(raw));
+                    onPriceRangeChange([val, priceRange[1]]);
+                  }}
+                  onBlur={() => {
+                    if (priceRange[0] > priceRange[1]) {
+                      onPriceRangeChange([priceRange[1], priceRange[0]]);
+                    }
+                  }}
+                  placeholder="0"
+                  className="w-full pl-8 pr-2 py-1.5 text-xs rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--background-card)] text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:outline-none focus:border-[var(--color-brand)] transition-colors"
+                  aria-label="Preço mínimo em reais"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor={isMobile ? "price-max-mobile" : "price-max"}
+                className="text-[11px] font-medium text-[var(--foreground-muted)] block mb-1"
+              >
+                Máximo
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-2.5 text-xs text-[var(--foreground-muted)] pointer-events-none select-none">
+                  R$
+                </span>
+                <input
+                  id={isMobile ? "price-max-mobile" : "price-max"}
+                  type="number"
+                  min={0}
+                  step={10}
+                  value={priceRange[1] === 0 ? "" : priceRange[1]}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const val = raw === "" ? 0 : Math.max(0, Number(raw));
+                    onPriceRangeChange([priceRange[0], val]);
+                  }}
+                  onBlur={() => {
+                    if (priceRange[1] < priceRange[0]) {
+                      onPriceRangeChange([priceRange[1], priceRange[0]]);
+                    }
+                  }}
+                  placeholder="5000"
+                  className="w-full pl-8 pr-2 py-1.5 text-xs rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--background-card)] text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:outline-none focus:border-[var(--color-brand)] transition-colors"
+                  aria-label="Preço máximo em reais"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Clear */}
-      {hasActiveFilters && (
-        <Button variant="ghost" size="sm" fullWidth onClick={clearFilters}>
-          <X size={14} />
-          Limpar filtros
-        </Button>
-      )}
+      {/* Seção: Tamanho */}
+      <div className="mb-6 pt-5 border-t border-[var(--border)]">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)] mb-3">
+          Tamanho
+        </h4>
+        <div className="flex flex-wrap gap-1.5">
+          {sizes.map((size) => {
+            const isSelected = selectedSizes.includes(size);
+            return (
+              <button
+                key={size}
+                type="button"
+                onClick={() => onToggleSize(size)}
+                className={cn(
+                  "min-w-10 h-9 px-2.5 border text-xs font-medium rounded-[var(--radius-sm)] transition-all cursor-pointer flex items-center justify-center",
+                  isSelected
+                    ? "bg-[var(--action-primary)] text-[var(--color-white)] border-[var(--action-primary)] shadow-xs"
+                    : "border-[var(--border)] text-[var(--foreground-secondary)] bg-[var(--background-card)] hover:border-[var(--border-control)] hover:text-[var(--foreground)]",
+                )}
+                aria-pressed={isSelected}
+              >
+                {size}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Seção: Cor */}
+      <div className="pt-5 border-t border-[var(--border)]">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--foreground-muted)] mb-3">
+          Cor
+        </h4>
+        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+          {colors.map((color) => {
+            const isSelected = selectedColors.includes(color);
+            const swatch = getColorSwatch(color);
+            return (
+              <label
+                key={color}
+                className="flex items-center gap-2.5 cursor-pointer text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors select-none py-0.5"
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleColor(color)}
+                  className="accent-[var(--action-primary)] size-4 rounded-[var(--radius-xs)] cursor-pointer"
+                />
+                <span
+                  className={cn("size-3 rounded-full border border-black/10 shrink-0", swatch)}
+                  aria-hidden="true"
+                />
+                <span>{color}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
     </div>
-  );
-
-  return (
-    <>
-      {/* Mobile filter toggle */}
-      <div className="lg:hidden mb-4">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setShowMobileFilters(!showMobileFilters)}
-        >
-          <SlidersHorizontal size={16} />
-          Filtros
-          {hasActiveFilters && (
-            <span className="ml-1 w-2 h-2 rounded-full bg-[var(--color-brand)]" />
-          )}
-        </Button>
-      </div>
-
-      {/* Mobile filters drawer */}
-      {showMobileFilters && (
-        <div className="lg:hidden mb-6 p-5 rounded-[var(--radius-lg)] bg-[var(--background-card)] border border-[var(--border)] animate-scale-in">
-          {filtersContent}
-        </div>
-      )}
-
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:block w-64 shrink-0">
-        <div className="sticky top-[calc(var(--header-height)+2rem)] p-5 rounded-[var(--radius-lg)] bg-[var(--background-card)] border border-[var(--border)]">
-          <h2 className="text-sm font-semibold text-[var(--foreground)] mb-5 flex items-center gap-2">
-            <SlidersHorizontal size={16} />
-            Filtros
-          </h2>
-          {filtersContent}
-        </div>
-      </aside>
-    </>
   );
 }

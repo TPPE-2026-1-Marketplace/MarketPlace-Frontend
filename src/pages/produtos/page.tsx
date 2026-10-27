@@ -1,19 +1,33 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type AnyModel = any;
-type ProductFiltersType = any;
-
-
-import React, { useState, useEffect, useMemo, Suspense } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Link } from "react-router-dom";
-import { SlidersHorizontal, X, ChevronDown } from "lucide-react";
+import React, { useState, useMemo, Suspense } from "react";
+import { useSearchParams, Link } from "react-router-dom";
+import { SlidersHorizontal, X, AlertCircle } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";
-import { useProducts } from "@/hooks/useProducts";
+import ProductFilters, { ALL_COLORS } from "@/components/ui/ProductFilters";
+import Pagination from "@/components/ui/Pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProducts, type ProductFilters as ApiFilters, type Product } from "@/hooks/useProducts";
 import { getDisplayVariant } from "@/lib/catalog";
 import { CATEGORIAS, TIPOS as TIPOS_CATALOGO } from "@/lib/categories";
+import { cn } from "@/lib/utils";
 
 const CATEGORIES = [{ value: "all", label: "Todas" }, ...CATEGORIAS];
-
 const TIPOS = [{ value: "all", label: "Todos" }, ...TIPOS_CATALOGO];
 
 const SORT_OPTIONS = [
@@ -23,72 +37,124 @@ const SORT_OPTIONS = [
   { value: "novidade", label: "Novidade" },
 ];
 
-const ALL_SIZES = ["38", "40", "42", "44", "46", "48", "50", "52", "54", "56", "58"];
-
-const ALL_COLORS = [
-  "Rosa", "Branco", "Azul Safira", "Vermelho", "Dourado", "Lilás",
-  "Verde Esmeralda", "Preto", "Champagne", "Nude", "Bordô", "Lavanda",
-];
+const ITEMS_PER_PAGE = 9;
 
 function ProdutosContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
-  
-  // Local state for UI
+
+  // Filtros locais da interface
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [sort, setSort] = useState("relevancia");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const category = searchParams.get("categoria") || "all";
   const search = searchParams.get("busca") || "";
-  // O comprimento vem da URL (?tipo=), assim os links do Header filtram a lista
   const selectedTipo = searchParams.get("tipo") || "all";
-  const setSelectedTipo = (tipo: string) =>
+
+  // Resetar página quando a busca ou categoria mudar sem efeito em cascata
+  const [prevFilterKey, setPrevFilterKey] = useState(`${category}:${search}`);
+  const currentFilterKey = `${category}:${search}`;
+  if (prevFilterKey !== currentFilterKey) {
+    setPrevFilterKey(currentFilterKey);
+    setCurrentPage(1);
+  }
+
+  const setSelectedTipo = (tipo: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (tipo === "all") next.delete("tipo");
       else next.set("tipo", tipo);
       return next;
     });
+  };
 
-  // Hook state
-  const [apiFilters, setApiFilters] = useState<ProductFiltersType>({
-    busca: search || undefined,
-    categoria: category !== "all" ? category : undefined,
-    page: 1,
-    limit: 20,
-  });
+  const setCategoryParam = (cat: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (cat === "all") next.delete("categoria");
+      else next.set("categoria", cat);
+      return next;
+    });
+  };
 
-  const { products, isLoading } = useProducts(apiFilters);
-
-  useEffect(() => {
-    setApiFilters((prev: any) => ({
-      ...prev,
+  // Filtros enviados para o hook de API (derivados reativamente)
+  const apiFilters = useMemo<ApiFilters>(
+    () => ({
       busca: search || undefined,
       categoria: category !== "all" ? category : undefined,
       page: 1,
-    }));
-  }, [category, search]);
+      limit: 50,
+    }),
+    [search, category],
+  );
 
-  // Apply the sidebar filters/sort on the client (the API only handles categoria/busca)
-  const productPrice = (p: any) => getDisplayVariant(p)?.precoVariante ?? p.precoBase;
+  const { products, isLoading, error, refetch } = useProducts(apiFilters);
 
-  const displayedProducts = useMemo(() => {
-    let list = products.filter((p: any) => {
+  // Cores dinâmicas extraídas dos produtos cadastrados
+  const availableColors = useMemo(() => {
+    const colorMap = new Map<string, string>();
+
+    products.forEach((p: Product) => {
+      p.variants?.forEach((v) => {
+        if (v.cor && v.cor.trim()) {
+          const raw = v.cor.trim();
+          const key = raw.toLowerCase();
+          if (!colorMap.has(key)) {
+            const formatted = raw
+              .split(/\s+/)
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(" ");
+            colorMap.set(key, formatted);
+          }
+        }
+      });
+    });
+
+    if (colorMap.size === 0) {
+      return ALL_COLORS;
+    }
+
+    return Array.from(colorMap.values()).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [products]);
+
+  const productPrice = (p: Product) => getDisplayVariant(p)?.precoVariante ?? p.precoBase;
+
+  // Filtragem e ordenação no cliente
+  const filteredProducts = useMemo(() => {
+    let list = products.filter((p: Product) => {
       const price = productPrice(p);
       if (price < priceRange[0] || price > priceRange[1]) return false;
       if (
         selectedSizes.length > 0 &&
-        !p.variants?.some((v: any) => selectedSizes.includes(v.tamanho))
-      )
+        !p.variants?.some((v) => v.tamanho && selectedSizes.includes(v.tamanho))
+      ) {
         return false;
-      if (
-        selectedColors.length > 0 &&
-        !p.variants?.some((v: any) => selectedColors.includes(v.cor))
-      )
-        return false;
-      if (selectedTipo !== "all" && p.tipo && p.tipo !== selectedTipo) return false;
+      }
+      if (selectedColors.length > 0) {
+        const selectedLowers = selectedColors.map((c) => c.trim().toLowerCase());
+        const matchesColor = p.variants?.some(
+          (v) => v.cor && selectedLowers.includes(v.cor.trim().toLowerCase()),
+        );
+        if (!matchesColor) return false;
+      }
+      if (selectedTipo !== "all") {
+        const lowerTipo = selectedTipo.toLowerCase();
+        const matchesTipo =
+          p.tipo?.toLowerCase() === lowerTipo ||
+          p.tags?.some((t) => t.trim().toLowerCase() === lowerTipo) ||
+          (lowerTipo === "midi" &&
+            (p.qualMedida?.toLowerCase() === "midi" ||
+              p.qualMedida?.toLowerCase() === "médio" ||
+              p.qualMedida?.toLowerCase() === "medio")) ||
+          (lowerTipo === "longo" &&
+            (p.qualMedida?.toLowerCase() === "longo" ||
+              p.qualMedida?.toLowerCase() === "maxi")) ||
+          (lowerTipo === "longuete" && p.qualMedida?.toLowerCase() === "longuete");
+        if (!matchesTipo) return false;
+      }
       return true;
     });
 
@@ -103,22 +169,45 @@ function ProdutosContent() {
     return list;
   }, [products, priceRange, selectedSizes, selectedColors, selectedTipo, sort]);
 
-  const toggleSize = (size: string) =>
-    setSelectedSizes((prev) =>
-      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
-    );
+  // Paginação dos produtos filtrados
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredProducts.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredProducts, currentPage]);
 
-  const toggleColor = (color: string) =>
-    setSelectedColors((prev) =>
-      prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]
+  const toggleSize = (size: string) => {
+    setSelectedSizes((prev) =>
+      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size],
     );
+    setCurrentPage(1);
+  };
+
+  const toggleColor = (color: string) => {
+    setSelectedColors((prev) => {
+      const lower = color.trim().toLowerCase();
+      const exists = prev.some((c) => c.trim().toLowerCase() === lower);
+      return exists
+        ? prev.filter((c) => c.trim().toLowerCase() !== lower)
+        : [...prev, color];
+    });
+    setCurrentPage(1);
+  };
 
   const clearFilters = () => {
     setPriceRange([0, 5000]);
     setSelectedSizes([]);
     setSelectedColors([]);
-    setSelectedTipo("all");
     setSort("relevancia");
+    setCurrentPage(1);
+    setFiltersOpen(false);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("tipo");
+      next.delete("categoria");
+      next.delete("busca");
+      return next;
+    });
   };
 
   const hasActiveFilters =
@@ -137,203 +226,365 @@ function ProdutosContent() {
     : "Todos os Vestidos";
 
   return (
-    <div className="min-h-screen bg-[#f8f8f8]">
-      {/* Page header */}
-      <div className="bg-[#1a1a1a] text-white py-10">
+    <div className="min-h-screen bg-[var(--background)]">
+      {/* Page Header (Design System DK Fashion) */}
+      <div className="bg-[var(--foreground)] text-[var(--color-white)] py-10 lg:py-12 border-b border-[var(--border)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-white mb-1 font-serif text-3xl">{pageTitle}</h1>
-          <p className="text-gray-400 text-sm font-sans">
-            {displayedProducts.length} vestido{displayedProducts.length !== 1 ? "s" : ""} encontrado{displayedProducts.length !== 1 ? "s" : ""}
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-normal text-[var(--color-white)] tracking-tight mb-2">
+            {pageTitle}
+          </h1>
+          <p className="text-sm font-sans text-neutral-300">
+            {filteredProducts.length} vestido{filteredProducts.length !== 1 ? "s" : ""} encontrado{filteredProducts.length !== 1 ? "s" : ""}
           </p>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-sans">
-        {/* Category tabs */}
+        {/* Category Tabs Rápidas */}
         <div className="flex gap-2 flex-wrap mb-6">
-          {CATEGORIES.map((cat) => (
-            <Link
-              key={cat.value}
-              to={cat.value === "all" ? "/produtos" : `/produtos?categoria=${cat.value}`}
-              className={`px-4 py-2 text-sm transition-colors border ${
-                category === cat.value
-                  ? "bg-[#1a1a1a] !text-white border-[#1a1a1a]"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-              }`}
-            >
-              {cat.label}
-            </Link>
-          ))}
+          {CATEGORIES.map((cat) => {
+            const nextParams = new URLSearchParams(searchParams);
+            if (cat.value === "all") nextParams.delete("categoria");
+            else nextParams.set("categoria", cat.value);
+            const query = nextParams.toString();
+            const targetUrl = query ? `/produtos?${query}` : "/produtos";
+
+            return (
+              <Link
+                key={cat.value}
+                to={targetUrl}
+                className={cn(
+                  "px-4 py-2 text-sm font-sans font-medium rounded-[var(--radius-full)] border transition-all duration-[var(--transition-fast)] cursor-pointer select-none",
+                  category === cat.value
+                    ? "bg-[var(--action-primary)] text-[var(--color-white)] border-[var(--action-primary)] shadow-xs"
+                    : "bg-[var(--background-card)] text-[var(--foreground-secondary)] border-[var(--border)] hover:border-[var(--border-control)] hover:text-[var(--foreground)]",
+                )}
+              >
+                {cat.label}
+              </Link>
+            );
+          })}
         </div>
 
-        <div className="flex gap-6">
-          {/* Sidebar filters */}
-          <aside className={`${filtersOpen ? "block" : "hidden"} lg:block w-full lg:w-60 shrink-0`}>
-            <div className="bg-white p-5 border border-gray-100 sticky top-24">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-gray-900 font-medium">Filtros</h3>
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearFilters}
-                    className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1"
-                  >
-                    <X className="w-3 h-3" /> Limpar
-                  </button>
-                )}
-              </div>
-
-              {/* Tipo (comprimento) */}
-              <div className="mb-6">
-                <h4 className="text-gray-700 mb-3 text-sm">Comprimento</h4>
-                <div className="space-y-2">
-                  {TIPOS.map((t) => (
-                    <label key={t.value} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="tipo"
-                        checked={selectedTipo === t.value}
-                        onChange={() => setSelectedTipo(t.value)}
-                        className="accent-[#1a1a1a]"
-                      />
-                      <span className="text-sm text-gray-600">{t.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price range */}
-              <div className="mb-6">
-                <h4 className="text-gray-700 mb-3 text-sm">Preço</h4>
-                <div className="space-y-2">
-                  <input
-                    type="range"
-                    min={0}
-                    max={5000}
-                    step={50}
-                    value={priceRange[1]}
-                    onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])}
-                    className="w-full accent-[#1a1a1a]"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>R$ {priceRange[0].toLocaleString("pt-BR")}</span>
-                    <span>R$ {priceRange[1].toLocaleString("pt-BR")}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sizes */}
-              <div className="mb-6">
-                <h4 className="text-gray-700 mb-3 text-sm">Tamanho</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {ALL_SIZES.map((size) => (
-                    <button
-                      key={size}
-                      onClick={() => toggleSize(size)}
-                      className={`w-10 h-9 border text-xs transition-colors ${
-                        selectedSizes.includes(size)
-                          ? "bg-[#1a1a1a] !text-white border-[#1a1a1a]"
-                          : "border-gray-200 text-gray-600 hover:border-gray-500"
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Colors */}
-              <div>
-                <h4 className="text-gray-700 mb-3 text-sm">Cor</h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                  {ALL_COLORS.map((color) => (
-                    <label key={color} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedColors.includes(color)}
-                        onChange={() => toggleColor(color)}
-                        className="accent-[#1a1a1a]"
-                      />
-                      <span className="text-sm text-gray-600">{color}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+        <div className="flex gap-8">
+          {/* Sidebar Desktop com ProductFilters */}
+          <aside className="hidden lg:block w-64 shrink-0">
+            <div className="sticky top-24">
+              <ProductFilters
+                tipo={selectedTipo}
+                onSelectTipo={setSelectedTipo}
+                priceRange={priceRange}
+                onPriceRangeChange={setPriceRange}
+                selectedSizes={selectedSizes}
+                onToggleSize={toggleSize}
+                selectedColors={selectedColors}
+                onToggleColor={toggleColor}
+                hasActiveFilters={hasActiveFilters}
+                onClearFilters={clearFilters}
+                colors={availableColors}
+              />
             </div>
           </aside>
 
-          {/* Products grid */}
-          <div className="flex-1">
-            {/* Toolbar */}
-            <div className="flex items-center justify-between mb-5 gap-4">
+          {/* Drawer / Sheet Mobile de Filtros */}
+          <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <SheetContent
+              side="left"
+              className="w-[85vw] max-w-sm p-0 flex flex-col bg-[var(--background-card)] border-r border-[var(--border)]"
+            >
+              <SheetHeader className="p-4 sm:p-5 border-b border-[var(--border)] flex flex-row items-center justify-between">
+                <SheetTitle className="text-base font-semibold font-serif text-[var(--foreground)] flex items-center gap-2">
+                  <SlidersHorizontal className="size-4 text-[var(--color-brand)]" />
+                  Filtros
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+                <ProductFilters
+                  tipo={selectedTipo}
+                  onSelectTipo={setSelectedTipo}
+                  priceRange={priceRange}
+                  onPriceRangeChange={setPriceRange}
+                  selectedSizes={selectedSizes}
+                  onToggleSize={toggleSize}
+                  selectedColors={selectedColors}
+                  onToggleColor={toggleColor}
+                  hasActiveFilters={hasActiveFilters}
+                  onClearFilters={clearFilters}
+                  colors={availableColors}
+                  isMobile
+                />
+              </div>
+              <SheetFooter className="p-4 border-t border-[var(--border)] flex flex-row gap-3 bg-[var(--background-secondary)]/40">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={clearFilters}
+                  className="flex-1 h-11 border-[var(--border-control)]"
+                >
+                  Limpar
+                </Button>
+                <Button
+                  type="button"
+                  variant="action"
+                  onClick={() => setFiltersOpen(false)}
+                  className="flex-1 h-11"
+                >
+                  Aplicar filtros
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+
+          {/* Área Principal de Produtos */}
+          <div className="flex-1 min-w-0">
+            {/* Toolbar Superior */}
+            <div className="flex items-center justify-between mb-5 gap-4 bg-[var(--background-card)] p-3 sm:p-4 rounded-[var(--radius-lg)] border border-[var(--border)]">
+              {/* Botão Mobile para Abrir Sheet de Filtros */}
               <button
-                onClick={() => setFiltersOpen(!filtersOpen)}
-                className="lg:hidden flex items-center gap-2 text-sm text-gray-600 border border-gray-200 px-4 py-2 hover:border-gray-400 transition-colors"
+                type="button"
+                onClick={() => setFiltersOpen(true)}
+                className="lg:hidden flex items-center gap-2 text-sm font-medium text-[var(--foreground-secondary)] border border-[var(--border)] px-3.5 py-2 rounded-[var(--radius-md)] hover:border-[var(--border-control)] hover:text-[var(--foreground)] transition-colors cursor-pointer bg-[var(--background-card)]"
               >
-                <SlidersHorizontal className="w-4 h-4" />
-                Filtros{" "}
+                <SlidersHorizontal className="size-4" />
+                <span>Filtros</span>
                 {hasActiveFilters && (
-                  <span className="bg-[#1a1a1a] !text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="bg-[var(--action-primary)] text-[var(--color-white)] text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold">
                     !
                   </span>
                 )}
               </button>
+
+              <div className="text-xs sm:text-sm text-[var(--foreground-muted)] hidden sm:block">
+                Mostrando {paginatedProducts.length} de {filteredProducts.length} itens
+              </div>
+
+              {/* Seletor de Ordenação */}
               <div className="flex items-center gap-2 ml-auto">
-                <span className="text-sm text-gray-500 hidden sm:block">Ordenar:</span>
-                <div className="relative">
-                  <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value)}
-                    className="appearance-none bg-white border border-gray-200 px-4 py-2 pr-8 text-sm text-gray-600 focus:outline-none focus:border-[#1a1a1a] cursor-pointer"
+                <span className="text-sm text-[var(--foreground-muted)] hidden md:block">
+                  Ordenar por:
+                </span>
+                <Select value={sort} onValueChange={setSort}>
+                  <SelectTrigger
+                    className="w-[160px] sm:w-[180px] h-9 text-xs sm:text-sm bg-[var(--background-card)] border-[var(--border)] text-[var(--foreground)] focus-visible:ring-1"
+                    aria-label="Ordenar produtos"
                   >
-                    {SORT_OPTIONS.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[var(--background-card)] border-[var(--border)]">
+                    {SORT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} className="cursor-pointer">
+                        {opt.label}
+                      </SelectItem>
                     ))}
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                 {[1, 2, 3, 4, 5, 6].map(i => (
-                   <div key={i} className="aspect-[3/4] bg-gray-100 animate-pulse border border-gray-200"></div>
-                 ))}
-              </div>
-            ) : displayedProducts.length === 0 ? (
-              <div className="text-center py-20 bg-white border border-gray-100">
-                <div className="w-16 h-16 bg-gray-50 flex items-center justify-center mx-auto mb-4 rounded-full">
-                  <SlidersHorizontal className="w-7 h-7 text-gray-400" />
-                </div>
-                <h3 className="text-gray-900 mb-2 font-medium">Nenhum vestido encontrado</h3>
-                <p className="text-gray-500 text-sm mb-4">
-                  Tente ajustar os filtros ou buscar por outros termos.
-                </p>
+            {/* Chips de Filtros Ativos */}
+            {hasActiveFilters && (
+              <div className="flex flex-wrap items-center gap-2 mb-6 p-3 rounded-[var(--radius-md)] bg-[var(--background-secondary)]/40 border border-[var(--border)]">
+                <span className="text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider mr-1">
+                  Ativos:
+                </span>
+
+                {search && (
+                  <Badge
+                    variant="default"
+                    className="normal-case tracking-normal gap-1.5 py-1 bg-[var(--background-card)] border border-[var(--border)] text-[var(--foreground)]"
+                  >
+                    Busca: "{search}"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchParams((prev) => {
+                          const next = new URLSearchParams(prev);
+                          next.delete("busca");
+                          return next;
+                        });
+                      }}
+                      className="hover:text-[var(--color-error)] cursor-pointer"
+                      aria-label="Remover busca"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                )}
+
+                {category !== "all" && (
+                  <Badge
+                    variant="default"
+                    className="normal-case tracking-normal gap-1.5 py-1 bg-[var(--background-card)] border border-[var(--border)] text-[var(--foreground)]"
+                  >
+                    Categoria: {CATEGORIES.find((c) => c.value === category)?.label || category}
+                    <button
+                      type="button"
+                      onClick={() => setCategoryParam("all")}
+                      className="hover:text-[var(--color-error)] cursor-pointer"
+                      aria-label="Remover filtro de categoria"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                )}
+
+                {selectedTipo !== "all" && (
+                  <Badge
+                    variant="default"
+                    className="normal-case tracking-normal gap-1.5 py-1 bg-[var(--background-card)] border border-[var(--border)] text-[var(--foreground)]"
+                  >
+                    Comprimento: {TIPOS.find((t) => t.value === selectedTipo)?.label || selectedTipo}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTipo("all")}
+                      className="hover:text-[var(--color-error)] cursor-pointer"
+                      aria-label="Remover filtro de comprimento"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                )}
+
+                {(priceRange[0] > 0 || priceRange[1] < 5000) && (
+                  <Badge
+                    variant="default"
+                    className="normal-case tracking-normal gap-1.5 py-1 bg-[var(--background-card)] border border-[var(--border)] text-[var(--foreground)]"
+                  >
+                    {priceRange[0] > 0 && priceRange[1] < 5000
+                      ? `Preço: R$ ${priceRange[0].toLocaleString("pt-BR")} - R$ ${priceRange[1].toLocaleString("pt-BR")}`
+                      : priceRange[0] > 0
+                      ? `Preço: A partir de R$ ${priceRange[0].toLocaleString("pt-BR")}`
+                      : `Preço: Até R$ ${priceRange[1].toLocaleString("pt-BR")}`}
+                    <button
+                      type="button"
+                      onClick={() => setPriceRange([0, 5000])}
+                      className="hover:text-[var(--color-error)] cursor-pointer"
+                      aria-label="Remover filtro de preço"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                )}
+
+                {selectedSizes.map((size) => (
+                  <Badge
+                    key={`chip-size-${size}`}
+                    variant="default"
+                    className="normal-case tracking-normal gap-1.5 py-1 bg-[var(--background-card)] border border-[var(--border)] text-[var(--foreground)]"
+                  >
+                    Tam: {size}
+                    <button
+                      type="button"
+                      onClick={() => toggleSize(size)}
+                      className="hover:text-[var(--color-error)] cursor-pointer"
+                      aria-label={`Remover tamanho ${size}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                ))}
+
+                {selectedColors.map((color) => (
+                  <Badge
+                    key={`chip-color-${color}`}
+                    variant="default"
+                    className="normal-case tracking-normal gap-1.5 py-1 bg-[var(--background-card)] border border-[var(--border)] text-[var(--foreground)]"
+                  >
+                    Cor: {color}
+                    <button
+                      type="button"
+                      onClick={() => toggleColor(color)}
+                      className="hover:text-[var(--color-error)] cursor-pointer"
+                      aria-label={`Remover cor ${color}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                ))}
+
                 <button
+                  type="button"
                   onClick={clearFilters}
-                  className="bg-[#1a1a1a] !text-white px-6 py-2 hover:bg-[#333333] transition-colors text-sm"
+                  className="text-xs text-[var(--color-brand)] hover:underline font-medium ml-auto cursor-pointer"
                 >
-                  Limpar Filtros
+                  Limpar todos
                 </button>
               </div>
+            )}
+
+            {/* Estado: Carregando (Skeleton da Grade) */}
+            {isLoading ? (
+              <div
+                data-testid="products-skeleton"
+                className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+              >
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Skeleton
+                    key={i}
+                    className="aspect-[3/4] w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-neutral-200"
+                  />
+                ))}
+              </div>
+            ) : error ? (
+              /* Estado: Erro na API */
+              <div className="py-16">
+                <EmptyState
+                  icon={<AlertCircle className="size-8 text-[var(--color-error)]" />}
+                  title="Erro ao carregar vestidos"
+                  body={error || "Não foi possível carregar os produtos. Tente novamente."}
+                  action={
+                    <Button variant="action" size="md" onClick={() => refetch()}>
+                      Tentar novamente
+                    </Button>
+                  }
+                />
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              /* Estado: Vazio (Nenhum produto encontrado) */
+              <div className="py-16">
+                <EmptyState
+                  icon={<SlidersHorizontal className="size-8 text-[var(--color-brand)]" />}
+                  title="Nenhum vestido encontrado"
+                  body="Tente ajustar os filtros ou buscar por outros termos."
+                  action={
+                    <Button variant="action" size="md" onClick={clearFilters}>
+                      Limpar Filtros
+                    </Button>
+                  }
+                />
+              </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {displayedProducts.map((product: any) => {
-                  const firstVariant = getDisplayVariant(product);
-                  return (
-                    <ProductCard
-                      key={product.idProduto}
-                      id={product.idProduto}
-                      titulo={product.titulo}
-                      preco={firstVariant?.precoVariante ?? product.precoBase}
-                      imagem={firstVariant?.images[0]?.url || "/hero-dress.png"}
-                      categoria={product.categories?.[0]?.nome}
-                      variant={firstVariant}
+              /* Grade de Produtos */
+              <div>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {paginatedProducts.map((product: Product) => {
+                    const firstVariant = getDisplayVariant(product);
+                    return (
+                      <ProductCard
+                        key={product.idProduto}
+                        id={product.idProduto}
+                        titulo={product.titulo}
+                        preco={firstVariant?.precoVariante ?? product.precoBase}
+                        imagem={firstVariant?.images[0]?.url || "/hero-dress.png"}
+                        categoria={product.categories?.[0]?.nome}
+                        nota={product.mediaAvaliacao}
+                        totalAvaliacoes={product.totalAvaliacoes}
+                        variant={firstVariant}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Paginação */}
+                {totalPages > 1 && (
+                  <div className="mt-8">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
                     />
-                  );
-                })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -347,8 +598,8 @@ export default function ProdutosPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
-          <div className="w-8 h-8 rounded-full border-2 border-gray-300 border-t-gray-900 animate-spin" />
+        <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+          <div className="size-8 rounded-full border-2 border-[var(--border)] border-t-[var(--action-primary)] animate-spin" />
         </div>
       }
     >

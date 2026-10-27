@@ -4,6 +4,27 @@
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-playfair), ui-serif, Georgia, serif;
+
+  /* Pontes para os componentes shadcn (card, tabs, carousel, skeleton, avatar)
+     consumirem os tokens DK Fashion acima em vez das cores padrão do shadcn. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--background-card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--background-card);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--color-brand);
+  --color-primary-foreground: var(--color-white);
+  --color-secondary: var(--background-secondary);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--background-secondary);
+  --color-muted-foreground: var(--foreground-muted);
+  --color-accent: var(--background-secondary);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--color-error);
+  --color-border: var(--border);
+  --color-input: var(--border-control);
+  --color-ring: var(--color-brand);
 }
 
 /* ============================
@@ -31,6 +52,11 @@
   --background-secondary: #f3f4f6;
   --background-card: #ffffff;
   --background-elevated: #ffffff;
+  /* Fundo das áreas de trabalho e cabeçalhos de tabela do painel (Figma "background-store") */
+  --background-store: #f8f8f8;
+
+  /* Charts (Figma "color-bg-chart-muted": barras fora do mês em destaque) */
+  --color-bg-chart-muted: #e9a8c4;
 
   /* Foreground */
   --foreground: #111827;
