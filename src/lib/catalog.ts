@@ -39,6 +39,9 @@ export interface Product {
   material?: string | null;
   composicao?: string | null;
   silhueta?: string | null;
+  qualMedida?: string | null;
+  tags?: string[] | null;
+  tipo?: string | null;
   /** Nota média das avaliações (0 quando o produto não tem avaliações). */
   mediaAvaliacao?: number;
   totalAvaliacoes?: number;
@@ -64,6 +67,9 @@ interface ProductResponse {
   material?: string | null;
   composicao?: string | null;
   silhueta?: string | null;
+  qualMedida?: string | null;
+  tags?: string[] | null;
+  tipo?: string | null;
   // A média vem do Postgres como numeric, ou seja, como string ("4.50").
   mediaAvaliacao?: number | string | null;
   totalAvaliacoes?: number | string | null;
@@ -133,12 +139,38 @@ async function hydrateVariant(raw: ProductVariantResponse): Promise<ProductVaria
   };
 }
 
+export function resolveProductTipo(raw: ProductResponse): string | null {
+  if (raw.tipo && raw.tipo.trim()) {
+    return raw.tipo.trim().toLowerCase();
+  }
+
+  const tags = (raw.tags ?? []).map((t) => t.trim().toLowerCase());
+  if (tags.includes("midi")) return "midi";
+  if (tags.includes("longo")) return "longo";
+  if (tags.includes("longuete")) return "longuete";
+
+  const medida = raw.qualMedida?.trim().toLowerCase();
+  if (medida) {
+    if (medida === "midi" || medida === "médio" || medida === "medio") return "midi";
+    if (medida === "longo" || medida === "maxi") return "longo";
+    if (medida === "longuete") return "longuete";
+  }
+
+  const fullText = `${raw.titulo ?? ""} ${raw.descricao ?? ""}`.toLowerCase();
+  if (/\bmidi\b/.test(fullText)) return "midi";
+  if (/\blonguete\b/.test(fullText)) return "longuete";
+  if (/\blongo\b/.test(fullText)) return "longo";
+
+  return null;
+}
+
 export async function normalizeProduct(raw: ProductResponse): Promise<Product> {
   const idProduto = Number(raw.idProduto);
   if (!Number.isInteger(idProduto) || idProduto <= 0) {
     throw new Error("Produto recebido sem idProduto válido");
   }
   const variants = await Promise.all((raw.variants ?? []).map(hydrateVariant));
+  const tipo = resolveProductTipo(raw);
 
   return {
     idProduto,
@@ -150,6 +182,9 @@ export async function normalizeProduct(raw: ProductResponse): Promise<Product> {
     material: raw.material ?? null,
     composicao: raw.composicao ?? null,
     silhueta: raw.silhueta ?? null,
+    qualMedida: raw.qualMedida ?? null,
+    tags: raw.tags ?? [],
+    tipo,
     mediaAvaliacao: Number(raw.mediaAvaliacao) || 0,
     totalAvaliacoes: Number(raw.totalAvaliacoes) || 0,
     categories: raw.categories ?? [],

@@ -116,8 +116,6 @@ export default function ProductDetailPage() {
     findVariant(product, selectedColor || undefined) ??
     getDisplayVariant(product);
 
-  const hasActiveVariant = Boolean(activeVariant && activeVariant.ativo);
-
   const gallery = activeVariant?.images.length
     ? activeVariant.images
     : [{ idImagem: 0, url: "/hero-dress.png", ordem: 0, descricao: null }];
