@@ -89,6 +89,8 @@ export default function FavoritesPage() {
                   preco={variant?.precoVariante ?? product.precoBase}
                   imagem={variant?.images[0]?.url || "/hero-dress.png"}
                   categoria={product.categories[0]?.nome}
+                  nota={product.mediaAvaliacao}
+                  totalAvaliacoes={product.totalAvaliacoes}
                   variant={variant}
                 />
               );
