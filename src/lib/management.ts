@@ -49,3 +49,18 @@ export const fetchManagementOrders = () =>
 
 export const fetchPeople = () =>
   api.get<PaginatedResponse<ApiPerson>>("/people", { page: 1, limit: 100 });
+
+export const PICKUP_TYPE_LABELS: Record<ApiPickupType, string> = {
+  entrega: "Entrega",
+  loja: "Loja",
+};
+
+/** Nome exibido do cliente: o do cadastro ou o informado na venda avulsa. */
+export function orderCustomerName(order: ApiOrder): string {
+  return order.user?.nome || order.clienteNomeAvulso || "Cliente não identificado";
+}
+
+/** CPF do cliente do pedido (cadastrado ou avulso), quando houver. */
+export function orderCustomerCpf(order: ApiOrder): string | null {
+  return order.idUsuario || order.clienteCpfAvulso || null;
+}

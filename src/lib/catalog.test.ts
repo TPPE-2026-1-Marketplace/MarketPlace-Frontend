@@ -1,17 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./api";
 import {
+  createReview,
+  deleteMyReview,
+  fetchMyReviewStatus,
   fetchProduct,
   fetchProducts,
   fetchProductReviews,
   findVariant,
   getDisplayVariant,
   normalizeProduct,
+  updateReview,
   type Product,
   type ProductVariant,
 } from "./catalog";
 
-vi.mock("./api", () => ({ api: { get: vi.fn() } }));
+vi.mock("./api", () => ({ api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 const getMock = vi.mocked(api.get);
 
 function variant(overrides: Partial<ProductVariant> = {}): ProductVariant {
@@ -116,6 +120,11 @@ describe("normalizeProduct", () => {
       material: null,
       composicao: null,
       silhueta: null,
+      qualMedida: null,
+      tags: [],
+      tipo: null,
+      mediaAvaliacao: 0,
+      totalAvaliacoes: 0,
       categories: [],
       variants: [
         {
@@ -150,6 +159,21 @@ describe("normalizeProduct", () => {
   it("rejeita produto sem idProduto válido", async () => {
     await expect(normalizeProduct({ titulo: "Sem id" })).rejects.toThrow("idProduto válido");
     await expect(normalizeProduct({ idProduto: -1 })).rejects.toThrow();
+  });
+
+  it("converte a média (numeric do Postgres vem como string) e o total de avaliações", async () => {
+    const result = await normalizeProduct({ idProduto: 1, mediaAvaliacao: "4.50", totalAvaliacoes: "12" });
+
+    expect(result.mediaAvaliacao).toBe(4.5);
+    expect(result.totalAvaliacoes).toBe(12);
+  });
+
+  it("usa zero quando o produto não traz média nem total", async () => {
+    const semCampos = await normalizeProduct({ idProduto: 1 });
+    const nulos = await normalizeProduct({ idProduto: 1, mediaAvaliacao: null, totalAvaliacoes: null });
+
+    expect(semCampos).toMatchObject({ mediaAvaliacao: 0, totalAvaliacoes: 0 });
+    expect(nulos).toMatchObject({ mediaAvaliacao: 0, totalAvaliacoes: 0 });
   });
 });
 
@@ -225,5 +249,40 @@ describe("fetchProductReviews", () => {
     const result = await fetchProductReviews(7, 3, 5);
 
     expect(result.meta).toEqual({ page: 3, limit: 5, total: 0, totalPages: 0 });
+  });
+});
+
+describe("avaliação do próprio cliente", () => {
+  beforeEach(() => {
+    vi.mocked(api.get).mockReset();
+    vi.mocked(api.post).mockReset().mockResolvedValue(undefined);
+    vi.mocked(api.patch).mockReset().mockResolvedValue(undefined);
+    vi.mocked(api.delete).mockReset().mockResolvedValue(undefined);
+  });
+
+  it("consulta o estado do cliente no produto", async () => {
+    const status = { avaliacao: null, podeAvaliar: true, motivo: "PODE_AVALIAR" };
+    getMock.mockResolvedValueOnce(status);
+
+    await expect(fetchMyReviewStatus(7)).resolves.toEqual(status);
+    expect(getMock).toHaveBeenCalledWith("/reviews/product/7/mine");
+  });
+
+  it("cria a avaliação enviando o produto no corpo", async () => {
+    await createReview(7, { nota: 5, comentario: "Lindo" });
+
+    expect(api.post).toHaveBeenCalledWith("/reviews", { idProduto: 7, nota: 5, comentario: "Lindo" });
+  });
+
+  it("edita a própria avaliação pelo produto da rota", async () => {
+    await updateReview(7, { nota: 3 });
+
+    expect(api.patch).toHaveBeenCalledWith("/reviews/product/7", { nota: 3 });
+  });
+
+  it("remove a própria avaliação", async () => {
+    await deleteMyReview(7);
+
+    expect(api.delete).toHaveBeenCalledWith("/reviews/product/7");
   });
 });

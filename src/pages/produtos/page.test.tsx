@@ -40,6 +40,20 @@ describe("ProdutosPage", () => {
     expect(screen.queryByRole("button", { name: /Limpar$/ })).not.toBeInTheDocument();
   });
 
+  it("mostra a nota e a contagem nos cards que têm avaliações", async () => {
+    vi.mocked(fetchProducts).mockResolvedValue({
+      data: [
+        { ...catalog[0], mediaAvaliacao: 4.5, totalAvaliacoes: 12 },
+        { ...catalog[1], mediaAvaliacao: 0, totalAvaliacoes: 0 },
+      ],
+      meta: { page: 1, limit: 20, total: 2, totalPages: 1 },
+    });
+    await renderPage();
+
+    expect(screen.getByLabelText("Nota 4,5 de 5, 12 avaliações")).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/^Nota /)).toHaveLength(1);
+  });
+
   it("usa a busca e a categoria da URL no título", async () => {
     await renderPage("/produtos?busca=rosa");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent('Busca: "rosa"');

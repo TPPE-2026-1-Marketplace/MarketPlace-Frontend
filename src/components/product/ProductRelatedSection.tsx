@@ -30,6 +30,8 @@ export function ProductRelatedSection({ products, className }: ProductRelatedSec
               preco={variant?.precoVariante ?? p.precoBase}
               imagem={variant?.images[0]?.url || "/hero-dress.png"}
               categoria={p.categories[0]?.nome}
+              nota={p.mediaAvaliacao}
+              totalAvaliacoes={p.totalAvaliacoes}
               variant={variant}
             />
           );

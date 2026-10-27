@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useBanners } from "@/context/BannerContext";
 import { categoryToPath } from "@/context/BannerContext";
+import { buttonClassName } from "@/components/ui/button-variants";
 
 const FALLBACK_SLIDES = [
   {
@@ -52,39 +53,38 @@ export default function HeroSection() {
             alt={s.title}
             className="w-full h-full object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/80 via-[#0a0a0a]/40 to-transparent" />
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "linear-gradient(90deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.52) 40%, rgba(0, 0, 0, 0.02) 72%, rgba(0, 0, 0, 0.08) 100%)",
+            }}
+          />
         </div>
       ))}
 
       {/* Content */}
       <div className="absolute inset-0 flex items-center" style={{ zIndex: 5 }}>
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-          <div className="max-w-xl">
+          <div className="flex max-w-[580px] flex-col items-start gap-6">
             {slides[current].tag && (
-              <p className="text-gray-300 text-xs tracking-[0.35em] uppercase mb-4 font-sans">
+              <p className="w-full font-sans text-xs leading-4 font-medium tracking-[2px] text-white uppercase">
                 {slides[current].tag}
               </p>
             )}
-            <h1
-              className="text-white mb-5 font-serif"
-              style={{
-                fontSize: "clamp(2rem, 5vw, 4rem)",
-                lineHeight: 1.1,
-                letterSpacing: "-0.01em",
-              }}
-            >
+            <h1 className="w-full font-serif text-[2.5rem] leading-[1.15] text-white sm:text-[4rem] sm:leading-[70px]">
               {slides[current].title}
             </h1>
             {slides[current].subtitle && (
-              <p className="text-gray-300 text-sm sm:text-base mb-8 leading-relaxed max-w-md font-sans">
+              <p className="w-full max-w-md font-sans text-base leading-[26px] text-white/90">
                 {slides[current].subtitle}
               </p>
             )}
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
               {slides[current].primaryCta && (
                 <Link
                   to={categoryToPath(slides[current].primaryCategory)}
-                  className="bg-white text-[#1a1a1a] px-8 py-3.5 hover:bg-gray-100 transition-colors text-sm tracking-widest uppercase font-medium text-center"
+                  className={buttonClassName({ variant: "action", size: "touch" })}
                 >
                   {slides[current].primaryCta}
                 </Link>

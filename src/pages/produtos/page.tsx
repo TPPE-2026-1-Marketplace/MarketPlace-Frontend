@@ -567,6 +567,8 @@ function ProdutosContent() {
                         preco={firstVariant?.precoVariante ?? product.precoBase}
                         imagem={firstVariant?.images[0]?.url || "/hero-dress.png"}
                         categoria={product.categories?.[0]?.nome}
+                        nota={product.mediaAvaliacao}
+                        totalAvaliacoes={product.totalAvaliacoes}
                         variant={firstVariant}
                       />
                     );

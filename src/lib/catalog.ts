@@ -42,6 +42,9 @@ export interface Product {
   qualMedida?: string | null;
   tags?: string[] | null;
   tipo?: string | null;
+  /** Nota média das avaliações (0 quando o produto não tem avaliações). */
+  mediaAvaliacao?: number;
+  totalAvaliacoes?: number;
   categories: Array<{ idCategoria?: number; nome: string }>;
   variants: ProductVariant[];
 }
@@ -67,6 +70,9 @@ interface ProductResponse {
   qualMedida?: string | null;
   tags?: string[] | null;
   tipo?: string | null;
+  // A média vem do Postgres como numeric, ou seja, como string ("4.50").
+  mediaAvaliacao?: number | string | null;
+  totalAvaliacoes?: number | string | null;
   categories?: Array<{ idCategoria?: number; nome: string }>;
   variants?: ProductVariantResponse[];
 }
@@ -179,6 +185,8 @@ export async function normalizeProduct(raw: ProductResponse): Promise<Product> {
     qualMedida: raw.qualMedida ?? null,
     tags: raw.tags ?? [],
     tipo,
+    mediaAvaliacao: Number(raw.mediaAvaliacao) || 0,
+    totalAvaliacoes: Number(raw.totalAvaliacoes) || 0,
     categories: raw.categories ?? [],
     variants: variants.filter((variant): variant is ProductVariant => variant !== null),
   };
@@ -205,6 +213,8 @@ export interface ProductReview {
   nota: number;
   comentario: string | null;
   dataAvaliacao: string;
+  /** Preenchida quando o cliente edita a avaliação; nula enquanto não editada. */
+  dataEdicao?: string | null;
   cliente: { nome: string };
   compraVerificada?: boolean;
 }
@@ -223,16 +233,23 @@ export interface ProductReviewsResponse {
   };
 }
 
+/** Busca uma página de avaliações. Rejeita quando a API falha. */
+export async function getProductReviews(
+  productId: number,
+  page = 1,
+  limit = 10,
+): Promise<ProductReviewsResponse> {
+  return api.get<ProductReviewsResponse>(`/reviews/product/${productId}`, { page, limit });
+}
+
+/** Como `getProductReviews`, mas uma falha da API vira uma lista vazia. */
 export async function fetchProductReviews(
   productId: number,
   page = 1,
   limit = 10,
 ): Promise<ProductReviewsResponse> {
   try {
-    return await api.get<ProductReviewsResponse>(
-      `/reviews/product/${productId}`,
-      { page, limit },
-    );
+    return await getProductReviews(productId, page, limit);
   } catch {
     return {
       data: [],
@@ -244,3 +261,45 @@ export async function fetchProductReviews(
   }
 }
 
+
+/** Por que o cliente pode ou não avaliar o produto (GET /reviews/product/:id/mine). */
+export type ReviewEligibility = "PODE_AVALIAR" | "JA_AVALIOU" | "SEM_COMPRA_VERIFICADA";
+
+export interface MyReview {
+  idProduto: number;
+  nota: number;
+  comentario: string | null;
+  dataAvaliacao: string;
+  /** Nula enquanto o cliente não editou a avaliação. */
+  dataEdicao: string | null;
+}
+
+export interface MyReviewStatus {
+  avaliacao: MyReview | null;
+  podeAvaliar: boolean;
+  motivo: ReviewEligibility;
+}
+
+export interface ReviewInput {
+  nota: number;
+  comentario?: string;
+}
+
+/** Avaliação do cliente autenticado no produto e se ele pode avaliá-lo. */
+export async function fetchMyReviewStatus(productId: number): Promise<MyReviewStatus> {
+  return api.get<MyReviewStatus>(`/reviews/product/${productId}/mine`);
+}
+
+export async function createReview(productId: number, input: ReviewInput): Promise<void> {
+  await api.post("/reviews", { idProduto: productId, ...input });
+}
+
+/** Edita nota e/ou comentário da própria avaliação. */
+export async function updateReview(productId: number, input: Partial<ReviewInput>): Promise<void> {
+  await api.patch(`/reviews/product/${productId}`, input);
+}
+
+/** Remove a própria avaliação do produto. */
+export async function deleteMyReview(productId: number): Promise<void> {
+  await api.delete(`/reviews/product/${productId}`);
+}
