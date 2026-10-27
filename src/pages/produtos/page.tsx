@@ -391,12 +391,16 @@ function ProdutosContent() {
                   </Badge>
                 )}
 
-                {priceRange[1] < 5000 && (
+                {(priceRange[0] > 0 || priceRange[1] < 5000) && (
                   <Badge
                     variant="default"
                     className="normal-case tracking-normal gap-1.5 py-1 bg-[var(--background-card)] border border-[var(--border)] text-[var(--foreground)]"
                   >
-                    Até R$ {priceRange[1].toLocaleString("pt-BR")}
+                    {priceRange[0] > 0 && priceRange[1] < 5000
+                      ? `Preço: R$ ${priceRange[0].toLocaleString("pt-BR")} - R$ ${priceRange[1].toLocaleString("pt-BR")}`
+                      : priceRange[0] > 0
+                      ? `Preço: A partir de R$ ${priceRange[0].toLocaleString("pt-BR")}`
+                      : `Preço: Até R$ ${priceRange[1].toLocaleString("pt-BR")}`}
                     <button
                       type="button"
                       onClick={() => setPriceRange([0, 5000])}

@@ -135,13 +135,84 @@ export default function ProductFilters({
             max={5000}
             step={50}
             value={priceRange[1]}
-            onChange={(e) => onPriceRangeChange([priceRange[0], Number(e.target.value)])}
+            onChange={(e) => onPriceRangeChange([priceRange[0], Math.max(priceRange[0], Number(e.target.value))])}
             className="w-full accent-[var(--action-primary)] cursor-pointer"
-            aria-label="Filtrar por preço máximo"
+            aria-label="Filtrar por preço máximo na barra"
           />
           <div className="flex justify-between items-center text-xs font-medium text-[var(--foreground-secondary)]">
             <span>R$ {priceRange[0].toLocaleString("pt-BR")}</span>
             <span>R$ {priceRange[1].toLocaleString("pt-BR")}</span>
+          </div>
+
+          {/* Entradas manuais de intervalo específico */}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <div>
+              <label
+                htmlFor={isMobile ? "price-min-mobile" : "price-min"}
+                className="text-[11px] font-medium text-[var(--foreground-muted)] block mb-1"
+              >
+                Mínimo
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-2.5 text-xs text-[var(--foreground-muted)] pointer-events-none select-none">
+                  R$
+                </span>
+                <input
+                  id={isMobile ? "price-min-mobile" : "price-min"}
+                  type="number"
+                  min={0}
+                  step={10}
+                  value={priceRange[0] === 0 ? "" : priceRange[0]}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const val = raw === "" ? 0 : Math.max(0, Number(raw));
+                    onPriceRangeChange([val, priceRange[1]]);
+                  }}
+                  onBlur={() => {
+                    if (priceRange[0] > priceRange[1]) {
+                      onPriceRangeChange([priceRange[1], priceRange[0]]);
+                    }
+                  }}
+                  placeholder="0"
+                  className="w-full pl-8 pr-2 py-1.5 text-xs rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--background-card)] text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:outline-none focus:border-[var(--color-brand)] transition-colors"
+                  aria-label="Preço mínimo em reais"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor={isMobile ? "price-max-mobile" : "price-max"}
+                className="text-[11px] font-medium text-[var(--foreground-muted)] block mb-1"
+              >
+                Máximo
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-2.5 text-xs text-[var(--foreground-muted)] pointer-events-none select-none">
+                  R$
+                </span>
+                <input
+                  id={isMobile ? "price-max-mobile" : "price-max"}
+                  type="number"
+                  min={0}
+                  step={10}
+                  value={priceRange[1] === 0 ? "" : priceRange[1]}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const val = raw === "" ? 0 : Math.max(0, Number(raw));
+                    onPriceRangeChange([priceRange[0], val]);
+                  }}
+                  onBlur={() => {
+                    if (priceRange[1] < priceRange[0]) {
+                      onPriceRangeChange([priceRange[1], priceRange[0]]);
+                    }
+                  }}
+                  placeholder="5000"
+                  className="w-full pl-8 pr-2 py-1.5 text-xs rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--background-card)] text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:outline-none focus:border-[var(--color-brand)] transition-colors"
+                  aria-label="Preço máximo em reais"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

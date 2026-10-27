@@ -142,6 +142,24 @@ describe("ProdutosPage", () => {
     expect(screen.getByTestId("location").textContent).toBe("/produtos?categoria=festa");
   });
 
+  it("permite digitar intervalo específico de preço nos inputs mínimo e máximo", async () => {
+    await renderPage("/produtos");
+    const minInputs = screen.getAllByLabelText("Preço mínimo em reais");
+    const maxInputs = screen.getAllByLabelText("Preço máximo em reais");
+
+    // Usar o primeiro input (desktop)
+    // Vestido Rosa custa 300, Vestido Preto custa 800, Vestido Azul custa 1200
+    fireEvent.change(minInputs[0], { target: { value: "400" } });
+    fireEvent.change(maxInputs[0], { target: { value: "1000" } });
+
+    expect(screen.getByText("1 vestido encontrado")).toBeInTheDocument();
+    expect(screen.getByText("Vestido Preto")).toBeInTheDocument();
+    expect(screen.queryByText("Vestido Rosa")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vestido Azul")).not.toBeInTheDocument();
+
+    expect(screen.getByText(/Preço: R\$ 400 - R\$ 1\.000/)).toBeInTheDocument();
+  });
+
   it("renderiza empty state de erro quando a API falha", async () => {
     vi.mocked(fetchProducts).mockRejectedValue(new Error("Falha no servidor"));
     renderWithProviders(<ProdutosPage />, { route: "/produtos" });
