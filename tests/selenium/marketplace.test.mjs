@@ -675,7 +675,7 @@ test("administrador abre o PDV sem iniciar venda", async (t) => {
   await loginAs(loginEmail, loginPassword);
   await driver.get(url("/pdv"));
   assert.equal(
-    await (await waitForHeading("PDV - Ponto de Venda")).isDisplayed(),
+    await (await waitForHeading("PDV · Nova venda")).isDisplayed(),
     true,
   );
   const search = await driver.wait(
