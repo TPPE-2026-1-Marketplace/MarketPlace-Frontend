@@ -87,11 +87,30 @@ describe("ClientExport", () => {
     await renderLoaded();
 
     await userEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    expect(screen.getByText("Exportar clientes")).toBeInTheDocument();
+    expect(click).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar exportação" }));
 
     expect(parts[0]).toContain('"Ana Cliente","ana@dk.com","61999990000","11122233344"');
     expect(parts[0]).toContain('"Bia ""Aspas"""');
     expect(click).toHaveBeenCalled();
+    expect(screen.getByText("Exportação preparada")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     vi.unstubAllGlobals();
+  });
+
+  it("não baixa nada ao cancelar a exportação", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await renderLoaded();
+
+    await userEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(click).not.toHaveBeenCalled();
   });
 
   it("mostra o erro e tenta de novo", async () => {

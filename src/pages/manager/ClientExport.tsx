@@ -3,6 +3,7 @@ import AccessNotice from "@/components/manager/AccessNotice";
 import AdminField from "@/components/manager/AdminField";
 import AdminPageHeader from "@/components/manager/AdminPageHeader";
 import { ErrorState, LoadingState } from "@/components/manager/AdminStates";
+import ExportClientsDialog from "@/components/manager/ExportClientsDialog";
 import FilterBar from "@/components/manager/FilterBar";
 import KpiCard, { KpiGrid } from "@/components/manager/KpiCard";
 import NoResults from "@/components/manager/NoResults";
@@ -39,6 +40,7 @@ export function ClientExport() {
   const { clients, isLoading, error, refetch } = useManagementClients();
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
 
   const filteredClients = useMemo(() => clients.filter((client) => matchesSearch(client, search)), [clients, search]);
 
@@ -60,7 +62,7 @@ export function ClientExport() {
             size="sm"
             className={adminButtonClassName}
             disabled={filteredClients.length === 0}
-            onClick={exportCsv}
+            onClick={() => setExportOpen(true)}
           >
             Exportar CSV
           </Button>
@@ -106,6 +108,15 @@ export function ClientExport() {
       )}
 
       <AccessNotice />
+
+      {exportOpen && (
+        <ExportClientsDialog
+          count={filteredClients.length}
+          filename={clientsCsvFilename()}
+          onConfirm={exportCsv}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
     </>
   );
 }
