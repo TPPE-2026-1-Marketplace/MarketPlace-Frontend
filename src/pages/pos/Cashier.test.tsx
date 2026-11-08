@@ -130,7 +130,6 @@ describe("Cashier (PDV)", () => {
   });
 
   it("valida vendedor e cliente e conclui a venda no PIX", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     postMock.mockResolvedValueOnce({ idPedido: 77 });
     await renderCashier();
     await addRosa();
@@ -149,19 +148,23 @@ describe("Cashier (PDV)", () => {
     await userEvent.click(screen.getByRole("button", { name: /PIX/ }));
     await userEvent.click(screen.getByRole("button", { name: "Confirmar Venda" }));
 
-    expect(await screen.findByText("Venda #77 finalizada com sucesso!")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Venda concluída" })).toBeInTheDocument();
+    expect(screen.getByText("Venda #77 registrada com sucesso.")).toBeInTheDocument();
+    expect(screen.getByText(/Cliente: Maria · Vendedor: ANA01 · Total: R\$\s400,00/)).toBeInTheDocument();
     expect(postMock).toHaveBeenCalledWith("/orders/in-store", expect.objectContaining({
       codigoVendedor: "ANA01",
       idUsuario: "52998224725",
       clienteNomeAvulso: "Maria",
     }));
     expect(screen.queryByRole("heading", { name: "Finalizar Venda" })).not.toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(3000));
-    expect(screen.queryByText("Venda #77 finalizada com sucesso!")).not.toBeInTheDocument();
+
+    // A venda foi limpa: "Nova venda" volta ao catálogo com a lista vazia.
+    await userEvent.click(screen.getByRole("button", { name: "Nova venda" }));
+    expect(screen.getByText("Nenhum item adicionado")).toBeInTheDocument();
   });
 
-  it("vendedor logado vende com o próprio CPF e vê erros da API", async () => {
-    postMock.mockRejectedValueOnce(new Error("Estoque insuficiente"));
+  it("vendedor logado vende com o próprio CPF", async () => {
+    postMock.mockResolvedValueOnce({ idPedido: 78 });
     await renderCashier(employee);
     expect(screen.getByText("Ana Vendas • Vendedor")).toBeInTheDocument();
     await addRosa();
@@ -174,11 +177,43 @@ describe("Cashier (PDV)", () => {
     await userEvent.click(screen.getByRole("button", { name: /Cartão/ }));
     await userEvent.click(screen.getByRole("button", { name: "Confirmar Venda" }));
 
-    expect(await screen.findByText("Estoque insuficiente")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Venda concluída" })).toBeInTheDocument();
     expect(postMock.mock.calls[0][1]).toMatchObject({ codigoVendedor: "u-003" });
+  });
 
-    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(screen.queryByRole("heading", { name: "Finalizar Venda" })).not.toBeInTheDocument();
+  it("mostra a falha da venda preservando os itens e permite voltar à venda", async () => {
+    postMock.mockRejectedValueOnce(new Error("Estoque insuficiente"));
+    await renderCashier(employee);
+    await addRosa();
+
+    await userEvent.click(screen.getByRole("button", { name: "Finalizar Venda" }));
+    await userEvent.type(screen.getByPlaceholderText("Nome completo do cliente"), "Joana");
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar Venda" }));
+
+    expect(await screen.findByRole("heading", { name: "Falha na venda" })).toBeInTheDocument();
+    expect(screen.getByText("Motivo: Estoque insuficiente")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Voltar à venda" }));
+    expect(screen.getByText("Itens da Venda (1)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finalizar Venda" })).toBeInTheDocument();
+  });
+
+  it("tenta de novo após a falha com os mesmos dados e conclui a venda", async () => {
+    postMock.mockRejectedValueOnce(new Error("Sem conexão")).mockResolvedValueOnce({ idPedido: 79 });
+    await renderCashier(employee);
+    await addRosa();
+
+    await userEvent.click(screen.getByRole("button", { name: "Finalizar Venda" }));
+    await userEvent.type(screen.getByPlaceholderText("Nome completo do cliente"), "Joana");
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar Venda" }));
+    await screen.findByRole("heading", { name: "Falha na venda" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    expect(await screen.findByRole("heading", { name: "Venda concluída" })).toBeInTheDocument();
+    expect(screen.getByText("Venda #79 registrada com sucesso.")).toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(2);
+    expect(postMock.mock.calls[1][1]).toEqual(postMock.mock.calls[0][1]);
   });
 
   it("bloqueia a venda quando o CPF do cliente é inválido", async () => {

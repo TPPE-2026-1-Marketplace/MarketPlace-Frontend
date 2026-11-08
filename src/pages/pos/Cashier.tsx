@@ -22,9 +22,14 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { usePOS } from "../../context/POSContext";
 import { ApiProduct, POSSaleItem } from "../../data/pos-types";
+import { SaleCompleted, SaleFailed } from "../../components/pos/SaleResult";
 import { api } from "../../lib/api";
 import { CPF_INVALID_MESSAGE, isValidCpf } from "../../lib/br-validators";
 import { maskCpf } from "../../lib/utils";
+
+type SaleOutcome =
+  | { status: "completed"; saleId: string; customerName?: string; sellerCode: string; total: number }
+  | { status: "failed"; reason?: string };
 
 export function Cashier() {
   const navigate = useNavigate();
@@ -49,6 +54,7 @@ export function Cashier() {
   
   const [showCheckout, setShowCheckout] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [outcome, setOutcome] = useState<SaleOutcome | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -155,19 +161,33 @@ export function Cashier() {
     );
     setIsCompleting(false);
 
-    if (result.success) {
-      setMessage({ type: "success", text: `Venda #${result.saleId} finalizada com sucesso!` });
+    if (result.success && result.saleId) {
+      setOutcome({
+        status: "completed",
+        saleId: result.saleId,
+        customerName: customerName || undefined,
+        sellerCode: finalSellerId,
+        total,
+      });
       setShowCheckout(false);
       setSellerCode("");
       setCustomerName("");
       setCustomerCpf("");
       setCustomerPhone("");
       setCustomerEmail("");
-      setTimeout(() => setMessage(null), 3000);
     } else {
-      setMessage({ type: "error", text: result.message || "Erro ao finalizar venda." });
+      // Os itens e os dados do fechamento continuam preservados para a nova tentativa.
+      setShowCheckout(false);
+      setOutcome({ status: "failed", reason: result.message });
     }
   };
+
+  // A tela de falha continua visível durante a nova tentativa; o resultado a substitui.
+  const handleRetrySale = () => {
+    void handleCompleteSale();
+  };
+
+  const handleBackToSale = () => setOutcome(null);
 
   const handleCancelCheckout = () => {
     setShowCheckout(false);
@@ -227,6 +247,28 @@ export function Cashier() {
         </div>
       )}
 
+      {outcome && (
+        <div className="p-6">
+          {outcome.status === "completed" ? (
+            <SaleCompleted
+              saleId={outcome.saleId}
+              customerName={outcome.customerName}
+              sellerCode={outcome.sellerCode}
+              total={outcome.total}
+              onNewSale={() => setOutcome(null)}
+            />
+          ) : (
+            <SaleFailed
+              reason={outcome.reason}
+              retrying={isCompleting}
+              onRetry={handleRetrySale}
+              onBack={handleBackToSale}
+            />
+          )}
+        </div>
+      )}
+
+      {!outcome && (
       <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-white border border-gray-100 p-4">
@@ -439,6 +481,7 @@ export function Cashier() {
           </div>
         </div>
       </div>
+      )}
 
       {showCheckout && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
