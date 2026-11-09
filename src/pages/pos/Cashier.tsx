@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, AlertCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePOS } from "../../context/POSContext";
-import { ApiProduct, POSSaleItem } from "../../data/pos-types";
+import { ApiProduct, POSSaleItem, POSSeller } from "../../data/pos-types";
 import { SaleCompleted, SaleFailed } from "../../components/pos/SaleResult";
-import { api } from "../../lib/api";
+import { loadPOSProducts, loadPOSSellers, remainingPhysicalStock } from "@/lib/pos-catalog";
 import { CPF_INVALID_MESSAGE, isValidCpf } from "../../lib/br-validators";
 import { maskCpf } from "../../lib/utils";
 import Button from "@/components/ui/Button";
@@ -31,6 +31,9 @@ export function Cashier() {
   const [selectedVariantSku, setSelectedVariantSku] = useState("");
   const [quantity, setQuantity] = useState(1);
 
+  const [sellers, setSellers] = useState<POSSeller[]>([]);
+  const [sellersLoading, setSellersLoading] = useState(true);
+  const [sellersError, setSellersError] = useState("");
   const [sellerCode, setSellerCode] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerCpf, setCustomerCpf] = useState("");
@@ -43,26 +46,38 @@ export function Cashier() {
   const [outcome, setOutcome] = useState<SaleOutcome | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-    fetchProducts();
-  }, [user, navigate]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const response = await api.get<{ data: ApiProduct[] }>("/products?limit=100");
-      setProducts(response.data);
+      setProducts(await loadPOSProducts());
     } catch {
       setError("Erro ao carregar produtos. Verifique a conexão.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const fetchSellers = useCallback(async () => {
+    setSellersLoading(true);
+    setSellersError("");
+    try {
+      setSellers(await loadPOSSellers());
+    } catch {
+      setSellersError("Não foi possível carregar os vendedores. Você pode informar o código manualmente.");
+    } finally {
+      setSellersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    void fetchProducts();
+    void fetchSellers();
+  }, [user, navigate, fetchProducts, fetchSellers]);
 
   const filteredProducts = products.filter(
     (p) =>
@@ -82,6 +97,11 @@ export function Cashier() {
     const variant = selectedProduct.variants.find((v) => v.codigoSku === selectedVariantSku);
     if (!variant) {
       setMessage({ type: "error", text: "Variação não encontrada." });
+      return;
+    }
+
+    if (remainingPhysicalStock(variant, currentSale) < quantity) {
+      setMessage({ type: "error", text: "Quantidade indisponível no estoque da loja." });
       return;
     }
 
@@ -109,16 +129,15 @@ export function Cashier() {
       setMessage({ type: "error", text: "Adicione produtos à venda." });
       return;
     }
-    // Auto-fill seller if it's an employee or manager
-    if (user?.role === "employee" || user?.role === "manager") {
-      setSellerCode(user.id);
+    if (!sellerCode && user?.role === "employee") {
+      setSellerCode(user.sellerCode || user.id);
     }
     setShowCheckout(true);
   };
 
   const handleCompleteSale = async () => {
-    // Se o usuário logado for vendedor ou gerente, força o uso do seu próprio CPF do JWT
-    const finalSellerId = (user?.role === "employee" || user?.role === "manager") ? user.id : sellerCode;
+    const selectedSeller = sellers.find((seller) => seller.cpf === sellerCode.trim() || seller.code?.toLowerCase() === sellerCode.trim().toLowerCase());
+    const finalSellerId = selectedSeller ? selectedSeller.code || selectedSeller.cpf : sellerCode.trim();
 
     if (!finalSellerId.trim()) {
       setMessage({ type: "error", text: "Informe o código do vendedor (CPF)." });
@@ -161,6 +180,7 @@ export function Cashier() {
       setCustomerCpf("");
       setCustomerPhone("");
       setCustomerEmail("");
+      void fetchProducts();
     } else {
       // Os itens e os dados do fechamento continuam preservados para a nova tentativa.
       setShowCheckout(false);
@@ -212,8 +232,8 @@ export function Cashier() {
         )
       ) : showCheckout ? (
         <SaleCheckout
-          sellerCode={user.role === "employee" || user.role === "manager" ? user.id : sellerCode}
-          sellerDisabled={user.role === "employee" || user.role === "manager"}
+          sellerCode={sellerCode}
+          sellers={sellers} sellersLoading={sellersLoading} sellersError={sellersError} onReloadSellers={fetchSellers}
           onSellerChange={setSellerCode}
           customerName={customerName} onNameChange={setCustomerName}
           customerCpf={customerCpf} onCpfChange={(value) => setCustomerCpf(maskCpf(value))}
@@ -232,7 +252,11 @@ export function Cashier() {
           variantSku={selectedVariantSku} onVariantChange={setSelectedVariantSku}
           quantity={quantity} onQuantityChange={setQuantity} onAdd={handleAddToSale}
           items={currentSale} total={total} onRemove={removeItem}
-          onUpdateQuantity={updateQuantity} onClear={clearSale} onCheckout={handleFinalizeSale}
+          onUpdateQuantity={(index, nextQuantity) => {
+            const item = currentSale[index];
+            const variant = item.product.variants.find((variant) => variant.codigoSku === item.variantSku);
+            if (nextQuantity <= item.quantity || nextQuantity - item.quantity <= remainingPhysicalStock(variant, currentSale)) updateQuantity(index, nextQuantity);
+          }} onClear={clearSale} onCheckout={handleFinalizeSale}
         />
       )}
     </main>

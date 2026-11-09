@@ -36,7 +36,8 @@ async function renderCashier(user = superadmin) {
 
 async function addRosa(sku = "ROSA-P", quantity = "2") {
   await userEvent.click(screen.getByRole("button", { name: "Selecionar produto: Vestido Rosa" }));
-  await userEvent.selectOptions(screen.getByRole("combobox"), sku);
+  if (sku === "ROSA-M") await userEvent.click(screen.getByRole("button", { name: "Padrão" }));
+  await userEvent.click(screen.getByRole("button", { name: sku === "ROSA-M" ? "Tamanho Único" : "Tamanho P" }));
   // O campo nunca fica vazio (volta para 1), então o valor é definido de uma vez.
   fireEvent.change(screen.getByRole("spinbutton"), { target: { value: quantity } });
   await userEvent.click(screen.getByRole("button", { name: /Adicionar à venda/ }));
@@ -46,7 +47,16 @@ describe("Cashier (PDV)", () => {
   beforeEach(() => {
     getMock.mockReset();
     postMock.mockReset();
-    getMock.mockResolvedValue({ data: products });
+    getMock.mockImplementation(async (path) => {
+      if (path.startsWith("/inventory/")) return { qtdOnline: 50, qtdLojaFisica: 10 };
+      if (path.startsWith("/images/catalog/")) return [];
+      if (path === "/employees") return { data: [
+        { cpf: "seller-ana", ativo: true, role_perfil: "vendedor", codigo_funcionario: "ANA01", person: { nome: "Ana Vendas" } },
+        { cpf: "seller-carlos", ativo: true, role_perfil: "vendedor", codigo_funcionario: "CARLOS02", person: { nome: "Carlos Moda" } },
+        { cpf: "seller-inactive", ativo: false, role_perfil: "vendedor", codigo_funcionario: "INATIVO", person: { nome: "Vendedor inativo" } },
+      ] };
+      return { data: products };
+    });
   });
 
   afterEach(() => {
@@ -86,10 +96,9 @@ describe("Cashier (PDV)", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await renderCashier();
 
-    await userEvent.click(screen.getByRole("button", { name: /Saia Azul/ }));
-    expect(screen.getByRole("option", { name: "Nenhuma variação cadastrada" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Adicionar à venda/ }));
-    expect(screen.getByText("Selecione o produto e a variação.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Selecionar produto: Saia Azul" }));
+    expect(screen.getByText("Nenhuma variação cadastrada")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Adicionar à venda/ })).toBeDisabled();
 
     await addRosa();
     expect(screen.getByText("Produto adicionado à venda!")).toBeInTheDocument();
@@ -163,22 +172,22 @@ describe("Cashier (PDV)", () => {
     expect(screen.getByText("Nenhum item adicionado")).toBeInTheDocument();
   });
 
-  it("vendedor logado vende com o próprio CPF", async () => {
+  it("vendedor logado inicia com seu identificador editável", async () => {
     postMock.mockResolvedValueOnce({ idPedido: 78 });
     await renderCashier(employee);
     expect(screen.getByText("Ana Vendas · Vendedor")).toBeInTheDocument();
     await addRosa();
 
     await userEvent.click(screen.getByRole("button", { name: "Finalizar venda" }));
-    expect(screen.getByPlaceholderText("Ex: VEND01 ou CPF")).toHaveValue("u-003");
-    expect(screen.getByPlaceholderText("Ex: VEND01 ou CPF")).toBeDisabled();
+    expect(screen.getByPlaceholderText("Ex: VEND01 ou CPF")).toHaveValue("ANA01");
+    expect(screen.getByPlaceholderText("Ex: VEND01 ou CPF")).toBeEnabled();
     await userEvent.type(screen.getByPlaceholderText("Nome completo do cliente"), "Joana");
     await userEvent.click(screen.getByRole("button", { name: /Dinheiro/ }));
     await userEvent.click(screen.getByRole("button", { name: /Cartão/ }));
     await userEvent.click(screen.getByRole("button", { name: "Confirmar venda" }));
 
     expect(await screen.findByRole("heading", { name: "Venda concluída" })).toBeInTheDocument();
-    expect(postMock.mock.calls[0][1]).toMatchObject({ codigoVendedor: "u-003" });
+    expect(postMock.mock.calls[0][1]).toMatchObject({ codigoVendedor: "ANA01" });
   });
 
   it("mostra a falha da venda preservando os itens e permite voltar à venda", async () => {
@@ -264,6 +273,85 @@ describe("Cashier (PDV)", () => {
     expect(screen.getByRole("button", { name: "Finalizar venda" })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Limpar busca" }));
     expect(screen.getByRole("button", { name: "Selecionar produto: Vestido Rosa" })).toBeInTheDocument();
+  });
+
+  it("seleciona vendedor pelo nome e sincroniza com o código digitado", async () => {
+    postMock.mockResolvedValueOnce({ idPedido: 90 });
+    await renderCashier();
+    await addRosa("ROSA-P", "1");
+    await userEvent.click(screen.getByRole("button", { name: "Finalizar venda" }));
+    const sellers = screen.getByLabelText("Selecionar vendedor");
+    expect(screen.queryByRole("option", { name: /Vendedor inativo/ })).not.toBeInTheDocument();
+    await userEvent.selectOptions(sellers, "seller-carlos");
+    expect(screen.getByLabelText("Código do vendedor *")).toHaveValue("CARLOS02");
+    fireEvent.change(screen.getByLabelText("Código do vendedor *"), { target: { value: "ana01" } });
+    expect(sellers).toHaveValue("seller-ana");
+    await userEvent.selectOptions(sellers, "seller-carlos");
+    await userEvent.type(screen.getByLabelText("Nome da cliente *"), "Maria");
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar venda" }));
+    await screen.findByRole("heading", { name: "Venda concluída" });
+    expect(postMock).toHaveBeenCalledWith("/orders/in-store", expect.objectContaining({ codigoVendedor: "CARLOS02" }));
+  });
+
+  it("permite digitar o código quando a lista de vendedores falha", async () => {
+    const original = getMock.getMockImplementation()!;
+    getMock.mockImplementation(async (path, params) => {
+      if (path === "/employees") throw new Error("offline");
+      return original(path, params);
+    });
+    await renderCashier();
+    await addRosa();
+    await userEvent.click(screen.getByRole("button", { name: "Finalizar venda" }));
+    expect(screen.getByText(/Não foi possível carregar os vendedores/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Código do vendedor *")).toBeEnabled();
+    expect(screen.getByLabelText("Selecionar vendedor")).toBeDisabled();
+  });
+
+  it("seleciona pela foto e bloqueia tamanhos sem saldo físico", async () => {
+    const original = getMock.getMockImplementation()!;
+    getMock.mockImplementation(async (path, params) => {
+      if (path === "/inventory/ROSA-P") return { qtdOnline: 10, qtdLojaFisica: 0 };
+      if (path === "/images/catalog/ROSA-P") return [{ ordemNoCatalogo: 1, image: { idImagem: 1, url: "/vestido.jpg", ordem: 1, descricao: null } }];
+      return original(path, params);
+    });
+    await renderCashier();
+    expect(screen.getByAltText("Vestido Rosa")).toHaveAttribute("src", "/vestido.jpg");
+    await userEvent.click(screen.getByRole("button", { name: "Ver produto: Vestido Rosa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Rosa" }));
+    expect(screen.getByRole("button", { name: "Tamanho P — indisponível" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Adicionar à venda" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Padrão" }));
+    await userEvent.click(screen.getByRole("button", { name: "Tamanho Único" }));
+    expect(screen.getByRole("button", { name: "Tamanho Único" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Adicionar à venda" })).toBeEnabled();
+  });
+
+  it("considera as unidades já no carrinho para limitar o estoque", async () => {
+    const original = getMock.getMockImplementation()!;
+    getMock.mockImplementation(async (path, params) => {
+      if (path === "/inventory/ROSA-P") return { qtdOnline: 30, qtdLojaFisica: 2 };
+      return original(path, params);
+    });
+    await renderCashier();
+    await addRosa("ROSA-P", "2");
+    expect(screen.getByRole("button", { name: "Aumentar quantidade de Vestido Rosa" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Selecionar produto: Vestido Rosa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Rosa" }));
+    expect(screen.getByRole("button", { name: "Tamanho P — indisponível" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Adicionar à venda" })).toBeDisabled();
+  });
+
+  it("não permite adicionar quando a consulta de estoque falha", async () => {
+    const original = getMock.getMockImplementation()!;
+    getMock.mockImplementation(async (path, params) => {
+      if (path.startsWith("/inventory/")) throw new Error("offline");
+      return original(path, params);
+    });
+    await renderCashier();
+    await userEvent.click(screen.getByRole("button", { name: "Selecionar produto: Vestido Rosa" }));
+    expect(screen.getByText(/Não foi possível consultar o estoque/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tamanho P — indisponível" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Adicionar à venda" })).toBeDisabled();
   });
 
 });

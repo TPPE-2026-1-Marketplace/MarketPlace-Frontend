@@ -1,8 +1,12 @@
+import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import AdminField from "@/components/manager/AdminField";
 import { adminButtonClassName, adminCardClassName, adminControlClassName, adminLabelClassName } from "@/components/manager/adminClasses";
 import Button from "@/components/ui/Button";
 import type { ApiProduct, POSSaleItem } from "@/data/pos-types";
+import ProductPhoto from "./ProductPhoto";
+import VariantPicker from "./VariantPicker";
+import { remainingPhysicalStock } from "@/lib/pos-catalog";
 import { cn, formatCurrency } from "@/lib/utils";
 
 interface SaleCatalogProps {
@@ -34,6 +38,12 @@ const smallClassName = "text-xs leading-[18px] text-[var(--foreground-secondary)
 /** Nova venda e carrinho nas versões desktop e mobile do PDV. */
 export default function SaleCatalog(props: SaleCatalogProps) {
   const { products, selectedProduct, items } = props;
+  const selectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (selectedProduct) selectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+  }, [selectedProduct]);
+  const variant = selectedProduct?.variants.find((item) => item.codigoSku === props.variantSku);
+  const available = remainingPhysicalStock(variant, items);
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,860fr)_minmax(0,492fr)]">
       <section className="flex min-w-0 flex-col gap-4" aria-labelledby="pdv-products-title">
@@ -59,29 +69,23 @@ export default function SaleCatalog(props: SaleCatalogProps) {
             <p className={smallClassName}>Altere a busca para tentar novamente.</p>
             <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={() => props.onSearch("")}>Limpar busca</Button>
           </div>
-        ) : products.map((product) => (
-          <article key={product.idProduto} className={cn(adminCardClassName, "flex min-w-0 flex-col items-start gap-2 p-4")}>
-            <h3 className={cn(titleClassName, "break-words")}>{product.titulo}</h3>
+        ) : <div className="grid max-h-[680px] grid-cols-2 gap-4 overflow-y-auto pr-1 xl:grid-cols-3">{products.map((product) => (
+          <article key={product.idProduto} className={cn(adminCardClassName, "flex min-w-0 flex-col items-start gap-2 p-3")}>
+            <button type="button" className="w-full rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand)]" aria-label={"Ver produto: " + product.titulo} onClick={() => props.onSelectProduct(product)}><ProductPhoto product={product} /></button>
+            <h3 className="text-base font-semibold leading-6 break-words">{product.titulo}</h3>
             <p className={cn(adminLabelClassName, "text-[var(--foreground-muted)]")}>SKU base · {product.sku}</p>
             <p className={bodyClassName}>A partir de {formatCurrency(Number(product.precoBase))}</p>
-            <Button variant="outline-neutral" size="sm" className={adminButtonClassName} aria-label={"Selecionar produto: " + product.titulo} onClick={() => props.onSelectProduct(product)}>Selecionar produto</Button>
+            <Button variant="outline-neutral" size="sm" className={cn(adminButtonClassName, "mt-auto w-full min-w-0 px-2 text-xs")} aria-label={"Selecionar produto: " + product.titulo} onClick={() => props.onSelectProduct(product)}>Selecionar produto</Button>
           </article>
-        ))}
+        ))}</div>}
         {selectedProduct && (
-          <section className={cn(adminCardClassName, "flex flex-col items-start gap-4 p-6")} aria-labelledby="pdv-selected-title">
+          <section ref={selectionRef} className={cn(adminCardClassName, "flex flex-col items-start gap-4 p-6")} aria-labelledby="pdv-selected-title">
             <h3 id="pdv-selected-title" className={titleClassName}>{selectedProduct.titulo}</h3>
-            <AdminField label="Variação *" htmlFor="pdv-variant" className="w-full">
-              <select id="pdv-variant" value={props.variantSku} onChange={(event) => props.onVariantChange(event.target.value)} className={adminControlClassName}>
-                <option value="">Selecione a variação</option>
-                {selectedProduct.variants?.length ? selectedProduct.variants.map((variant) => (
-                  <option key={variant.codigoSku} value={variant.codigoSku}>{variant.tamanho || "-"} / {variant.cor || "-"} · {variant.codigoSku}</option>
-                )) : <option disabled>Nenhuma variação cadastrada</option>}
-              </select>
-            </AdminField>
+            <VariantPicker key={selectedProduct.idProduto} product={selectedProduct} sku={props.variantSku} items={items} onChange={(sku) => { props.onVariantChange(sku); props.onQuantityChange(1); }} />
             <AdminField label="Quantidade *" htmlFor="pdv-quantity" className="w-full">
-              <input id="pdv-quantity" type="number" min="1" step="1" value={props.quantity} onChange={(event) => props.onQuantityChange(Math.max(1, Math.floor(Number(event.target.value)) || 1))} className={adminControlClassName} />
+              <input id="pdv-quantity" type="number" min="1" max={available || 1} step="1" value={props.quantity} onChange={(event) => props.onQuantityChange(Math.max(1, Math.floor(Number(event.target.value)) || 1))} className={adminControlClassName} />
             </AdminField>
-            <Button variant="action" size="sm" className={adminButtonClassName} onClick={props.onAdd}>Adicionar à venda</Button>
+            <Button variant="action" size="sm" className={adminButtonClassName} disabled={!variant || available < props.quantity} onClick={props.onAdd}>Adicionar à venda</Button>
           </section>
         )}
       </section>
@@ -102,7 +106,7 @@ export default function SaleCatalog(props: SaleCatalogProps) {
                 <div className="flex w-full items-start gap-2" role="group" aria-label={"Quantidade de " + item.product.titulo}>
                   <Button variant="outline-neutral" size="sm" className={cn(adminButtonClassName, "w-16 min-w-0")} aria-label={"Diminuir quantidade de " + item.product.titulo} onClick={() => props.onUpdateQuantity(index, item.quantity - 1)}>−</Button>
                   <span className="text-sm font-medium leading-5" aria-live="polite">{item.quantity}</span>
-                  <Button variant="outline-neutral" size="sm" className={cn(adminButtonClassName, "w-16 min-w-0")} aria-label={"Aumentar quantidade de " + item.product.titulo} onClick={() => props.onUpdateQuantity(index, item.quantity + 1)}>+</Button>
+                  <Button variant="outline-neutral" size="sm" className={cn(adminButtonClassName, "w-16 min-w-0")} aria-label={"Aumentar quantidade de " + item.product.titulo} disabled={remainingPhysicalStock(item.product.variants.find((variant) => variant.codigoSku === item.variantSku), items) <= 0} onClick={() => props.onUpdateQuantity(index, item.quantity + 1)}>+</Button>
                 </div>
                 <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={() => props.onRemove(index)}>Remover item</Button>
               </article>
