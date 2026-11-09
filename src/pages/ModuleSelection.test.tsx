@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { employee, manager, renderWithProviders, superadmin } from "@/test/render";
+import { customer, employee, manager, renderWithProviders, superadmin } from "@/test/render";
 import { ModuleSelection } from "./ModuleSelection";
 
 const location = () => screen.getByTestId("location").textContent;
@@ -12,6 +12,22 @@ describe("ModuleSelection", () => {
 
     expect(location()).toBe("/login");
     expect(screen.queryByText(/Bem-vinda/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["cliente", customer],
+    ["perfil desconhecido", { ...customer, role: "desconhecido" } as unknown as typeof customer],
+  ])("não oferece módulos operacionais para %s", (_label, user) => {
+    renderWithProviders(<ModuleSelection />, { user, route: "/selecionar-modulo" });
+    expect(location()).toBe("/");
+    expect(screen.queryByRole("button", { name: /PDV - Vendas Presenciais/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Módulo de Gestão/ })).not.toBeInTheDocument();
+  });
+
+  it("caixa pode escolher o PDV", () => {
+    renderWithProviders(<ModuleSelection />, { user: { ...employee, role: "cashier" } });
+    expect(screen.getByRole("button", { name: /PDV - Vendas Presenciais/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Módulo de Gestão/ })).not.toBeInTheDocument();
   });
 
   it("gerente acessa gestão e PDV", async () => {

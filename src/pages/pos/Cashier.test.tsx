@@ -2,7 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../lib/api";
-import { employee, manager, renderWithProviders, superadmin } from "@/test/render";
+import { customer, employee, manager, renderWithProviders, superadmin } from "@/test/render";
 import { Cashier } from "./Cashier";
 
 vi.mock("../../lib/api", async (importOriginal) => ({
@@ -66,6 +66,28 @@ describe("Cashier (PDV)", () => {
   it("manda para o login sem usuário", () => {
     renderWithProviders(<Cashier />, { route: "/pdv" });
     expect(location()).toBe("/login");
+    expect(getMock).not.toHaveBeenCalled();
+    expect(postMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "PDV · Nova venda" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["cliente", customer],
+    ["perfil desconhecido", { ...customer, role: "desconhecido" } as unknown as typeof customer],
+    ["perfil ausente", { ...customer, role: undefined } as unknown as typeof customer],
+  ])("bloqueia acesso direto ao PDV para %s sem consultar a API", (_label, user) => {
+    renderWithProviders(<Cashier />, { user, route: "/pdv" });
+    expect(location()).toBe("/");
+    expect(screen.queryByRole("heading", { name: "PDV · Nova venda" })).not.toBeInTheDocument();
+    expect(getMock).not.toHaveBeenCalled();
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it.each([superadmin, manager, employee, { ...employee, role: "cashier" as const }])("permite acesso ao PDV para $role", async (user) => {
+    await renderCashier(user);
+    expect(location()).toBe("/pdv");
+    expect(screen.getByRole("heading", { name: "PDV · Nova venda" })).toBeInTheDocument();
+    expect(getMock).toHaveBeenCalledWith("/products?limit=100");
   });
 
   it("carrega os produtos, busca e mostra o papel do usuário", async () => {

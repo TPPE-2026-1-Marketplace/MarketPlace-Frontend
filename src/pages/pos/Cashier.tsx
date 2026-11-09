@@ -19,7 +19,7 @@ type SaleOutcome =
 
 export function Cashier() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isInternalUser } = useAuth();
   const { currentSale, addItem, removeItem, updateQuantity, clearSale, completeSale } = usePOS();
 
   const [products, setProducts] = useState<ApiProduct[]>([]);
@@ -72,12 +72,16 @@ export function Cashier() {
 
   useEffect(() => {
     if (!user) {
-      navigate("/login");
+      navigate("/login", { replace: true });
+      return;
+    }
+    if (!isInternalUser) {
+      navigate("/", { replace: true });
       return;
     }
     void fetchProducts();
     void fetchSellers();
-  }, [user, navigate, fetchProducts, fetchSellers]);
+  }, [user, isInternalUser, navigate, fetchProducts, fetchSellers]);
 
   const filteredProducts = products.filter(
     (p) =>
@@ -203,7 +207,7 @@ export function Cashier() {
     setCustomerEmail("");
   };
 
-  if (!user) return null;
+  if (!user || !isInternalUser) return null;
 
   return (
     <main className="flex min-h-screen flex-col gap-6 bg-[var(--background-store)] p-4 text-[var(--foreground)] lg:p-8">
