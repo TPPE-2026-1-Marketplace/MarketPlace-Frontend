@@ -804,24 +804,26 @@ if (allowAdminMutations) {
     await visualPause(adminMutationStepDelayMs);
 
     await clickPanelNav("Usuários");
-    assert.equal(await (await waitForHeading("Gestão de Usuários")).isDisplayed(), true);
+    assert.equal(await (await waitForHeading("Usuários")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Novo Usuário"));
-    assert.equal(await (await waitForHeading("Novo Usuário")).isDisplayed(), true);
+    await clickVisible(await findButtonByText("Novo usuário"));
+    assert.equal(await (await waitForHeading("Novo usuário")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="000.000.000-00"]', userCpf);
+    await fillInput("#user-cpf", userCpf);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="Ex: Ana Silva"]', userName);
+    await fillInput("#user-name", userName);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="usuario@dkfestas.com.br"]', userEmail);
+    await fillInput("#user-email", userEmail);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="Senha de acesso"]', userPassword);
+    await fillInput("#user-password", userPassword);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="(11) 99999-0000"]', "61999999999");
+    await fillInput("#user-phone", "61999999999");
     await visualPause(adminMutationStepDelayMs);
-    await selectOptionByText("select", roleLabel);
+    await selectOptionByText("#user-role", roleLabel);
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Cadastrar Usuário"));
+    await clickVisible(await findButtonByText("Salvar usuário"));
+    await visualPause(adminMutationStepDelayMs);
+    await clickVisible(await findButtonByText("Concluir"));
     await visualPause(adminMutationStepDelayMs);
     await driver.wait(
       until.elementLocated(
