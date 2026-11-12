@@ -650,7 +650,7 @@ test("administrador navega pelos modulos gerenciais sem alterar dados", async (t
   const sections = [
     ["/painel/estoque", "Estoque"],
     ["/painel/pedidos", "Pedidos"],
-    ["/painel/relatorios", "Relatórios e Análises"],
+    ["/painel/relatorios", "Relatórios"],
     ["/painel/comissoes", "Comissões e Metas"],
     ["/painel/cupons", "Cupons e Campanhas"],
   ];
