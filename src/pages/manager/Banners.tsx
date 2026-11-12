@@ -83,9 +83,6 @@ export function Banners() {
     );
   }
 
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message={error} onRetry={refetch} />;
-
   const clearFilters = () => {
     setDraft(EMPTY_FILTERS);
     setFilters(EMPTY_FILTERS);
@@ -164,62 +161,71 @@ export function Banners() {
         }
       />
 
-      <KpiGrid>
-        <KpiCard
-          label="Publicados"
-          value={formatKpiCount(publishedCount)}
-          help="No período selecionado"
-        />
-        <KpiCard
-          label="Rascunhos"
-          value={formatKpiCount(draftCount)}
-          help="No período selecionado"
-        />
-      </KpiGrid>
-
-      <FilterBar onApply={() => setFilters(draft)}>
-        <AdminField label="Buscar título ou coleção" htmlFor="banners-search">
-          <input
-            id="banners-search"
-            type="search"
-            value={draft.search}
-            onChange={(e) => setDraft((prev) => ({ ...prev, search: e.target.value }))}
-            placeholder="Título ou coleção..."
-            className={adminControlClassName}
-          />
-        </AdminField>
-
-        <AdminField
-          label={`Status: ${STATUS_FILTER_LABELS[draft.status]}`}
-          htmlFor="banners-status"
-        >
-          <select
-            id="banners-status"
-            value={draft.status}
-            onChange={(e) =>
-              setDraft((prev) => ({
-                ...prev,
-                status: e.target.value as BannerStatusFilter,
-              }))
-            }
-            className={adminControlClassName}
-          >
-            <option value="all">Todos</option>
-            <option value="published">Publicado</option>
-            <option value="draft">Rascunho</option>
-          </select>
-        </AdminField>
-      </FilterBar>
-
-      {filteredBanners.length === 0 ? (
-        <NoResults onClear={clearFilters} />
+      {isLoading ? (
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} onRetry={refetch} />
       ) : (
-        <RecordsTable
-          title="Registros recentes"
-          columns={columns}
-          rows={filteredBanners}
-          getRowKey={(banner) => banner.id}
-        />
+        <>
+          <KpiGrid>
+            <KpiCard
+              label="Publicados"
+              value={formatKpiCount(publishedCount)}
+              help="No período selecionado"
+            />
+            <KpiCard
+              label="Rascunhos"
+              value={formatKpiCount(draftCount)}
+              help="No período selecionado"
+            />
+          </KpiGrid>
+
+          <FilterBar onApply={() => setFilters(draft)}>
+            <AdminField label="Buscar título ou coleção" htmlFor="banners-search">
+              <input
+                id="banners-search"
+                type="search"
+                value={draft.search}
+                onChange={(e) => setDraft((prev) => ({ ...prev, search: e.target.value }))}
+                placeholder="Título ou coleção..."
+                className={adminControlClassName}
+              />
+            </AdminField>
+
+            <AdminField
+              label={`Status: ${STATUS_FILTER_LABELS[draft.status]}`}
+              htmlFor="banners-status"
+            >
+              <select
+                id="banners-status"
+                value={draft.status}
+                onChange={(e) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    status: e.target.value as BannerStatusFilter,
+                  }))
+                }
+                className={adminControlClassName}
+              >
+                <option value="all">Todos</option>
+                <option value="published">Publicado</option>
+                <option value="draft">Rascunho</option>
+              </select>
+            </AdminField>
+          </FilterBar>
+
+          {filteredBanners.length === 0 ? (
+            <NoResults onClear={clearFilters} />
+          ) : (
+            <RecordsTable
+              key={JSON.stringify(filters)}
+              title="Registros recentes"
+              columns={columns}
+              rows={filteredBanners}
+              getRowKey={(banner) => banner.id}
+            />
+          )}
+        </>
       )}
 
       <AccessNotice />

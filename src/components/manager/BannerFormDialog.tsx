@@ -136,12 +136,7 @@ function BannerFormContent({
       : `Banner ${form.title} criado`;
 
     return (
-      <AdminDialog
-        open={open}
-        onClose={onClose}
-        title="Alterações salvas"
-        description="Revise os dados antes de continuar."
-      >
+      <AdminDialog open={open} onClose={onClose} title="Alterações salvas">
         <SavedConfirmation result={savedText} onConclude={onClose} />
       </AdminDialog>
     );
@@ -153,11 +148,10 @@ function BannerFormContent({
         open={open}
         onClose={onClose}
         title="Pré-visualização do banner"
-        description="Revise os dados antes de continuar."
         actions={
-          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <>
             <Button
-              variant="outline-neutral"
+              variant="action"
               size="sm"
               className={adminButtonClassName}
               onClick={() => setStep("form")}
@@ -172,10 +166,10 @@ function BannerFormContent({
             >
               Cancelar
             </Button>
-          </div>
+          </>
         }
       >
-        <div className="mb-4 h-[220px] w-full overflow-hidden border border-[var(--border)] bg-[var(--background-card)]">
+        <div className="h-[220px] w-full overflow-hidden border border-[var(--border)] bg-[var(--background-card)]">
           <ImageWithFallback
             src={form.image}
             alt={form.title}
@@ -204,25 +198,23 @@ function BannerFormContent({
       title={dialogTitle}
       description="Revise os dados antes de continuar."
       actions={
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline-neutral"
-              size="sm"
-              className={adminButtonClassName}
-              onClick={handlePreview}
-            >
-              Pré-visualizar
-            </Button>
-            <Button
-              variant="action"
-              size="sm"
-              className={adminButtonClassName}
-              onClick={handleSave}
-            >
-              Salvar banner
-            </Button>
-          </div>
+        <>
+          <Button
+            variant="outline-neutral"
+            size="sm"
+            className={adminButtonClassName}
+            onClick={handlePreview}
+          >
+            Pré-visualizar
+          </Button>
+          <Button
+            variant="action"
+            size="sm"
+            className={adminButtonClassName}
+            onClick={handleSave}
+          >
+            Salvar banner
+          </Button>
           <Button
             variant="outline-neutral"
             size="sm"
@@ -231,7 +223,7 @@ function BannerFormContent({
           >
             Cancelar
           </Button>
-        </div>
+        </>
       }
     >
       {generalError && (
