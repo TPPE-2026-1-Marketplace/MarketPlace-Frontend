@@ -38,7 +38,7 @@ O uso do antigo prefixo `NEXT_PUBLIC_` não funcionará.
 
 ## Infraestrutura e Execução
 
-- **Desenvolvimento Local:** Use `pnpm dev` ou o Docker Compose de dev.
+- **Desenvolvimento Local:** Use `make dev-up` (Docker) ou `make dev` (host). `make help` lista todos os comandos, com os mesmos nomes do backend; testes e checagens com `make dev-test` / `make dev-ci`.
 - **Produção:** O `Dockerfile` está configurado com multi-stage build. A primeira etapa realiza o `pnpm run build` gerando estáticos no Vite, e a segunda etapa utiliza uma imagem `nginx:alpine` superleve para servir o diretório `dist/`.
 
 > Siga estas regras rigorosamente para manter a consistência com a decisão arquitetural da equipe!

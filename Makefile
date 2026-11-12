@@ -1,14 +1,26 @@
-COMPOSE_DEV := docker compose --env-file .env.development -f compose.dev.yml
-COMPOSE_PROD := docker compose --env-file .env.production -f compose.prod.yml
+# Makefile do frontend. Mesmo esqueleto e mesmos nomes de comando do backend
+# (MarketPlace-Backend): o que é comum aos dois fica nas seções Setup, Local,
+# Desenvolvimento, Produção local e Utilidades; o que é só deste repositório
+# fica em "Específicos do frontend". `make help` é gerado a partir dos
+# comentários `## ` de cada alvo e dos títulos `##@`.
+
+COMPOSE_PROJECT := marketplace-frontend
+COMPOSE_DEV := docker compose -p $(COMPOSE_PROJECT) --env-file .env.development -f compose.dev.yml
+COMPOSE_PROD := docker compose -p $(COMPOSE_PROJECT) --env-file .env.production -f compose.prod.yml
 SERVICE := app
 
 export DOCKER_BUILDKIT := 1
 export COMPOSE_DOCKER_CLI_BUILD := 1
 
-.PHONY: help env-setup env-check install dev lint build start selenium selenium-local selenium-local-ui selenium-prod-ui \
-    dev-up dev-down dev-logs dev-shell dev-build dev-rebuild dev-reset \
-    prod-up prod-down prod-logs prod-build prod-rebuild prod-image \
-    clean check hooks hooks-off
+.DEFAULT_GOAL := help
+
+.PHONY: help hooks hooks-off env-setup env-check install \
+	dev lint test build start clean \
+	dev-up dev-down dev-restart dev-build dev-rebuild dev-reset dev-logs dev-shell \
+	dev-test dev-test-cov dev-lint dev-lint-fix dev-typecheck dev-check dev-ci \
+	prod-up prod-down prod-logs prod-build prod-rebuild prod-image \
+	check \
+	selenium selenium-local selenium-local-ui selenium-prod-ui
 
 SELENIUM_LOCAL_URL ?= http://localhost:3000
 SELENIUM_PROD_URL ?= https://marketplace-frontend-jh71.onrender.com/
@@ -21,89 +33,139 @@ SELENIUM_CHECKOUT_PAYMENT_HOLD_MS ?= 8000
 SELENIUM_ALLOW_ADMIN_MUTATIONS ?= false
 SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS ?= 1000
 
-help:
-	@echo "Setup e local:"
-	@echo "  make hooks            Ativa os hooks versionados (.githooks)"
-	@echo "  make hooks-off        Desativa os hooks versionados"
-	@echo "  make env-setup        Cria .env.development e .env.production a partir dos .example"
-	@echo "  make env-check        Compara as chaves dos .env com as dos .example (sem mostrar valores)"
-	@echo "  make install          Instala dependencias localmente com pnpm"
-	@echo "  make dev              Sobe o Next.js localmente em modo desenvolvimento"
-	@echo "  make lint             Executa o lint do projeto"
-	@echo "  make test             Executa os testes localmente com pnpm"
-	@echo "  make build            Gera o build local de producao"
-	@echo "  make start            Inicia a aplicacao local usando o build"
-	@echo "  make selenium         Executa Selenium contra SELENIUM_BASE_URL (producao)"
-	@echo "  make selenium-local   Executa Selenium contra o front local (porta 3000)"
-	@echo "  make selenium-local-ui Executa Selenium remoto com Chrome e noVNC"
-	@echo "  make selenium-prod-ui Executa Selenium remoto contra a producao com Chrome e noVNC"
+##@ Setup
+
+help: ## Lista os comandos disponíveis
+	@awk 'BEGIN { FS = ":.*## " } \
+		/^##@/ { printf "\n%s\n", substr($$0, 5) } \
+		/^[a-zA-Z0-9_-]+:.*## / { printf "  make %-22s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 	@echo ""
-	@echo "Desenvolvimento (Docker):"
-	@echo "  make dev-up           Sobe o ambiente Docker de desenvolvimento"
-	@echo "  make dev-down         Derruba o ambiente Docker de desenvolvimento"
-	@echo "  make dev-logs         Exibe logs do ambiente Docker de desenvolvimento"
-	@echo "  make dev-shell        Abre um shell no container da aplicacao"
-	@echo "  make dev-test         Executa os testes no container (path=<pattern> para filtrar)"
-	@echo "  make dev-test-cov     Executa os testes com relatorio de cobertura no container"
-	@echo "  make dev-lint         Executa o lint dentro do container"
-	@echo "  make dev-build        Apenas constroi a imagem de desenvolvimento"
-	@echo "  make dev-rebuild      Constroi e sobe o ambiente Docker de desenvolvimento"
-	@echo "  make dev-reset        Derruba o ambiente e REMOVE OS VOLUMES (apaga banco!)"
-	@echo ""
-	@echo "Producao (Docker):"
-	@echo "  make prod-up          Sobe o ambiente Docker de producao"
-	@echo "  make prod-down        Derruba o ambiente Docker de producao"
-	@echo "  make prod-logs        Exibe logs do ambiente Docker de producao"
-	@echo "  make prod-build       Apenas constroi a imagem de producao"
-	@echo "  make prod-rebuild     Constroi e sobe o ambiente Docker de producao"
-	@echo "  make prod-image       Builda a imagem runner como o CD (VITE_API_URL=... make prod-image)"
-	@echo ""
-	@echo "Utilidades:"
-	@echo "  make clean            Remove artefatos locais de build"
-	@echo "  make check            Verifica se o Dockerfile esta correto"
+	@echo "Opções: path=<padrão> (dev-test*), svc=<serviço> (dev-logs), VITE_API_URL=<url> (prod-image)"
 
 # Aponta o Git para os hooks versionados: o commit-msg preenche os
 # Co-authored-by do trio. Basta rodar uma vez por clone.
-hooks:
+hooks: ## Ativa o commit-msg versionado (.githooks)
 	git config core.hooksPath .githooks
 	@echo "Hooks ativados a partir de .githooks/"
 
-hooks-off:
+hooks-off: ## Desativa o commit-msg versionado (volta para .git/hooks)
 	git config --unset core.hooksPath || true
 	@echo "Hooks desativados (voltando para .git/hooks)"
 
-env-check:
-	@sh scripts/env-check.sh
-
-env-setup:
+env-setup: ## Cria .env.development e .env.production a partir dos .example
 	cp -n .env.development.example .env.development || true
 	cp -n .env.production.example .env.production || true
 	@echo "Arquivos .env.development e .env.production criados (se ainda nao existiam)."
 	@echo "Edite-os com os valores reais antes de subir o ambiente."
 
-install:
+env-check: ## Compara as chaves dos .env com as dos .example (sem mostrar valores)
+	@sh scripts/env-check.sh
+
+install: ## Instala as dependências no host com pnpm
 	pnpm install
 
-dev:
-	pnpm dev
+##@ Local (sem Docker)
 
-lint:
+dev: ## Sobe o Vite no host (porta 3000), com o .env.development
+	pnpm dev --port 3000
+
+lint: ## ESLint no host
 	pnpm lint
 
-test:
+test: ## Testes unitários (Vitest) no host
 	pnpm test
 
-build:
+build: ## Typecheck + build de produção no host (dist/)
 	pnpm build
 
-start:
-	pnpm start
+start: ## Serve o build (dist/) com o vite preview
+	pnpm preview
 
-selenium:
+clean: ## Remove os artefatos de build
+	rm -rf dist coverage tsconfig.tsbuildinfo tsconfig.node.tsbuildinfo
+
+##@ Desenvolvimento (Docker)
+
+dev-up: ## Sobe o ambiente de desenvolvimento
+	$(COMPOSE_DEV) up -d $(SERVICE)
+
+dev-down: ## Derruba o ambiente de desenvolvimento
+	$(COMPOSE_DEV) down
+
+dev-restart: ## Recria os containers (down + up) sem rebuild
+	$(COMPOSE_DEV) down
+	$(COMPOSE_DEV) up -d $(SERVICE)
+
+dev-build: ## Só constrói a imagem de desenvolvimento
+	$(COMPOSE_DEV) build $(SERVICE)
+
+dev-rebuild: ## Reconstrói a imagem e sobe o ambiente
+	$(COMPOSE_DEV) up --build -d $(SERVICE)
+
+dev-reset: ## Derruba tudo e APAGA OS VOLUMES (node_modules)
+	$(COMPOSE_DEV) down -v
+
+dev-logs: ## Acompanha os logs (svc=app|selenium para filtrar)
+	$(COMPOSE_DEV) logs -f $(svc)
+
+dev-shell: ## Abre um shell no container do app
+	$(COMPOSE_DEV) exec $(SERVICE) sh
+
+dev-test: ## Testes unitários no container (path=<padrão> filtra)
+	$(COMPOSE_DEV) exec $(SERVICE) pnpm test $(path)
+
+dev-test-cov: ## Testes com cobertura no container (coverage/)
+	$(COMPOSE_DEV) exec $(SERVICE) pnpm test:coverage $(path)
+
+dev-lint: ## ESLint no container (sem fix)
+	$(COMPOSE_DEV) exec $(SERVICE) pnpm lint
+
+dev-lint-fix: ## ESLint com auto-fix no container
+	$(COMPOSE_DEV) exec $(SERVICE) pnpm lint:fix
+
+dev-typecheck: ## Verifica os tipos (tsc -b) no container
+	$(COMPOSE_DEV) exec $(SERVICE) pnpm typecheck
+
+dev-check: ## lint + typecheck no container
+	$(COMPOSE_DEV) exec $(SERVICE) sh -c "pnpm lint && pnpm typecheck"
+
+dev-ci: ## dev-check + testes + build no container (espelha o CI)
+	$(COMPOSE_DEV) exec $(SERVICE) sh -c "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+
+##@ Produção local (Docker)
+
+prod-up: ## Sobe a imagem de produção localmente (.env.production)
+	$(COMPOSE_PROD) up -d
+
+prod-down: ## Derruba o ambiente de produção local
+	$(COMPOSE_PROD) down
+
+prod-logs: ## Acompanha os logs da produção local
+	$(COMPOSE_PROD) logs -f
+
+prod-build: ## Só constrói a imagem de produção (VITE_API_URL do .env.production)
+	$(COMPOSE_PROD) build $(SERVICE)
+
+prod-rebuild: ## Reconstrói a imagem de produção e sobe
+	$(COMPOSE_PROD) up --build -d
+
+# Espelha o build do CD (.github/workflows/cd.yml).
+prod-image: ## Builda a imagem runner como o CD (VITE_API_URL=... obrigatório)
+	@test -n "$(VITE_API_URL)" || (echo "ERRO: informe VITE_API_URL, por exemplo: VITE_API_URL=http://localhost:3001/api make prod-image" && exit 2)
+	docker build --target runner --build-arg VITE_API_URL="$(VITE_API_URL)" -t marketplace-frontend:local .
+
+##@ Utilidades
+
+check: ## Valida o Dockerfile (docker build --check)
+	docker build . --check
+
+##@ Específicos do frontend
+
+selenium: ## Selenium no host contra SELENIUM_BASE_URL (produção)
 	@test -n "$(SELENIUM_BASE_URL)" || (echo "ERRO: informe a URL de producao, por exemplo: SELENIUM_BASE_URL=https://loja.exemplo.com make selenium" && exit 2)
 	SELENIUM_ENV=production SELENIUM_BASE_URL="$(SELENIUM_BASE_URL)" HEADLESS="$(HEADLESS)" pnpm test:selenium
 
-selenium-local:
+selenium-local: ## Selenium no host contra o front local (porta 3000)
 	@curl --fail --silent --show-error "$(SELENIUM_LOCAL_URL)" > /dev/null || (echo "ERRO: front indisponivel em $(SELENIUM_LOCAL_URL). Inicie com make dev-up." && exit 2)
 	set -a && . ./.env.development && set +a && \
 	SELENIUM_ENV=local \
@@ -111,7 +173,7 @@ selenium-local:
 	HEADLESS="$(HEADLESS)" \
 	pnpm test:selenium
 
-selenium-local-ui:
+selenium-local-ui: ## Selenium remoto (Chrome + noVNC) contra o front local
 	$(COMPOSE_DEV) up -d app
 	$(COMPOSE_DEV) up -d --force-recreate selenium
 	@echo "Aguardando front em $(SELENIUM_LOCAL_URL)..."
@@ -140,7 +202,7 @@ selenium-local-ui:
 	SELENIUM_HOLD_OPEN_MS="$(SELENIUM_UI_HOLD_OPEN_MS)" \
 	pnpm test:selenium
 
-selenium-prod-ui:
+selenium-prod-ui: ## Selenium remoto (Chrome + noVNC) contra a produção
 	$(COMPOSE_DEV) up -d --force-recreate --no-deps selenium
 	@echo "Aguardando Selenium em $(SELENIUM_REMOTE_URL)/status..."
 	@attempt=0; until curl --fail --silent "$(SELENIUM_REMOTE_URL)/status" > /dev/null; do \
@@ -164,59 +226,3 @@ selenium-prod-ui:
 	SELENIUM_STEP_DELAY_MS="$(SELENIUM_UI_STEP_DELAY_MS)" \
 	SELENIUM_HOLD_OPEN_MS="$(SELENIUM_UI_HOLD_OPEN_MS)" \
 	pnpm test:selenium
-
-dev-up:
-	$(COMPOSE_DEV) up -d
-
-dev-down:
-	$(COMPOSE_DEV) down
-
-dev-logs:
-	$(COMPOSE_DEV) logs -f
-
-dev-shell:
-	$(COMPOSE_DEV) exec $(SERVICE) sh
-
-dev-test:
-	$(COMPOSE_DEV) exec $(SERVICE) pnpm test $(path)
-
-dev-test-cov:
-	$(COMPOSE_DEV) exec $(SERVICE) pnpm test:coverage
-
-dev-lint:
-	$(COMPOSE_DEV) exec $(SERVICE) pnpm lint
-
-dev-build:
-	$(COMPOSE_DEV) build $(SERVICE)
-
-dev-rebuild:
-	$(COMPOSE_DEV) up --build -d
-
-dev-reset:
-	$(COMPOSE_DEV) down -v
-
-prod-up:
-	$(COMPOSE_PROD) up -d
-
-prod-down:
-	$(COMPOSE_PROD) down
-
-prod-logs:
-	$(COMPOSE_PROD) logs -f
-
-prod-build:
-	$(COMPOSE_PROD) build $(SERVICE)
-
-prod-rebuild:
-	$(COMPOSE_PROD) up --build -d
-
-# Espelha o build do CD (.github/workflows/cd.yml).
-prod-image:
-	@test -n "$(VITE_API_URL)" || (echo "ERRO: informe VITE_API_URL, por exemplo: VITE_API_URL=http://localhost:3001/api make prod-image" && exit 2)
-	docker build --target runner --build-arg VITE_API_URL="$(VITE_API_URL)" -t marketplace-frontend:local .
-
-clean:
-	rm -rf dist node_modules
-
-check:
-	docker build . --check
