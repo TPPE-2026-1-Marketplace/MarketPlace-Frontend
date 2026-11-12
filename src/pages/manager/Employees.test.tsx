@@ -1,19 +1,25 @@
-import { act, screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError } from "../../lib/api";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { api, ApiError } from "@/lib/api";
+import { formatCommissionRate, mapFrontendToRole, mapRoleToFrontend } from "@/lib/employees";
 import { manager, renderWithProviders, superadmin } from "@/test/render";
-import { Employees, mapFrontendToRole, mapRoleToFrontend } from "./Employees";
+import { Employees } from "./Employees";
 
-vi.mock("../../lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../lib/api")>()),
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 const getMock = vi.mocked(api.get);
 const postMock = vi.mocked(api.post);
 const patchMock = vi.mocked(api.patch);
 
-const person = (cpf: string, nome: string, telefone: string | null = null) => ({ cpf, nome, email: `${cpf}@dk.com`, telefone });
+const person = (cpf: string, nome: string, telefone: string | null = null) => ({
+  cpf,
+  nome,
+  email: `${cpf}@dk.com`,
+  telefone,
+});
 const staff = [
   { cpf: "333", ativo: true, role_perfil: "administrador", taxa_comissao: 0, meta_vendas: null, codigo_funcionario: null, person: person("333", "Super DK") },
   { cpf: "11111111111", ativo: true, role_perfil: "vendedor", taxa_comissao: "0.05", meta_vendas: "20000", codigo_funcionario: "ANA01", person: person("11111111111", "Ana Vendas", "61999990000") },
@@ -23,21 +29,33 @@ const staff = [
 ];
 
 const rows = () => screen.getAllByRole("row").slice(1);
-const input = (placeholder: string) => screen.getByPlaceholderText(placeholder);
+const kpi = (label: string) => screen.getByText(label, { selector: "p" }).nextElementSibling;
+const dialog = () => within(screen.getByRole("dialog"));
 
 async function renderEmployees(user = superadmin) {
   renderWithProviders(<Employees />, { user });
   await screen.findByText("Ana Vendas");
 }
 
-describe("mapeamento de papéis", () => {
-  it("converte entre os papéis do backend e do frontend", () => {
+async function applyFilters(values: { search?: string; role?: string; status?: string }) {
+  const search = screen.getByLabelText("Buscar nome, e-mail ou CPF");
+  await userEvent.clear(search);
+  if (values.search) await userEvent.type(search, values.search);
+  await userEvent.selectOptions(screen.getByLabelText(/^Perfil:/), values.role ?? "all");
+  await userEvent.selectOptions(screen.getByLabelText(/^Status:/), values.status ?? "all");
+  await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+}
+
+describe("papéis da equipe", () => {
+  it("converte entre os papéis do backend e do frontend e formata a comissão", () => {
     expect(["administrador", "gerente", "caixa", "cliente", "vendedor"].map(mapRoleToFrontend)).toEqual([
       "superadmin", "manager", "cashier", "customer", "employee",
     ]);
     expect((["superadmin", "manager", "cashier", "customer", "employee"] as const).map(mapFrontendToRole)).toEqual([
       "administrador", "gerente", "caixa", "cliente", "vendedor",
     ]);
+    expect(formatCommissionRate("0.05")).toBe("5%");
+    expect(formatCommissionRate(0.035)).toBe("3,5%");
   });
 });
 
@@ -49,210 +67,189 @@ describe("Employees", () => {
     getMock.mockResolvedValue({ data: staff });
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("super admin vê a equipe, sem clientes, e filtra por perfil", async () => {
+  it("administrador vê a equipe ativa, sem clientes, com indicadores e filtros", async () => {
     await renderEmployees();
 
-    expect(screen.getByText("1 funcionário(s) · 0 gerente(s) · 1 caixa(s)")).toBeInTheDocument();
-    expect(screen.queryByText("Cliente Final")).not.toBeInTheDocument();
-    expect(rows()).toHaveLength(4);
-    // o próprio usuário (cpf 333) não pode ser desativado
-    expect(within(rows()[0]).queryByTitle("Desativar")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Usuários" })).toBeInTheDocument();
+    expect(kpi("Funcionários")).toHaveTextContent("01");
+    expect(kpi("Gerentes")).toHaveTextContent("00");
+    expect(kpi("Caixas")).toHaveTextContent("01");
+    expect(kpi("Ativos")).toHaveTextContent("03");
 
-    await userEvent.click(screen.getByRole("button", { name: "Funcionário" }));
+    // Abre em "Status: ativos": o gerente inativo e o cliente ficam de fora.
+    expect(rows()).toHaveLength(3);
+    expect(screen.queryByText("Cliente Final")).not.toBeInTheDocument();
+    expect(screen.getByText("Super DK (você)")).toBeInTheDocument();
+    const ana = rows().find((row) => row.textContent?.includes("Ana Vendas")) as HTMLElement;
+    expect(ana).toHaveTextContent("Vendedor");
+    expect(ana).toHaveTextContent("ANA01");
+    expect(ana).toHaveTextContent("5%");
+
+    await applyFilters({ status: "inactive" });
     expect(rows()).toHaveLength(1);
-    await userEvent.click(screen.getByRole("button", { name: "Gerente" }));
-    expect(screen.getByText("Gerente Antigo")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Todos" }));
+    expect(rows()[0]).toHaveTextContent("Gerente Antigo");
+
+    await applyFilters({ role: "cashier" });
+    expect(rows()).toHaveLength(1);
+    expect(screen.getByLabelText("Perfil: caixa")).toBeInTheDocument();
+
+    await applyFilters({ search: "11111" });
+    expect(rows()).toHaveLength(1);
+
+    await applyFilters({ search: "ninguém" });
+    await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
     expect(rows()).toHaveLength(4);
   });
 
-  it("gerente não vê super admins nem pode criá-los", async () => {
+  it("gerente só consulta: não vê administradores nem ações de edição", async () => {
     await renderEmployees(manager);
 
     expect(screen.queryByText("Super DK")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Super Admin" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Novo Usuário/ }));
-    expect(within(screen.getByRole("combobox")).getAllByRole("option").map((o) => o.textContent)).toEqual(["Funcionário", "Caixa"]);
+    expect(screen.queryByRole("button", { name: "Novo usuário" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText(/^Perfil:/)).queryByRole("option", { name: "Administrador" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver usuário Ana Vendas" }));
+    expect(dialog().getByText("CPF *").nextElementSibling).toHaveTextContent("***.***.***-11");
+    expect(dialog().getByText("Telefone").nextElementSibling).toHaveTextContent("(61) 99999-0000");
+    expect(dialog().getByText("Meta de vendas (R$)").nextElementSibling).toHaveTextContent("20.000");
+    expect(dialog().queryByRole("button", { name: "Salvar usuário" })).not.toBeInTheDocument();
+    expect(dialog().queryByRole("button", { name: "Desativar usuário" })).not.toBeInTheDocument();
+    await userEvent.click(dialog().getByRole("button", { name: "Fechar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("mostra os detalhes de um vendedor", async () => {
+  it("valida o cadastro novo", async () => {
     await renderEmployees();
+    await userEvent.click(screen.getByRole("button", { name: "Novo usuário" }));
+    expect(dialog().getByRole("heading", { name: "Novo usuário" })).toBeInTheDocument();
+    const salvar = dialog().getByRole("button", { name: "Salvar usuário" });
 
-    await userEvent.click(within(rows()[1]).getByTitle("Ver detalhes"));
-    expect(screen.getByRole("heading", { name: "Ana Vendas" })).toBeInTheDocument();
-    expect(screen.getByText("Taxa:").parentElement).toHaveTextContent("5%");
-    expect(screen.getByText("Meta:").parentElement).toHaveTextContent("R$ 20.000");
-    await userEvent.click(within(rows()[1]).getByTitle("Ver detalhes"));
-    expect(screen.queryByRole("heading", { name: "Ana Vendas" })).not.toBeInTheDocument();
+    await userEvent.click(salvar);
+    expect(dialog().getByRole("alert")).toHaveTextContent("Preencha todos os campos obrigatórios.");
 
-    await userEvent.click(within(rows()[2]).getByTitle("Ver detalhes"));
-    expect(screen.getByText("Telefone:").parentElement).toHaveTextContent("—");
-    await userEvent.click(screen.getByRole("heading", { name: "Gerente Antigo" }).nextElementSibling as HTMLElement);
-    expect(screen.queryByRole("heading", { name: "Gerente Antigo" })).not.toBeInTheDocument();
+    await userEvent.type(dialog().getByLabelText("CPF *"), "123");
+    await userEvent.type(dialog().getByLabelText("Nome completo *"), "Nova");
+    await userEvent.type(dialog().getByLabelText("E-mail *"), "nova@dk.com");
+    await userEvent.type(dialog().getByLabelText("Senha *"), "segredo");
+    await userEvent.click(salvar);
+    expect(dialog().getByRole("alert")).toHaveTextContent("CPF deve conter exatamente 11 dígitos numéricos.");
+
+    await userEvent.type(dialog().getByLabelText("CPF *"), "45678900");
+    expect(dialog().getByLabelText("CPF *")).toHaveValue("123.456.789-00");
+    await userEvent.click(salvar);
+    expect(dialog().getByRole("alert")).toHaveTextContent("CPF inválido. Confira os números digitados.");
+
+    await userEvent.clear(dialog().getByLabelText("CPF *"));
+    await userEvent.type(dialog().getByLabelText("CPF *"), "52998224725");
+    await userEvent.type(dialog().getByLabelText("Telefone"), "00123");
+    await userEvent.click(salvar);
+    expect(dialog().getByRole("alert")).toHaveTextContent("Telefone inválido");
+
+    await userEvent.clear(dialog().getByLabelText("Telefone"));
+    await userEvent.click(salvar);
+    expect(dialog().getByRole("alert")).toHaveTextContent("Código de vendedor é obrigatório para vendedores.");
+    expect(postMock).not.toHaveBeenCalled();
   });
 
-  it("valida o formulário de cadastro", async () => {
-    await renderEmployees();
-    await userEvent.click(screen.getByRole("button", { name: /Novo Usuário/ }));
-    const salvar = screen.getByRole("button", { name: /Cadastrar Usuário/ });
-
-    await userEvent.click(salvar);
-    expect(screen.getByText("Preencha todos os campos obrigatórios.")).toBeInTheDocument();
-
-    await userEvent.type(input("000.000.000-00"), "123");
-    await userEvent.type(input("Ex: Ana Silva"), "Nova");
-    await userEvent.type(input("usuario@dkfestas.com.br"), "nova@dk.com");
-    await userEvent.type(input("Senha de acesso"), "segredo");
-    await userEvent.click(salvar);
-    expect(screen.getByText("CPF deve conter exatamente 11 dígitos numéricos.")).toBeInTheDocument();
-
-    await userEvent.type(input("000.000.000-00"), "45678900");
-    expect(input("000.000.000-00")).toHaveValue("123.456.789-00");
-    await userEvent.click(salvar);
-    expect(screen.getByText("CPF inválido. Confira os números digitados.")).toBeInTheDocument();
-
-    await userEvent.clear(input("000.000.000-00"));
-    await userEvent.type(input("000.000.000-00"), "52998224725");
-    expect(input("000.000.000-00")).toHaveValue("529.982.247-25");
-    await userEvent.click(salvar);
-    expect(screen.getByText("Código do vendedor é obrigatório para funcionários.")).toBeInTheDocument();
-  });
-
-  it("cadastra um vendedor com comissão e volta para a lista", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it("cadastra um vendedor com comissão e mostra a confirmação", async () => {
     postMock.mockResolvedValueOnce({});
     await renderEmployees();
-    await userEvent.click(screen.getByRole("button", { name: /Novo Usuário/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Novo usuário" }));
 
-    await userEvent.type(input("000.000.000-00"), "52998224725");
-    await userEvent.type(input("Ex: Ana Silva"), "Nova");
-    await userEvent.type(input("usuario@dkfestas.com.br"), "nova@dk.com");
-    const senha = input("Senha de acesso");
-    await userEvent.type(senha, "segredo");
-    await userEvent.click(senha.nextElementSibling as HTMLElement);
-    expect(senha).toHaveAttribute("type", "text");
-    await userEvent.type(input("(11) 99999-0000"), "61988887777");
-    expect(input("(11) 99999-0000")).toHaveValue("(61) 98888-7777");
-    await userEvent.type(input("Ex: ANA01"), "nova01");
-    await userEvent.click(screen.getByLabelText(/Programa de bônus/));
-    await userEvent.click(screen.getByRole("button", { name: /Cadastrar Usuário/ }));
+    await userEvent.type(dialog().getByLabelText("CPF *"), "52998224725");
+    await userEvent.type(dialog().getByLabelText("Nome completo *"), "Nova Vendedora");
+    await userEvent.type(dialog().getByLabelText("E-mail *"), "nova@dk.com");
+    await userEvent.type(dialog().getByLabelText("Senha *"), "segredo123");
+    await userEvent.type(dialog().getByLabelText("Telefone"), "61988887777");
+    await userEvent.type(dialog().getByLabelText("Código de vendedor"), "nov01");
+    await userEvent.clear(dialog().getByLabelText("Comissão (%)"));
+    await userEvent.type(dialog().getByLabelText("Comissão (%)"), "7");
+    await userEvent.click(dialog().getByRole("button", { name: "Salvar usuário" }));
 
     expect(postMock).toHaveBeenCalledWith("/employees", {
       cpf: "52998224725",
-      nome: "Nova",
+      nome: "Nova Vendedora",
       email: "nova@dk.com",
-      senha: "segredo",
+      senha: "segredo123",
       telefone: "61988887777",
       ativo: true,
       role_perfil: "vendedor",
-      taxa_comissao: 0.05,
-      meta_vendas: 20000,
-      codigo_funcionario: "NOVA01",
+      taxa_comissao: 0.07,
+      meta_vendas: 10000,
+      codigo_funcionario: "NOV01",
     });
-    expect(await screen.findByText("Usuário cadastrado com sucesso!")).toBeInTheDocument();
+    expect(await screen.findByText("Alterações salvas")).toBeInTheDocument();
+    expect(dialog().getByText("Resultado").nextElementSibling).toHaveTextContent("Usuário Nova Vendedora cadastrado");
+    await userEvent.click(dialog().getByRole("button", { name: "Concluir" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(getMock).toHaveBeenCalledTimes(2);
-    act(() => vi.advanceTimersByTime(3000));
-    expect(screen.queryByText("Usuário cadastrado com sucesso!")).not.toBeInTheDocument();
   });
 
-  it("edita um caixa sem enviar comissão nem senha", async () => {
+  it("edita um caixa sem enviar comissão, senha nem telefone inalterado", async () => {
     patchMock.mockResolvedValueOnce({});
     await renderEmployees();
 
-    await userEvent.click(within(rows()[3]).getByTitle("Editar"));
-    expect(screen.getByRole("heading", { name: "Editar: Caixa Loja" })).toBeInTheDocument();
-    expect(input("000.000.000-00")).toBeDisabled();
-    expect(screen.queryByText("Configurações de Comissão")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByLabelText("Usuário ativo"));
-    await userEvent.click(screen.getByRole("button", { name: /Salvar Alterações/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Editar usuário Caixa Loja" }));
+    expect(dialog().getByRole("heading", { name: "Usuário · Caixa Loja" })).toBeInTheDocument();
+    expect(dialog().queryByLabelText("Comissão (%)")).not.toBeInTheDocument();
+    await userEvent.clear(dialog().getByLabelText("Nome completo *"));
+    await userEvent.type(dialog().getByLabelText("Nome completo *"), "Caixa Central");
+    await userEvent.click(dialog().getByRole("button", { name: "Salvar usuário" }));
 
-    expect(patchMock).toHaveBeenCalledWith("/employees/44444444444", expect.objectContaining({
-      ativo: false,
-      role_perfil: "caixa",
-      taxa_comissao: undefined,
-    }));
-    expect(patchMock.mock.calls[0][1]).not.toHaveProperty("senha");
-    expect(await screen.findByText("Usuário atualizado com sucesso!")).toBeInTheDocument();
+    expect(patchMock).toHaveBeenCalledWith(
+      "/employees/44444444444",
+      expect.objectContaining({ nome: "Caixa Central", role_perfil: "caixa", taxa_comissao: undefined }),
+    );
+    const payload = patchMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("senha");
+    expect(payload).not.toHaveProperty("cpf");
+    expect(payload.telefone).toBeUndefined();
+    expect(await screen.findByText("Usuário Caixa Central atualizado")).toBeInTheDocument();
   });
 
-  it("na edição não reenvia o telefone se ele não mudou, mas o exibe com máscara", async () => {
-    patchMock.mockResolvedValueOnce({});
+  it("envia telefone null ao esvaziar o campo e mostra o erro da API", async () => {
+    patchMock.mockRejectedValueOnce(new ApiError(409, "E-mail em uso"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
     await renderEmployees();
 
-    await userEvent.click(within(rows()[1]).getByTitle("Editar"));
-    expect(input("(11) 99999-0000")).toHaveValue("(61) 99999-0000");
-    await userEvent.click(screen.getByRole("button", { name: /Salvar Alterações/ }));
-
-    expect((patchMock.mock.calls[0][1] as { telefone?: string | null }).telefone).toBeUndefined();
-  });
-
-  it("na edição envia telefone null quando o campo é esvaziado", async () => {
-    patchMock.mockResolvedValueOnce({});
-    await renderEmployees();
-
-    await userEvent.click(within(rows()[1]).getByTitle("Editar"));
-    await userEvent.clear(input("(11) 99999-0000"));
-    await userEvent.click(screen.getByRole("button", { name: /Salvar Alterações/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Editar usuário Ana Vendas" }));
+    expect(dialog().getByLabelText("Telefone")).toHaveValue("(61) 99999-0000");
+    await userEvent.clear(dialog().getByLabelText("Telefone"));
+    await userEvent.click(dialog().getByRole("button", { name: "Salvar usuário" }));
 
     expect((patchMock.mock.calls[0][1] as { telefone?: string | null }).telefone).toBeNull();
+    expect(await dialog().findByRole("alert")).toHaveTextContent("E-mail em uso");
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("mostra o erro da API ao salvar e cancela o formulário", async () => {
-    patchMock.mockRejectedValueOnce(new ApiError(409, "E-mail em uso"));
+  it("desativa um usuário após confirmação, mas não o próprio administrador", async () => {
+    patchMock.mockResolvedValueOnce({});
     await renderEmployees();
 
-    await userEvent.click(within(rows()[1]).getByTitle("Editar"));
-    await userEvent.selectOptions(screen.getByRole("combobox"), "manager");
-    await userEvent.click(screen.getByRole("button", { name: /Salvar Alterações/ }));
-    expect(await screen.findByText("E-mail em uso")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Editar usuário Super DK" }));
+    expect(dialog().queryByRole("button", { name: "Desativar usuário" })).not.toBeInTheDocument();
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(screen.queryByRole("heading", { name: /Editar:/ })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Novo Usuário/ }));
-    await userEvent.click(screen.getByRole("heading", { name: "Novo Usuário" }).nextElementSibling as HTMLElement);
-    expect(screen.queryByRole("heading", { name: "Novo Usuário" })).not.toBeInTheDocument();
-  });
-
-  it("desativa um usuário após confirmação", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValue(true);
-    patchMock.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("500"));
-    await renderEmployees();
-
-    await userEvent.click(within(rows()[1]).getByTitle("Desativar"));
+    await userEvent.click(screen.getByRole("button", { name: "Editar usuário Ana Vendas" }));
+    await userEvent.click(dialog().getByRole("button", { name: "Desativar usuário" }));
+    expect(dialog().getByRole("heading", { name: "Desativar usuário" })).toBeInTheDocument();
+    await userEvent.click(dialog().getByRole("button", { name: "Voltar" }));
     expect(patchMock).not.toHaveBeenCalled();
-    await userEvent.click(within(rows()[1]).getByTitle("Desativar"));
-    expect(confirm).toHaveBeenLastCalledWith("Desativar Ana Vendas?");
-    expect(patchMock).toHaveBeenCalledWith("/employees/11111111111", { ativo: false });
-    expect(await screen.findByText("Usuário desativado com sucesso.")).toBeInTheDocument();
 
-    await userEvent.click(within(rows()[3]).getByTitle("Desativar"));
-    expect(await screen.findByText("Erro ao desativar o usuário.")).toBeInTheDocument();
+    await userEvent.click(dialog().getByRole("button", { name: "Desativar usuário" }));
+    await userEvent.click(dialog().getByRole("button", { name: "Desativar" }));
+    expect(patchMock).toHaveBeenCalledWith("/employees/11111111111", { ativo: false });
+    expect(await screen.findByText("Usuário Ana Vendas desativado")).toBeInTheDocument();
   });
 
-  it("avisa quando a lista não carrega", async () => {
+  it("mostra o erro de carregamento e tenta de novo", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     getMock.mockRejectedValueOnce(new Error("offline"));
     renderWithProviders(<Employees />, { user: superadmin });
 
-    expect(await screen.findByText("Erro ao carregar funcionários.")).toBeInTheDocument();
-  });
-
-  it("rejeita telefone inválido no cadastro", async () => {
-    await renderEmployees();
-    await userEvent.click(screen.getByRole("button", { name: /Novo Usuário/ }));
-
-    await userEvent.type(input("000.000.000-00"), "52998224725");
-    await userEvent.type(input("Ex: Ana Silva"), "Nova");
-    await userEvent.type(input("usuario@dkfestas.com.br"), "nova@dk.com");
-    await userEvent.type(input("Senha de acesso"), "segredo");
-    await userEvent.type(input("(11) 99999-0000"), "6100000000");
-    await userEvent.click(screen.getByRole("button", { name: /Cadastrar Usuário/ }));
-
-    expect(screen.getByText("Telefone inválido. Use DDD + número, ex.: (61) 99999-0000.")).toBeInTheDocument();
-    expect(postMock).not.toHaveBeenCalledWith("/employees", expect.anything());
+    expect(await screen.findByText("Não foi possível carregar os dados")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByText("Ana Vendas")).toBeInTheDocument();
   });
 });

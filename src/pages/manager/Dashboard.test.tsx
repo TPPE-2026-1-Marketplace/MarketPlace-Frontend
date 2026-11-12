@@ -90,7 +90,7 @@ describe("ManagerDashboard", () => {
     ["estoque", /Estoque/],
     ["pedidos", /Pedidos/],
     ["vendas-pdv", "Vendas PDV"],
-    ["relatorios", "Relatórios e Análises"],
+    ["relatorios", "Relatórios"],
     ["comissoes", /Comiss/],
     ["exportar", "Clientes"],
     ["usuarios", /Usuários|Funcionários/],
