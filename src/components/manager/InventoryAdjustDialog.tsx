@@ -11,6 +11,8 @@ interface InventoryAdjustDialogProps {
   onClose: () => void;
   onSave: (codigoSku: string, stock: { online: number; physical: number }) => Promise<void>;
   onRemove: (row: InventoryRow) => Promise<void>;
+  /** Abre a edição do produto da linha (Figma 850:5697). */
+  onEditProduct?: (row: InventoryRow) => void;
 }
 
 type Step = "form" | "confirm-remove" | "saved" | "removed";
@@ -23,7 +25,7 @@ export default function InventoryAdjustDialog(props: InventoryAdjustDialogProps)
 
 const toQuantity = (value: string) => Math.max(0, Math.floor(Number(value) || 0));
 
-function InventoryAdjustContent({ row, onClose, onSave, onRemove }: InventoryAdjustDialogProps) {
+function InventoryAdjustContent({ row, onClose, onSave, onRemove, onEditProduct }: InventoryAdjustDialogProps) {
   const [online, setOnline] = useState(row?.stockOnline ?? 0);
   const [physical, setPhysical] = useState(row?.stockPhysical ?? 0);
   const [step, setStep] = useState<Step>("form");
@@ -117,6 +119,11 @@ function InventoryAdjustContent({ row, onClose, onSave, onRemove }: InventoryAdj
       actions={
         <>
           {errorMessage}
+          {onEditProduct && (
+            <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={() => onEditProduct(row)}>
+              Editar produto
+            </Button>
+          )}
           <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={() => setStep("confirm-remove")}>
             {removesProduct ? "Excluir produto" : "Excluir variante"}
           </Button>
