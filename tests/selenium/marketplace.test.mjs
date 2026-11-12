@@ -651,7 +651,7 @@ test("administrador navega pelos modulos gerenciais sem alterar dados", async (t
     ["/painel/estoque", "Estoque"],
     ["/painel/pedidos", "Pedidos"],
     ["/painel/relatorios", "Relatórios"],
-    ["/painel/comissoes", "Comissões e Metas"],
+    ["/painel/comissoes", "Comissões"],
     ["/painel/cupons", "Cupons e Campanhas"],
   ];
 
