@@ -19,6 +19,12 @@ export interface ApiOrder {
   user?: {
     nome: string;
   };
+  /** Vendedor da venda presencial (GET /orders traz `employee.person`). */
+  employee?: {
+    cpf: string;
+    codigo_funcionario: string | null;
+    person?: { nome: string } | null;
+  } | null;
   dataPedido: string;
   status: ApiOrderStatus;
   subtotal: number | string;
