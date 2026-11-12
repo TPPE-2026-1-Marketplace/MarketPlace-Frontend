@@ -106,6 +106,12 @@ describe("ManagerDashboard", () => {
     expect(screen.getByText(/^Painel \//)).toHaveTextContent("Painel / Banners");
   });
 
+  it("abre a aba de retirada em loja", () => {
+    renderPanel("/painel/retirada");
+
+    expect(screen.getByText(/^Painel \//)).toHaveTextContent("Painel / Retirada em loja");
+  });
+
   it("super admin vê a aba de cupons", async () => {
     renderPanel("/painel/cupons", superadmin);
 
