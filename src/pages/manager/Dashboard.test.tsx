@@ -89,7 +89,7 @@ describe("ManagerDashboard", () => {
   it.each([
     ["estoque", /Estoque/],
     ["pedidos", /Pedidos/],
-    ["vendas-pdv", "Vendas Presenciais (PDV)"],
+    ["vendas-pdv", "Vendas PDV"],
     ["relatorios", "Relatórios e Análises"],
     ["comissoes", /Comiss/],
     ["exportar", "Clientes"],

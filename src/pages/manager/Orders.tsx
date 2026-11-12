@@ -9,7 +9,7 @@ import NoResults from "@/components/manager/NoResults";
 import OrderDetailDialog from "@/components/manager/OrderDetailDialog";
 import RecordsTable, { type RecordColumn } from "@/components/manager/RecordsTable";
 import { adminButtonClassName, adminControlClassName } from "@/components/manager/adminClasses";
-import { formatKpiCount } from "@/components/manager/format";
+import { formatKpiCount, formatShortDate } from "@/components/manager/format";
 import Button from "@/components/ui/Button";
 import { useManagementOrders } from "@/hooks/useManagementOrders";
 import {
@@ -30,10 +30,6 @@ interface OrderFilters {
 }
 
 const EMPTY_FILTERS: OrderFilters = { search: "", status: "all", pickupType: "all" };
-
-// "26 out", como no protótipo.
-const shortDate = (value: string) =>
-  new Date(value).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "").replace(" de ", " ");
 
 // Na listagem só o primeiro nome (Figma: "Marina · ***.***.***-00"); o nome completo fica no detalhe.
 function customerCell(order: ApiOrder) {
@@ -94,7 +90,7 @@ export function Orders({ readOnly = false }: OrdersProps) {
   const columns: RecordColumn<ApiOrder>[] = [
     { key: "pedido", header: "Pedido", primary: true, render: (order) => `#${order.idPedido}` },
     { key: "cliente", header: "Cliente / CPF", render: customerCell },
-    { key: "data", header: "Data", render: (order) => shortDate(order.dataPedido) },
+    { key: "data", header: "Data", render: (order) => formatShortDate(order.dataPedido) },
     { key: "modalidade", header: "Modalidade", render: (order) => PICKUP_TYPE_LABELS[order.tipoRetirada] },
     { key: "total", header: "Total", render: (order) => formatCurrency(Number(order.valorTotal)) },
     { key: "status", header: "Status", render: (order) => ORDER_STATUS_LABELS[order.status] },
