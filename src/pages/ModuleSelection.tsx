@@ -30,14 +30,8 @@ export function ModuleSelection() {
     <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         <div className="text-center mb-8">
-          <div className="w-24 h-12 mx-auto mb-4 overflow-hidden">
-            <img
-              src="figma:asset/65bd0ec255fb348be2810d7107aa837bd84441e2.png"
-              alt="DK Fashion"
-              className="w-full h-full object-contain"
-              style={{ filter: "none" }}
-            />
-          </div>
+          {/* Mesmo logo do Header da loja (public/dk-logo.svg). */}
+          <img src="/dk-logo.svg" alt="DK Fashion" className="mx-auto mb-4 h-16 w-auto" />
           <h1 className="text-gray-900 text-2xl mb-2">
             Bem-vinda, {user.name}
           </h1>
