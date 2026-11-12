@@ -5,24 +5,26 @@ import { useAuth } from "../context/AuthContext";
 
 export function ModuleSelection() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, isInternalUser } = useAuth();
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  // Redirect to login if not authenticated
+  // Somente perfis internos podem escolher módulos operacionais.
   useEffect(() => {
     if (!user) {
-      navigate("/login");
+      navigate("/login", { replace: true });
+    } else if (!isInternalUser) {
+      navigate("/", { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, isInternalUser, navigate]);
 
   const canAccessManagement = user?.role === "superadmin" || user?.role === "manager";
 
-  // Don't render if no user
-  if (!user) {
+  // Não exibe entradas para os módulos antes da autorização.
+  if (!user || !isInternalUser) {
     return null;
   }
 
