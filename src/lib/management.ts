@@ -15,6 +15,7 @@ export interface ApiOrder {
   idUsuario: string | null;
   clienteNomeAvulso?: string | null;
   clienteCpfAvulso?: string | null;
+  clienteEmailAvulso?: string | null;
   idFuncionario?: string | null;
   user?: {
     nome: string;
@@ -31,6 +32,7 @@ export interface ApiOrder {
   valorFrete: number | string;
   valorTotal: number | string;
   tipoRetirada: ApiPickupType;
+  codigoVerificacaoRetirada?: string | null;
   codigoRastreamento: string | null;
   items: ApiOrderItem[];
 }
@@ -56,6 +58,12 @@ export const fetchManagementOrders = () =>
 export const fetchPeople = () =>
   api.get<PaginatedResponse<ApiPerson>>("/people", { page: 1, limit: 100 });
 
+export const fetchOrderVerificationCode = (idPedido: number) =>
+  api.get<{ codigoVerificacaoRetirada: string }>(`/orders/${idPedido}/verification-code`);
+
+export const confirmOrderPickup = (idPedido: number, pin: string) =>
+  api.post<ApiOrder>(`/orders/${idPedido}/confirm-pickup`, { pin });
+
 export const PICKUP_TYPE_LABELS: Record<ApiPickupType, string> = {
   entrega: "Entrega",
   loja: "Loja",
@@ -69,4 +77,13 @@ export function orderCustomerName(order: ApiOrder): string {
 /** CPF do cliente do pedido (cadastrado ou avulso), quando houver. */
 export function orderCustomerCpf(order: ApiOrder): string | null {
   return order.idUsuario || order.clienteCpfAvulso || null;
+}
+
+/** E-mail do cliente do pedido (cadastrado ou informado na compra avulsa). */
+export function orderCustomerEmail(order: ApiOrder, peopleMap?: Map<string, ApiPerson>): string | null {
+  if (order.clienteEmailAvulso) return order.clienteEmailAvulso;
+  if (order.idUsuario && peopleMap) {
+    return peopleMap.get(order.idUsuario)?.email ?? null;
+  }
+  return null;
 }
