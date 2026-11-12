@@ -30,32 +30,35 @@ export function useStorePickup(enabled: boolean, now: Date = new Date()) {
   const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const [ordersRes, peopleRes] = await Promise.all([
+  const load = useCallback(
+    () =>
+      Promise.all([
         fetchManagementOrders(),
-        fetchPeople().catch(() => ({ data: [] })),
-      ]);
+        fetchPeople().catch(() => ({ data: [] as ApiPerson[] })),
+      ])
+        .then(([ordersRes, peopleRes]) => {
+          const map = new Map<string, ApiPerson>();
+          for (const person of peopleRes.data) {
+            map.set(person.cpf, person);
+          }
+          setPeopleMap(map);
 
-      const map = new Map<string, ApiPerson>();
-      for (const person of peopleRes.data) {
-        map.set(person.cpf, person);
-      }
-      setPeopleMap(map);
-
-      // Filtra apenas pedidos para retirada na loja física, excluindo vendas do PDV (que possuem idFuncionario)
-      const storeOrders = ordersRes.data.filter(
-        (order) => order.tipoRetirada === "loja" && !order.idFuncionario,
-      );
-      setOrders(storeOrders);
-      setError(null);
-    } catch (err) {
-      console.error("Erro ao carregar pedidos para retirada", err);
-      setError("Não foi possível carregar os pedidos de retirada.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+          // Filtra apenas pedidos para retirada na loja física, excluindo vendas do PDV (que possuem idFuncionario)
+          const storeOrders = ordersRes.data.filter(
+            (order) => order.tipoRetirada === "loja" && !order.idFuncionario,
+          );
+          setOrders(storeOrders);
+          setError(null);
+        })
+        .catch((err) => {
+          console.error("Erro ao carregar pedidos para retirada", err);
+          setError("Não foi possível carregar os pedidos de retirada.");
+        })
+        .finally(() => {
+          setIsLoading(false);
+        }),
+    [],
+  );
 
   const refetch = useCallback(async () => {
     setIsLoading(true);

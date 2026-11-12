@@ -134,7 +134,7 @@ function StorePickupDialogContent({
         title={`1 · Conferir pedido #${order.idPedido}`}
         description="Revise os dados antes de continuar."
         actions={
-          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <>
             <Button
               variant="action"
               size="sm"
@@ -151,7 +151,7 @@ function StorePickupDialogContent({
             >
               Cancelar
             </Button>
-          </div>
+          </>
         }
       >
         <AdminField label="Cliente" value={orderCustomerName(order)} />
@@ -174,28 +174,25 @@ function StorePickupDialogContent({
         open={open}
         onClose={onClose}
         title="2 · Validar código de retirada"
-        description="Revise os dados antes de continuar."
         actions={
-          <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline-neutral"
-                size="sm"
-                className={adminButtonClassName}
-                onClick={handleResendCode}
-              >
-                Reenviar código
-              </Button>
-              <Button
-                variant="action"
-                size="sm"
-                className={`${adminButtonClassName} whitespace-nowrap`}
-                onClick={handleValidate}
-                disabled={isValidating}
-              >
-                Validar e confirmar retirada
-              </Button>
-            </div>
+          <>
+            <Button
+              variant="outline-neutral"
+              size="sm"
+              className={adminButtonClassName}
+              onClick={handleResendCode}
+            >
+              Reenviar código
+            </Button>
+            <Button
+              variant="action"
+              size="sm"
+              className={`${adminButtonClassName} whitespace-nowrap`}
+              onClick={handleValidate}
+              disabled={isValidating}
+            >
+              Validar e confirmar retirada
+            </Button>
             <Button
               variant="outline-neutral"
               size="sm"
@@ -204,16 +201,16 @@ function StorePickupDialogContent({
             >
               Cancelar
             </Button>
-          </div>
+          </>
         }
       >
         {isResent && (
-          <p className="mb-4 text-xs text-[var(--foreground)]">
+          <p className="text-xs text-[var(--foreground)]">
             Novo código enviado para o e-mail cadastrado.
           </p>
         )}
         {codeError && (
-          <p role="alert" className="mb-4 text-xs text-[var(--color-error-text)]">
+          <p role="alert" className="text-xs text-[var(--color-error-text)]">
             {codeError}
           </p>
         )}
@@ -229,7 +226,7 @@ function StorePickupDialogContent({
             type="text"
             inputMode="numeric"
             maxLength={6}
-            placeholder="000000"
+            placeholder="123456"
             value={code}
             onChange={(e) => {
               const onlyNums = e.target.value.replace(/\D/g, "").slice(0, 6);
@@ -251,27 +248,24 @@ function StorePickupDialogContent({
         open={open}
         onClose={onClose}
         title="Código inválido"
-        description="Revise os dados antes de continuar."
         actions={
-          <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline-neutral"
-                size="sm"
-                className={adminButtonClassName}
-                onClick={handleResendCode}
-              >
-                Reenviar código
-              </Button>
-              <Button
-                variant="action"
-                size="sm"
-                className={adminButtonClassName}
-                onClick={handleRetry}
-              >
-                Tentar novamente
-              </Button>
-            </div>
+          <>
+            <Button
+              variant="outline-neutral"
+              size="sm"
+              className={adminButtonClassName}
+              onClick={handleResendCode}
+            >
+              Reenviar código
+            </Button>
+            <Button
+              variant="action"
+              size="sm"
+              className={adminButtonClassName}
+              onClick={handleRetry}
+            >
+              Tentar novamente
+            </Button>
             <Button
               variant="outline-neutral"
               size="sm"
@@ -280,7 +274,7 @@ function StorePickupDialogContent({
             >
               Cancelar
             </Button>
-          </div>
+          </>
         }
       >
         <AdminField label="Validação" value="O código informado não confere" />
@@ -295,18 +289,15 @@ function StorePickupDialogContent({
       open={open}
       onClose={onClose}
       title="Retirada concluída"
-      description="Revise os dados antes de continuar."
       actions={
-        <div className="flex w-full flex-wrap items-center justify-start gap-3">
-          <Button
-            variant="action"
-            size="sm"
-            className={adminButtonClassName}
-            onClick={onClose}
-          >
-            Concluir
-          </Button>
-        </div>
+        <Button
+          variant="action"
+          size="sm"
+          className={adminButtonClassName}
+          onClick={onClose}
+        >
+          Concluir
+        </Button>
       }
     >
       <AdminField label="Pedido" value={`#${order.idPedido}`} />

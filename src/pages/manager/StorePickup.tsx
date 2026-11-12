@@ -97,9 +97,6 @@ export function StorePickup({ now }: StorePickupProps) {
     );
   }
 
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message={error} onRetry={refetch} />;
-
   const clearFilters = () => {
     setDraftSearch("");
     setSearch("");
@@ -145,7 +142,7 @@ export function StorePickup({ now }: StorePickupProps) {
 
         return (
           <Button
-            variant={canPickup ? "action" : "outline-neutral"}
+            variant="outline-neutral"
             size="sm"
             className={`${adminButtonClassName} min-w-[136px] whitespace-nowrap`}
             onClick={() => setSelectedOrder(order)}
@@ -180,42 +177,51 @@ export function StorePickup({ now }: StorePickupProps) {
         }
       />
 
-      <KpiGrid>
-        <KpiCard
-          label="Aguardando retirada"
-          value={formatKpiCount(waitingCount)}
-          help="No período selecionado"
-        />
-        <KpiCard
-          label="Retirados hoje"
-          value={formatKpiCount(pickedUpTodayCount)}
-          help="No período selecionado"
-        />
-      </KpiGrid>
-
-      <FilterBar onApply={() => setSearch(draftSearch)}>
-        <AdminField label="Buscar pedido, nome ou e-mail" htmlFor="pickup-search">
-          <input
-            id="pickup-search"
-            ref={searchInputRef}
-            type="search"
-            value={draftSearch}
-            onChange={(e) => setDraftSearch(e.target.value)}
-            placeholder="Buscar pedido, nome ou e-mail..."
-            className={adminControlClassName}
-          />
-        </AdminField>
-      </FilterBar>
-
-      {filteredOrders.length === 0 ? (
-        <NoResults onClear={clearFilters} />
+      {isLoading ? (
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => void refetch()} />
       ) : (
-        <RecordsTable
-          title="Registros recentes"
-          columns={columns}
-          rows={filteredOrders}
-          getRowKey={(order) => String(order.idPedido)}
-        />
+        <>
+          <KpiGrid>
+            <KpiCard
+              label="Aguardando retirada"
+              value={formatKpiCount(waitingCount)}
+              help="No período selecionado"
+            />
+            <KpiCard
+              label="Retirados hoje"
+              value={formatKpiCount(pickedUpTodayCount)}
+              help="No período selecionado"
+            />
+          </KpiGrid>
+
+          <FilterBar onApply={() => setSearch(draftSearch)}>
+            <AdminField label="Buscar pedido, nome ou e-mail" htmlFor="pickup-search">
+              <input
+                id="pickup-search"
+                ref={searchInputRef}
+                type="search"
+                value={draftSearch}
+                onChange={(e) => setDraftSearch(e.target.value)}
+                placeholder="Buscar pedido, nome ou e-mail..."
+                className={adminControlClassName}
+              />
+            </AdminField>
+          </FilterBar>
+
+          {filteredOrders.length === 0 ? (
+            <NoResults onClear={clearFilters} />
+          ) : (
+            <RecordsTable
+              key={search}
+              title="Registros recentes"
+              columns={columns}
+              rows={filteredOrders}
+              getRowKey={(order) => String(order.idPedido)}
+            />
+          )}
+        </>
       )}
 
       <AccessNotice />

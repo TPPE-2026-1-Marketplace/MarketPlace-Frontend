@@ -19,6 +19,7 @@ export interface ApiOrder {
   idFuncionario?: string | null;
   user?: {
     nome: string;
+    email?: string | null;
   };
   /** Vendedor da venda presencial (GET /orders traz `employee.person`). */
   employee?: {
@@ -81,6 +82,7 @@ export function orderCustomerCpf(order: ApiOrder): string | null {
 
 /** E-mail do cliente do pedido (cadastrado ou informado na compra avulsa). */
 export function orderCustomerEmail(order: ApiOrder, peopleMap?: Map<string, ApiPerson>): string | null {
+  if (order.user?.email) return order.user.email;
   if (order.clienteEmailAvulso) return order.clienteEmailAvulso;
   if (order.idUsuario && peopleMap) {
     return peopleMap.get(order.idUsuario)?.email ?? null;
