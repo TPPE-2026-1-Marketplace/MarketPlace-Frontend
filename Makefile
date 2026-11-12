@@ -5,7 +5,7 @@ SERVICE := app
 export DOCKER_BUILDKIT := 1
 export COMPOSE_DOCKER_CLI_BUILD := 1
 
-.PHONY: help env-setup install dev lint build start selenium selenium-local selenium-local-ui selenium-prod-ui \
+.PHONY: help env-setup env-check install dev lint build start selenium selenium-local selenium-local-ui selenium-prod-ui \
     dev-up dev-down dev-logs dev-shell dev-build dev-rebuild dev-reset \
     prod-up prod-down prod-logs prod-build prod-rebuild prod-image \
     clean check hooks hooks-off
@@ -26,6 +26,7 @@ help:
 	@echo "  make hooks            Ativa os hooks versionados (.githooks)"
 	@echo "  make hooks-off        Desativa os hooks versionados"
 	@echo "  make env-setup        Cria .env.development e .env.production a partir dos .example"
+	@echo "  make env-check        Compara as chaves dos .env com as dos .example (sem mostrar valores)"
 	@echo "  make install          Instala dependencias localmente com pnpm"
 	@echo "  make dev              Sobe o Next.js localmente em modo desenvolvimento"
 	@echo "  make lint             Executa o lint do projeto"
@@ -70,6 +71,9 @@ hooks:
 hooks-off:
 	git config --unset core.hooksPath || true
 	@echo "Hooks desativados (voltando para .git/hooks)"
+
+env-check:
+	@sh scripts/env-check.sh
 
 env-setup:
 	cp -n .env.development.example .env.development || true

@@ -80,6 +80,21 @@ make env-setup
 
 Variáveis públicas do Vite devem usar o prefixo `VITE_`.
 
+### Arquivos de ambiente
+
+| Arquivo            | Quem lê                                                        | Observação                                                       |
+| ------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `.env.development` | Vite em dev (`make dev-up`, `pnpm dev`) e os alvos `selenium-*` | `VITE_API_URL` aponta para a API local (porta 3001)              |
+| `.env.production`  | só `make prod-*` (build local da imagem) e `selenium-prod-ui`   | Não altera o deploy: o CD usa a variável `VITE_API_URL` do GitHub |
+
+As `VITE_*` são embutidas no bundle **no build**: em produção, mudar uma variável
+exige gerar a imagem de novo. Por isso o `compose.prod.yml` não injeta nada no
+container (é um nginx estático); o `.env.production` só entra pelo `--env-file`
+do `Makefile`, como build-arg. Nenhum `.env.*` entra na imagem (`.dockerignore`).
+
+`make env-check` compara as chaves dos seus arquivos com as dos `.example` e
+lista o que falta ou sobra, sem mostrar valores.
+
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`): em push/PR para `dev` e `main` roda lint, testes de unidade, typecheck + build e o build da imagem Docker (`runner`).
