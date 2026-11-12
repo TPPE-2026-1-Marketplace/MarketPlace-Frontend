@@ -16,8 +16,20 @@ import { Banners } from "./Banners";
 import { POSSales } from "./POSSales";
 import { Coupons } from "./Coupons";
 import { ClientExport } from "./ClientExport";
+import { StorePickup } from "./StorePickup";
 
-type Tab = "dashboard" | "estoque" | "pedidos" | "vendas-pdv" | "relatorios" | "usuarios" | "comissoes" | "cupons" | "exportar" | "banners";
+type Tab =
+  | "dashboard"
+  | "estoque"
+  | "pedidos"
+  | "vendas-pdv"
+  | "relatorios"
+  | "usuarios"
+  | "comissoes"
+  | "cupons"
+  | "exportar"
+  | "banners"
+  | "retirada";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   superadmin: "Administrador",
@@ -83,6 +95,7 @@ export function ManagerDashboard() {
     { key: "cupons", label: "Cupons", requiresPermission: () => isSuperAdmin },
     { key: "exportar", label: "Clientes", requiresPermission: () => isManager },
     { key: "banners", label: "Banners", requiresPermission: () => isManager },
+    { key: "retirada", label: "Retirada em loja" },
   ];
   const visibleNavItems = navItems.filter((item) => !item.requiresPermission || item.requiresPermission());
 
@@ -109,6 +122,7 @@ export function ManagerDashboard() {
       {tab === "exportar" && <ClientExport />}
       {tab === "usuarios" && <Employees />}
       {tab === "banners" && <Banners />}
+      {tab === "retirada" && <StorePickup />}
     </AdminShell>
   );
 }
