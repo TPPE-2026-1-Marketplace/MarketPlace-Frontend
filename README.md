@@ -8,49 +8,61 @@ Base de front-end para a disciplina de Técnicas de Programação em Plataformas
 - Corepack habilitado
 - Docker e Docker Compose
 
-## Executando localmente
+## Executando com Docker (recomendado)
+
+```bash
+make env-setup     # cria .env.development e .env.production a partir dos .example
+make dev-up        # sobe o Vite com hot reload em http://localhost:3000
+make dev-logs      # acompanha os logs
+make dev-ci        # lint + typecheck + testes + build, como no CI
+```
+
+Para rodar a imagem de produção (nginx) localmente, com o `VITE_API_URL` do
+`.env.production`:
+
+```bash
+make prod-rebuild  # http://localhost:3003
+```
+
+## Executando localmente (sem Docker)
 
 ```bash
 make env-setup
-npm install -g pnpm
-pnpm install
-pnpm dev
+make install
+make dev           # http://localhost:3000
+make build         # typecheck + build em dist/
+make start         # serve o dist/ com o vite preview
 ```
 
-O projeto ficará disponível em `http://localhost:3000`.
+## Comandos (Makefile)
 
-## Executando com Docker
+`make help` lista todos, agrupados por seção. Os nomes e as seções são os mesmos
+do `Makefile` do backend; o que é só do frontend (Selenium) fica em
+"Específicos do frontend".
 
-```bash
-make docker-rebuild
-```
+| Comando                         | O que faz                                          |
+| ------------------------------- | -------------------------------------------------- |
+| `make dev-up` / `dev-down`      | Sobe / derruba o ambiente de desenvolvimento       |
+| `make dev-restart`              | Recria os containers sem rebuild                   |
+| `make dev-rebuild`              | Reconstrói a imagem e sobe                         |
+| `make dev-reset`                | Derruba e **apaga os volumes** (`node_modules`)    |
+| `make dev-logs svc=app`         | Logs de um serviço                                 |
+| `make dev-shell`                | Shell no container                                 |
+| `make dev-test path=<padrão>`   | Testes unitários (filtrando por arquivo)           |
+| `make dev-check`                | lint + typecheck                                   |
+| `make dev-ci`                   | lint + typecheck + testes + build (espelha o CI)   |
+| `make env-check`                | Compara os `.env` com os `.example` (só nomes)     |
+| `make prod-rebuild`             | Builda e sobe a imagem de produção localmente      |
 
-Para produção com Compose:
+O `make dev-up` sobe só o app. O container do Selenium é iniciado pelos alvos
+`selenium-*-ui`, quando necessário.
 
-```bash
-make docker-prod-build
-make docker-prod-up
-```
+## Debug
 
-O ambiente define `NODE_ENV` e usa arquivos locais por ambiente:
-
-- `.env.development` para desenvolvimento
-- `.env.production` para produção
-- `.env.development.example` e `.env.production.example` como templates versionados
-
-## Build de produção
-
-```bash
-pnpm build
-pnpm start
-```
-
-Ou via Docker:
-
-```bash
-docker build -t marketplace-frontend .
-docker run --rm -p 3000:3000 marketplace-frontend
-```
+O frontend é depurado no navegador: em dev, o Vite serve os módulos com source
+maps, então os breakpoints vão direto nos `.tsx` pela aba *Sources* do DevTools
+(ou pela extensão React Developer Tools). Não há modo `DEBUG=1` como no backend,
+porque não existe processo Node da aplicação para conectar um inspector.
 
 ## Testes de unidade
 
@@ -60,9 +72,9 @@ ao lado do código (`*.test.ts(x)` em `src/`) e compartilham utilitários em
 roteador de respostas para simular a API).
 
 ```bash
-pnpm test            # roda todos os testes uma vez
-pnpm test:watch      # modo watch durante o desenvolvimento
-pnpm test:coverage   # testes + cobertura em coverage/
+make dev-test        # roda todos os testes uma vez, no container
+make dev-test-cov    # testes + cobertura em coverage/
+pnpm test:watch      # modo watch durante o desenvolvimento (no host ou via make dev-shell)
 ```
 
 O `test:coverage` gera `coverage/lcov.info` (cobertura) e
@@ -79,6 +91,21 @@ make env-setup
 ```
 
 Variáveis públicas do Vite devem usar o prefixo `VITE_`.
+
+### Arquivos de ambiente
+
+| Arquivo            | Quem lê                                                        | Observação                                                       |
+| ------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `.env.development` | Vite em dev (`make dev-up`, `pnpm dev`) e `selenium-local*`    | `VITE_API_URL` aponta para a API local (porta 3001)              |
+| `.env.production`  | só `make prod-*` (build local da imagem) e `selenium-prod*`     | Não altera o deploy: o CD usa a variável `VITE_API_URL` do GitHub |
+
+As `VITE_*` são embutidas no bundle **no build**: em produção, mudar uma variável
+exige gerar a imagem de novo. Por isso o `compose.prod.yml` não injeta nada no
+container (é um nginx estático); o `.env.production` só entra pelo `--env-file`
+do `Makefile`, como build-arg. Nenhum `.env.*` entra na imagem (`.dockerignore`).
+
+`make env-check` compara as chaves dos seus arquivos com as dos `.example` e
+lista o que falta ou sobra, sem mostrar valores.
 
 ## CI/CD
 

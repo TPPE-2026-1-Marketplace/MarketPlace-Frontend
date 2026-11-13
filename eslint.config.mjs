@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
 // Config padrão de Vite + React + TypeScript (substitui o eslint-config-next,
 // legado do Next.js).
 export default tseslint.config(
-  { ignores: ["dist", "scratch", "vite.config.d.ts", "vite.config.js"] },
+  { ignores: ["dist"] },
   {
     files: ["**/*.{ts,tsx}"],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
