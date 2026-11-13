@@ -16,17 +16,6 @@ SERVICE := app
 
 .DEFAULT_GOAL := help
 
-SELENIUM_LOCAL_URL ?= http://localhost:3000
-SELENIUM_PROD_URL ?= https://marketplace-frontend-jh71.onrender.com/
-SELENIUM_REMOTE_URL ?= http://localhost:4444
-SELENIUM_NOVNC_URL ?= http://localhost:7900/?autoconnect=1&resize=scale&password=secret
-SELENIUM_UI_START_DELAY ?= 0
-SELENIUM_UI_STEP_DELAY_MS ?= 1500
-SELENIUM_UI_HOLD_OPEN_MS ?= 30000
-SELENIUM_CHECKOUT_PAYMENT_HOLD_MS ?= 8000
-SELENIUM_ALLOW_ADMIN_MUTATIONS ?= false
-SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS ?= 1000
-
 ##@ Setup
 
 .PHONY: help
@@ -35,7 +24,8 @@ help: ## Lista os comandos disponíveis
 		/^##@/ { printf "\n%s\n", substr($$0, 5) } \
 		/^[a-zA-Z0-9_-]+:.*## / { printf "  make %-22s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 	@echo ""
-	@echo "Opções: path=<padrão> (dev-test*), svc=<serviço> (dev-logs), VITE_API_URL=<url> (prod-image)"
+	@echo "Opções: path=<padrão> (dev-test*), svc=<serviço> (dev-logs), VITE_API_URL=<url> (prod-image),"
+	@echo "        HEADLESS=false (selenium-local/selenium-prod); demais em tests/selenium/README.md"
 
 # Aponta o Git para os hooks versionados: o commit-msg preenche os
 # Co-authored-by do trio. Basta rodar uma vez por clone.
@@ -189,72 +179,21 @@ check: ## Valida o Dockerfile (docker build --check)
 
 ##@ Específicos do frontend
 
-.PHONY: selenium
-selenium: ## Selenium no host contra SELENIUM_BASE_URL (produção)
-	@test -n "$(SELENIUM_BASE_URL)" || (echo "ERRO: informe a URL de producao, por exemplo: SELENIUM_BASE_URL=https://loja.exemplo.com make selenium" && exit 2)
-	SELENIUM_ENV=production SELENIUM_BASE_URL="$(SELENIUM_BASE_URL)" HEADLESS="$(HEADLESS)" pnpm test:selenium
+# A lógica dos alvos de Selenium fica em scripts/selenium.sh; padrões e
+# variáveis aceitas estão no cabeçalho do script e em tests/selenium/README.md.
 
 .PHONY: selenium-local
-selenium-local: ## Selenium no host contra o front local (porta 3000)
-	@curl --fail --silent --show-error "$(SELENIUM_LOCAL_URL)" > /dev/null || (echo "ERRO: front indisponivel em $(SELENIUM_LOCAL_URL). Inicie com make dev-up." && exit 2)
-	set -a && . ./.env.development && set +a && \
-	SELENIUM_ENV=local \
-	SELENIUM_BASE_URL="$${SELENIUM_BASE_URL:-$(SELENIUM_LOCAL_URL)}" \
-	HEADLESS="$(HEADLESS)" \
-	pnpm test:selenium
+selenium-local: ## Selenium no host contra o front local (precisa de make dev-up)
+	@COMPOSE="$(COMPOSE_DEV)" bash scripts/selenium.sh local
+
+.PHONY: selenium-prod
+selenium-prod: ## Selenium no host contra a produção
+	@COMPOSE="$(COMPOSE_DEV)" bash scripts/selenium.sh prod
 
 .PHONY: selenium-local-ui
 selenium-local-ui: ## Selenium remoto (Chrome + noVNC) contra o front local
-	$(COMPOSE_DEV) up -d app
-	$(COMPOSE_DEV) up -d --force-recreate selenium
-	@echo "Aguardando front em $(SELENIUM_LOCAL_URL)..."
-	@attempt=0; until curl --fail --silent "$(SELENIUM_LOCAL_URL)" > /dev/null; do \
-		attempt=$$((attempt + 1)); \
-		if [ $$attempt -ge 60 ]; then echo "ERRO: front indisponivel em $(SELENIUM_LOCAL_URL)."; exit 2; fi; \
-		sleep 1; \
-	done
-	@echo "Aguardando Selenium em $(SELENIUM_REMOTE_URL)/status..."
-	@attempt=0; until curl --fail --silent "$(SELENIUM_REMOTE_URL)/status" > /dev/null; do \
-		attempt=$$((attempt + 1)); \
-		if [ $$attempt -ge 90 ]; then echo "ERRO: Selenium indisponivel em $(SELENIUM_REMOTE_URL)/status."; exit 2; fi; \
-		sleep 1; \
-	done
-	@echo "Abra para acompanhar o navegador:"
-	@echo "$(SELENIUM_NOVNC_URL)"
-	@echo "Os testes iniciam em $(SELENIUM_UI_START_DELAY) segundos."
-	@sleep $(SELENIUM_UI_START_DELAY)
-	set -a && . ./.env.development && set +a && \
-	SELENIUM_ENV=local \
-	SELENIUM_BASE_URL="$(SELENIUM_LOCAL_URL)" \
-	SELENIUM_REMOTE_URL="$(SELENIUM_REMOTE_URL)" \
-	SELENIUM_HOST_GATEWAY="$$( $(COMPOSE_DEV) exec -T selenium getent hosts host.docker.internal | awk 'NR==1 { print $$1 }')" \
-	HEADLESS=false \
-	SELENIUM_STEP_DELAY_MS="$(SELENIUM_UI_STEP_DELAY_MS)" \
-	SELENIUM_HOLD_OPEN_MS="$(SELENIUM_UI_HOLD_OPEN_MS)" \
-	pnpm test:selenium
+	@COMPOSE="$(COMPOSE_DEV)" bash scripts/selenium.sh local-ui
 
 .PHONY: selenium-prod-ui
 selenium-prod-ui: ## Selenium remoto (Chrome + noVNC) contra a produção
-	$(COMPOSE_DEV) up -d --force-recreate --no-deps selenium
-	@echo "Aguardando Selenium em $(SELENIUM_REMOTE_URL)/status..."
-	@attempt=0; until curl --fail --silent "$(SELENIUM_REMOTE_URL)/status" > /dev/null; do \
-		attempt=$$((attempt + 1)); \
-		if [ $$attempt -ge 90 ]; then echo "ERRO: Selenium indisponivel em $(SELENIUM_REMOTE_URL)/status."; exit 2; fi; \
-		sleep 1; \
-	done
-	@echo "Abra para acompanhar o navegador:"
-	@echo "$(SELENIUM_NOVNC_URL)"
-	@echo "Os testes iniciam em $(SELENIUM_UI_START_DELAY) segundos."
-	@sleep $(SELENIUM_UI_START_DELAY)
-	set -a && . ./.env.production && set +a && \
-	SELENIUM_ENV=production \
-	SELENIUM_BASE_URL="$${SELENIUM_BASE_URL:-$(SELENIUM_PROD_URL)}" \
-	SELENIUM_REMOTE_URL="$(SELENIUM_REMOTE_URL)" \
-	SELENIUM_ALLOW_CHECKOUT_PAYMENT="$${SELENIUM_ALLOW_CHECKOUT_PAYMENT:-true}" \
-	SELENIUM_CHECKOUT_PAYMENT_HOLD_MS="$${SELENIUM_CHECKOUT_PAYMENT_HOLD_MS:-$(SELENIUM_CHECKOUT_PAYMENT_HOLD_MS)}" \
-	SELENIUM_ALLOW_ADMIN_MUTATIONS="$(SELENIUM_ALLOW_ADMIN_MUTATIONS)" \
-	SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS="$${SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS:-$(SELENIUM_ADMIN_MUTATION_STEP_DELAY_MS)}" \
-	HEADLESS=false \
-	SELENIUM_STEP_DELAY_MS="$(SELENIUM_UI_STEP_DELAY_MS)" \
-	SELENIUM_HOLD_OPEN_MS="$(SELENIUM_UI_HOLD_OPEN_MS)" \
-	pnpm test:selenium
+	@COMPOSE="$(COMPOSE_DEV)" bash scripts/selenium.sh prod-ui
