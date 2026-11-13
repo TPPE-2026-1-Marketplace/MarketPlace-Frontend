@@ -16,19 +16,6 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }));
 
-// O AddProduct (assistente de cadastro) é testado à parte: aqui ele só entrega o
-// payload para o Inventory persistir no backend.
-const addProductPayload = vi.hoisted(() => ({ current: undefined as unknown }));
-vi.mock("./AddProduct", () => ({
-  AddProduct: ({ onBack, onSave }: { onBack: () => void; onSave: (p: object, payload?: unknown) => void }) => (
-    <div>
-      <p>Assistente de cadastro</p>
-      <button onClick={onBack}>Voltar ao estoque</button>
-      <button onClick={() => onSave({}, addProductPayload.current)}>Salvar cadastro</button>
-    </div>
-  ),
-}));
-
 const catalog = [
   makeProduct({
     idProduto: 1,
@@ -71,9 +58,8 @@ describe("Inventory", () => {
     vi.mocked(fetchProducts).mockReset();
     vi.mocked(fetchProducts).mockResolvedValue({ data: catalog, meta: { page: 1, limit: 100, total: 3, totalPages: 1 } });
     for (const fn of [api.post, api.patch, api.delete]) vi.mocked(fn).mockReset();
-    vi.spyOn(window, "alert").mockImplementation(() => {});
+    vi.mocked(api.get).mockResolvedValue({ data: [], meta: { page: 1, limit: 100, total: 0, totalPages: 1 } });
     vi.spyOn(console, "error").mockImplementation(() => {});
-    addProductPayload.current = undefined;
   });
 
   it("lista uma linha por variante com os indicadores, incluindo produto sem variantes", async () => {
@@ -204,128 +190,40 @@ describe("Inventory", () => {
   });
 });
 
-describe("Inventory - cadastro de produto", () => {
-  const baseForm = {
-    title: "Vestido Novo",
-    sku: "DK-NOVO",
-    basePrice: 300,
-    description: "",
-    featured: true,
-    attrs: { Material: "Tule" },
-    tags: ["festa"],
-    colors: [
-      { name: "Preto", images: ["https://img/preto.jpg", "data:image/png;base64,AAA"] },
-      { name: "Branco", images: ["https://img/preto.jpg"] },
-    ],
-    sizes: ["M"],
-  };
-
+describe("Inventory - cadastro e edição de produto", () => {
   beforeEach(() => {
     vi.mocked(fetchProducts).mockResolvedValue({ data: catalog, meta: { page: 1, limit: 100, total: 3, totalPages: 1 } });
-    for (const fn of [api.post, api.patch, api.delete]) vi.mocked(fn).mockReset();
-    vi.spyOn(window, "alert").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.mocked(api.patch).mockResolvedValue({});
+    vi.mocked(api.get).mockResolvedValue({ data: [{ idCategoria: 1, nome: "Festa" }], meta: { page: 1, limit: 100, total: 1, totalPages: 1 } });
   });
 
-  async function openAddProduct() {
-    renderWithProviders(<Inventory />, { user: manager });
-    await screen.findByText("ROSA-P");
-    await userEvent.click(screen.getByRole("button", { name: "Adicionar produto" }));
-    expect(screen.getByText("Assistente de cadastro")).toBeInTheDocument();
-  }
-
-  it("volta ao estoque sem salvar", async () => {
-    await openAddProduct();
-    await userEvent.click(screen.getByRole("button", { name: "Voltar ao estoque" }));
-    expect(screen.getByText("ROSA-P")).toBeInTheDocument();
+  it("abre o assistente de cadastro e fecha sem salvar", async () => {
+    await renderInventory();
 
     await userEvent.click(screen.getByRole("button", { name: "Adicionar produto" }));
-    addProductPayload.current = undefined;
-    await userEvent.click(screen.getByRole("button", { name: "Salvar cadastro" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Cadastrar produto" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Informação básica" })).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(api.post).not.toHaveBeenCalled();
-    expect(screen.getByText("ROSA-P")).toBeInTheDocument();
   });
 
-  it("cria produto, variantes, estoque e imagens (reaproveitando a mesma URL)", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ blob: async () => new Blob(["x"], { type: "image/png" }) })));
-    let imageId = 0;
-    vi.mocked(api.post).mockImplementation(async (path: string) => {
-      if (path === "/products") return { idProduto: 99 };
-      if (path === "/images" || path === "/images/upload") return { idImagem: ++imageId };
-      return {};
-    });
-    addProductPayload.current = {
-      form: baseForm,
-      variants: [
-        { codigoSku: "NOVO-PRETO-M", color: "Preto", size: "M", price: 0, stockOnline: 3, stockPhysical: 1 },
-        { codigoSku: "NOVO-BRANCO-M", color: "Branco", size: "M", price: 320 },
-      ],
-    };
-    await openAddProduct();
+  it("abre a edição do produto a partir do ajuste de estoque", async () => {
+    await renderInventory();
 
-    await userEvent.click(screen.getByRole("button", { name: "Salvar cadastro" }));
-
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith("Produto cadastrado com sucesso no banco de dados!"));
-    expect(api.post).toHaveBeenCalledWith("/products", expect.objectContaining({
-      titulo: "Vestido Novo",
-      sku: "DK-NOVO",
-      preco_base: 300,
-      descricao: undefined,
-      material: "Tule",
-      tags: ["festa"],
-    }));
-    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigoSku: "NOVO-PRETO-M", precoVariante: 300 }));
-    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigoSku: "NOVO-BRANCO-M", precoVariante: 320 }));
-    expect(api.patch).toHaveBeenCalledWith("/inventory/NOVO-PRETO-M", expect.objectContaining({ qtdOnline: 3, qtdLojaFisica: 1 }));
-    expect(api.patch).toHaveBeenCalledWith("/inventory/NOVO-BRANCO-M", expect.objectContaining({ qtdOnline: 0, qtdLojaFisica: 0 }));
-    // URL registrada uma vez e reaproveitada na segunda variante; data URI vai por upload.
-    expect(vi.mocked(api.post).mock.calls.filter(([p]) => p === "/images")).toHaveLength(1);
-    expect(vi.mocked(api.post).mock.calls.filter(([p]) => p === "/images/upload")).toHaveLength(1);
-    expect(vi.mocked(api.post).mock.calls.filter(([p]) => p === "/images/catalog")).toHaveLength(3);
-    expect(await screen.findByText("ROSA-P")).toBeInTheDocument();
+    await openAdjust("ROSA-P");
+    await userEvent.click(screen.getByRole("button", { name: "Editar produto" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Editar produto" })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Título *")).toHaveValue("Vestido Rosa");
+    expect(within(dialog).getByLabelText("SKU base *")).toBeDisabled();
   });
 
-  it("cria uma variante padrão quando o assistente não define variantes", async () => {
-    vi.mocked(api.post).mockImplementation(async (path: string) => (path === "/products" ? { idProduto: 5 } : {}));
-    addProductPayload.current = { form: { ...baseForm, attrs: {}, tags: [], colors: [], sizes: [] }, variants: [] };
-    await openAddProduct();
+  it("perfil somente leitura não abre a edição", async () => {
+    await renderInventory({ readOnly: true });
 
-    await userEvent.click(screen.getByRole("button", { name: "Salvar cadastro" }));
-
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith("Produto cadastrado com sucesso no banco de dados!"));
-    expect(api.post).toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigoSku: "DK-NOVO", cor: "Único", tamanho: "U" }));
-    // Contrato do backend (#161): os nomes em snake_case foram removidos do DTO e dariam 400.
-    expect(api.post).not.toHaveBeenCalledWith("/product-variants", expect.objectContaining({ codigo_sku: expect.anything() }));
-    expect(api.post).not.toHaveBeenCalledWith("/product-variants", expect.objectContaining({ preco_variante: expect.anything() }));
-  });
-
-  it("avisa quando as imagens falham mas mantém o produto", async () => {
-    vi.mocked(api.post).mockImplementation(async (path: string) => {
-      if (path === "/products") return { idProduto: 99 };
-      if (path === "/images") throw new Error("ImgBB fora");
-      return {};
-    });
-    addProductPayload.current = { form: baseForm, variants: [{ codigoSku: "NOVO-PRETO-M", color: "Preto", size: "M" }] };
-    await openAddProduct();
-
-    await userEvent.click(screen.getByRole("button", { name: "Salvar cadastro" }));
-
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining("variantes: NOVO-PRETO-M")));
-  });
-
-  it("explica a falha quando o cadastro do produto não conclui", async () => {
-    vi.mocked(api.post).mockRejectedValueOnce(new Error("SKU duplicado"));
-    addProductPayload.current = { form: baseForm, variants: [] };
-    await openAddProduct();
-
-    await userEvent.click(screen.getByRole("button", { name: "Salvar cadastro" }));
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining("Não foi possível concluir o cadastro: SKU duplicado.")));
-    expect(screen.getByText("Assistente de cadastro")).toBeInTheDocument();
-
-    vi.mocked(api.post).mockRejectedValueOnce("erro estranho");
-    await userEvent.click(screen.getByRole("button", { name: "Salvar cadastro" }));
-    await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringContaining("Erro desconhecido")));
+    expect(screen.queryByRole("button", { name: /Ajustar estoque/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editar produto" })).not.toBeInTheDocument();
   });
 });

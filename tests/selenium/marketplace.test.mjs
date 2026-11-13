@@ -650,9 +650,11 @@ test("administrador navega pelos modulos gerenciais sem alterar dados", async (t
   const sections = [
     ["/painel/estoque", "Estoque"],
     ["/painel/pedidos", "Pedidos"],
-    ["/painel/relatorios", "Relatórios e Análises"],
-    ["/painel/comissoes", "Comissões e Metas"],
-    ["/painel/cupons", "Cupons e Campanhas"],
+    ["/painel/relatorios", "Relatórios"],
+    ["/painel/comissoes", "Comissões"],
+    ["/painel/cupons", "Cupons"],
+    ["/painel/retirada", "Retirada em loja"],
+    ["/painel/banners", "Banners"],
   ];
 
   for (const [path, heading] of sections) {
@@ -675,7 +677,7 @@ test("administrador abre o PDV sem iniciar venda", async (t) => {
   await loginAs(loginEmail, loginPassword);
   await driver.get(url("/pdv"));
   assert.equal(
-    await (await waitForHeading("PDV - Ponto de Venda")).isDisplayed(),
+    await (await waitForHeading("PDV · Nova venda")).isDisplayed(),
     true,
   );
   const search = await driver.wait(
@@ -725,73 +727,68 @@ if (allowAdminMutations) {
     await visualPause(adminMutationStepDelayMs);
 
     await clickVisible(await findButtonByText("Adicionar produto"));
-    assert.equal(await (await waitForHeading("Informação Básica")).isDisplayed(), true);
+    assert.equal(await (await waitForHeading("Cadastrar produto")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
 
-    await fillInput('input[placeholder^="Ex: Vestido de Festa"]', productTitle);
+    await fillInput("#product-title", productTitle);
     await visualPause(adminMutationStepDelayMs);
     await fillInput(
-      'textarea[placeholder^="Descreva os detalhes"]',
+      "#product-description",
       "Produto criado visualmente pelo Selenium para demonstrar o cadastro administrativo completo.",
     );
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="Ex: DK-009"]', sku);
+    await fillInput("#product-sku", sku);
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Avançar"));
+    await clickVisible(await findButtonByText("Próxima etapa"));
 
-    assert.equal(await (await waitForHeading("Atributos de Categoria")).isDisplayed(), true);
-    await visualPause(adminMutationStepDelayMs);
-    await selectOptionByVisibleIndex(0, "Vestuário");
-    await visualPause(adminMutationStepDelayMs);
-    await selectOptionByVisibleIndex(1, "Vestidos");
-    await visualPause(adminMutationStepDelayMs);
-    await selectOptionByVisibleIndex(2, "Festa");
-    await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Avançar"));
-
-    assert.equal(await (await waitForHeading("Especificações de Venda")).isDisplayed(), true);
-    await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="0,00"]', "129.90");
+    assert.equal(await (await waitForHeading("Categoria e atributos")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
     await clickVisible(
-      await driver.wait(until.elementLocated(By.xpath('//button[normalize-space()="M"]')), timeout),
+      await driver.wait(until.elementLocated(By.xpath('//fieldset//label[normalize-space()="Festa"]')), timeout),
     );
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Adicionar Cor"));
+    await clickVisible(await findButtonByText("Próxima etapa"));
+
+    assert.equal(await (await waitForHeading("Venda e imagens")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="Nome da cor (Ex: Rosa Nude)"]', "Preto");
+    await fillInput("#product-price", "129.90");
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Confirmar Cor"));
+    await clickVisible(
+      await driver.wait(until.elementLocated(By.xpath('//fieldset//button[normalize-space()="M"]')), timeout),
+    );
     await visualPause(adminMutationStepDelayMs);
+    await fillInput("#new-color-name", "Preto");
+    await clickVisible(await findButtonByText("Adicionar cor"));
+    await visualPause(adminMutationStepDelayMs);
+    await clickVisible(await findButtonByText("Gerenciar fotos da cor"));
 
     const fileInput = await driver.wait(
-      until.elementLocated(By.css('input[type="file"][accept="image/*"]')),
+      until.elementLocated(By.css('input[type="file"][accept^="image/"]')),
       timeout,
     );
     await fileInput.sendKeys(productImagePath);
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(
-      await driver.wait(
-        until.elementLocated(By.xpath('//button[contains(normalize-space(.), "Aplicar Corte")]')),
-        timeout,
-      ),
-    );
+    await clickVisible(await findButtonByText("Aplicar recorte"));
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Avançar"));
+    await clickVisible(await findButtonByText("Salvar imagens"));
+    await visualPause(adminMutationStepDelayMs);
+    await clickVisible(await findButtonByText("Próxima etapa"));
 
-    assert.equal(await (await waitForHeading("Gestão de Estoque")).isDisplayed(), true);
+    assert.equal(await (await waitForHeading("Gestão de estoque")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
-    const stockInputs = await driver.findElements(By.xpath("//tbody//input[@type='number']"));
-    assert.ok(stockInputs.length >= 3, "Inputs de estoque/preco da variante nao foram encontrados.");
-    await fillElement(stockInputs[0], "2");
+    await fillInput(`#online-${variantSku}`, "2");
     await visualPause(adminMutationStepDelayMs);
-    await fillElement(stockInputs[1], "1");
+    await fillInput(`#physical-${variantSku}`, "1");
     await visualPause(adminMutationStepDelayMs);
-    await fillElement(stockInputs[2], "129.90");
+    await fillInput(`#price-${variantSku}`, "129.90");
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Postar Produto"));
-    await acceptAlertIfPresent();
+    await clickVisible(await findButtonByText("Revisar produto"));
+    assert.equal(await (await waitForHeading("Revisar cadastro")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
+    await clickVisible(await findButtonByText("Confirmar e publicar"));
+    assert.equal(await (await waitForHeading("Produto publicado")).isDisplayed(), true);
+    await visualPause(adminMutationStepDelayMs);
+    await clickVisible(await findButtonByText("Voltar ao estoque"));
 
     assert.equal(await (await waitForHeading("Estoque")).isDisplayed(), true);
     await fillInput("#inventory-search", sku);
@@ -804,24 +801,26 @@ if (allowAdminMutations) {
     await visualPause(adminMutationStepDelayMs);
 
     await clickPanelNav("Usuários");
-    assert.equal(await (await waitForHeading("Gestão de Usuários")).isDisplayed(), true);
+    assert.equal(await (await waitForHeading("Usuários")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Novo Usuário"));
-    assert.equal(await (await waitForHeading("Novo Usuário")).isDisplayed(), true);
+    await clickVisible(await findButtonByText("Novo usuário"));
+    assert.equal(await (await waitForHeading("Novo usuário")).isDisplayed(), true);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="000.000.000-00"]', userCpf);
+    await fillInput("#user-cpf", userCpf);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="Ex: Ana Silva"]', userName);
+    await fillInput("#user-name", userName);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="usuario@dkfestas.com.br"]', userEmail);
+    await fillInput("#user-email", userEmail);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="Senha de acesso"]', userPassword);
+    await fillInput("#user-password", userPassword);
     await visualPause(adminMutationStepDelayMs);
-    await fillInput('input[placeholder="(11) 99999-0000"]', "61999999999");
+    await fillInput("#user-phone", "61999999999");
     await visualPause(adminMutationStepDelayMs);
-    await selectOptionByText("select", roleLabel);
+    await selectOptionByText("#user-role", roleLabel);
     await visualPause(adminMutationStepDelayMs);
-    await clickVisible(await findButtonByText("Cadastrar Usuário"));
+    await clickVisible(await findButtonByText("Salvar usuário"));
+    await visualPause(adminMutationStepDelayMs);
+    await clickVisible(await findButtonByText("Concluir"));
     await visualPause(adminMutationStepDelayMs);
     await driver.wait(
       until.elementLocated(

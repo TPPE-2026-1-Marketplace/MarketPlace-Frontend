@@ -1,40 +1,46 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../lib/api";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { api } from "@/lib/api";
 import { apiRouter } from "@/test/apiRouter";
 import { manager, renderWithProviders, superadmin } from "@/test/render";
 import { Commissions } from "./Commissions";
 
-vi.mock("../../lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../lib/api")>()),
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 const getMock = vi.mocked(api.get);
+const postMock = vi.mocked(api.post);
+const patchMock = vi.mocked(api.patch);
 
+const NOW = new Date("2026-10-27T12:00:00");
+
+const person = (nome: string) => ({ nome, email: `${nome}@dk.com`, cpf: "", telefone: null });
 const employees = {
   data: [
-    { cpf: "111", ativo: true, role_perfil: "vendedor", taxa_comissao: 0.05, meta_vendas: 1000, person: { nome: "Ana Vendas", email: "ana@dk.com" } },
-    { cpf: "222", ativo: true, role_perfil: "vendedor", taxa_comissao: 0.04, meta_vendas: 2000, person: { nome: "Bruno Loja", email: "bruno@dk.com" } },
-    { cpf: "333", ativo: true, role_perfil: "vendedor", taxa_comissao: 0.03, meta_vendas: 0, person: { nome: "Carla Nova", email: "carla@dk.com" } },
-    { cpf: "444", ativo: false, role_perfil: "vendedor", taxa_comissao: 0.05, meta_vendas: 0, person: { nome: "Vendedor Desligado", email: "x" } },
-    { cpf: "555", ativo: true, role_perfil: "gerente", taxa_comissao: 0, meta_vendas: 0, person: { nome: "Gerente", email: "g" } },
+    { cpf: "111", ativo: true, role_perfil: "vendedor", taxa_comissao: "0.05", meta_vendas: "1000", codigo_funcionario: "ANA01", person: person("Ana Vendas") },
+    { cpf: "222", ativo: true, role_perfil: "vendedor", taxa_comissao: "0.04", meta_vendas: "2000", codigo_funcionario: null, person: person("Bruno Loja") },
+    { cpf: "333", ativo: true, role_perfil: "vendedor", taxa_comissao: "0.03", meta_vendas: null, codigo_funcionario: null, person: person("Carla Nova") },
+    { cpf: "444", ativo: false, role_perfil: "vendedor", taxa_comissao: "0.05", meta_vendas: null, codigo_funcionario: null, person: person("Desligado") },
+    { cpf: "555", ativo: true, role_perfil: "gerente", taxa_comissao: 0, meta_vendas: null, codigo_funcionario: null, person: person("Gerente") },
   ],
 };
 
-const reports: Record<string, unknown> = {
+const reports = {
+  // Meta batida com bônus de +1,5%: comissão = 1500 × 6,5%.
   "111": {
     total_vendas: 1500,
-    comissao: 175,
+    comissao: 97.5,
     meta_batida: true,
     meta_vendas: 1000,
-    valor_bonus: 100,
+    valor_bonus: 0.015,
     pedidos: [
-      { idPedido: 9, dataPedido: "2026-09-10T12:00:00", valorTotal: "1000", cliente: { person: { nome: "Maria" } }, itens: [{}, {}] },
-      { idPedido: 10, dataPedido: "2026-09-11T12:00:00", valorTotal: "500" },
+      { idPedido: 84, dataPedido: "2026-10-26T12:00:00", valorTotal: "1000" },
+      { idPedido: 79, dataPedido: "2026-10-25T12:00:00", valorTotal: "500" },
     ],
   },
-  "222": { total_vendas: 2100, comissao: 84, meta_batida: true, meta_vendas: 2000, valor_bonus: 0, pedidos: [] },
+  "222": { total_vendas: 1000, comissao: 40, meta_batida: false, meta_vendas: 2000, valor_bonus: 0.01, pedidos: [] },
 };
 
 function backend(goals: unknown[] = []) {
@@ -49,126 +55,177 @@ function backend(goals: unknown[] = []) {
   );
 }
 
-const card = (name: string) => screen.getByText(name).closest("div.bg-white") as HTMLElement;
+const rows = () => screen.getAllByRole("row").slice(1);
+const row = (name: string) => rows().find((item) => item.textContent?.includes(name)) as HTMLElement;
+const kpi = (label: string) => screen.getAllByText(label, { selector: "p" })[0].nextElementSibling;
+const dialog = () => within(screen.getByRole("dialog"));
 
 async function renderCommissions(user = superadmin) {
-  renderWithProviders(<Commissions />, { user });
-  await screen.findByText("Comissões e Metas");
+  renderWithProviders(<Commissions now={NOW} />, { user });
+  await screen.findByText("Ana Vendas");
 }
 
 describe("Commissions", () => {
   beforeEach(() => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
     getMock.mockReset();
-    vi.mocked(api.patch).mockReset();
-    vi.mocked(api.post).mockReset();
+    postMock.mockReset();
+    patchMock.mockReset();
+    vi.spyOn(console, "error").mockImplementation(() => {});
     backend();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("lista só vendedores ativos com os indicadores do mês", async () => {
-    renderWithProviders(<Commissions />, { user: superadmin });
-    expect(screen.getByText("Carregando comissões...")).toBeInTheDocument();
-    await screen.findByText("Comissões e Metas");
-
-    expect(screen.queryByText("Vendedor Desligado")).not.toBeInTheDocument();
-    expect(screen.queryByText("Gerente")).not.toBeInTheDocument();
-    expect(screen.getByText("Total em Vendas").parentElement).toHaveTextContent("R$ 3.600,00");
-    expect(screen.getByText("Metas Atingidas").parentElement).toHaveTextContent("2 / 3");
-    expect(within(card("Ana Vendas")).getByText("Bônus ganho")).toBeInTheDocument();
-    expect(within(card("Bruno Loja")).getByText("Meta atingida")).toBeInTheDocument();
-    expect(within(card("Carla Nova")).getByText("0% da meta")).toBeInTheDocument();
-  });
-
-  it("expande o histórico de vendas", async () => {
+  it("lista os vendedores ativos da competência com indicadores, progresso e bônus em R$", async () => {
     await renderCommissions();
-    const ana = card("Ana Vendas");
-    const expand = within(ana).getAllByRole("button").slice(-1)[0];
 
-    await userEvent.click(expand);
-    expect(screen.getByText("Histórico de Vendas (2 registros)")).toBeInTheDocument();
-    expect(screen.getByText("Maria")).toBeInTheDocument();
-    expect(screen.getByText("Venda Avulsa")).toBeInTheDocument();
-    expect(screen.getByText("2 item(ns)")).toBeInTheDocument();
-    expect(screen.getByText("R$ 50,00")).toBeInTheDocument();
-    expect(screen.getByText("R$ 75,00")).toBeInTheDocument();
-    await userEvent.click(expand);
-    expect(screen.queryByText(/Histórico de Vendas/)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Comissões" })).toBeInTheDocument();
+    expect(kpi("Vendas da equipe")).toHaveTextContent("R$ 2.500,00");
+    expect(kpi("Comissões")).toHaveTextContent("R$ 137,50");
+    expect(kpi("Metas atingidas")).toHaveTextContent("1 de 3");
+    expect(kpi("Bônus")).toHaveTextContent("R$ 22,50");
+    expect(getMock).toHaveBeenCalledWith("/employees/111/commissions?mes=10&ano=2026");
 
-    await userEvent.click(within(card("Bruno Loja")).getAllByRole("button").slice(-1)[0]);
-    expect(screen.getByText("Nenhuma venda registrada.")).toBeInTheDocument();
+    expect(rows()).toHaveLength(3);
+    expect(rows()[0]).toHaveTextContent("Ana Vendas");
+    expect(row("Ana Vendas")).toHaveTextContent("150%");
+    expect(row("Ana Vendas")).toHaveTextContent("R$ 22,50");
+    expect(row("Bruno Loja")).toHaveTextContent("50%");
+    expect(row("Carla Nova")).toHaveTextContent("Sem meta");
+    expect(row("Carla Nova")).toHaveTextContent("Indisponível");
+    expect(screen.queryByText("Desligado")).not.toBeInTheDocument();
+    expect(screen.queryByText("Gerente")).not.toBeInTheDocument();
   });
 
-  it("gerente não edita e vê o aviso", async () => {
+  it("troca a competência e busca o vendedor", async () => {
+    await renderCommissions();
+
+    await userEvent.selectOptions(screen.getByLabelText(/^Competência:/), "2026-09");
+    expect(screen.getByLabelText("Competência: setembro / 2026")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    await waitFor(() => expect(getMock).toHaveBeenCalledWith("/employees/111/commissions?mes=9&ano=2026"));
+    await screen.findByText("Ana Vendas");
+
+    await userEvent.type(screen.getByLabelText("Buscar vendedor"), "ana01");
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    expect(rows()).toHaveLength(1);
+
+    await userEvent.clear(screen.getByLabelText("Buscar vendedor"));
+    await userEvent.type(screen.getByLabelText("Buscar vendedor"), "zzz");
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(rows()).toHaveLength(3);
+  });
+
+  it("mostra o detalhe e o histórico de vendas com a comissão de cada venda", async () => {
+    await renderCommissions();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver detalhes de Ana Vendas" }));
+    expect(dialog().getByRole("heading", { name: "Comissão e meta · Ana Vendas" })).toBeInTheDocument();
+    expect(dialog().getByText("Competência").nextElementSibling).toHaveTextContent("Outubro / 2026");
+    expect(dialog().getByLabelText("Taxa de comissão (%)")).toHaveValue("5");
+    expect(dialog().getByLabelText("Bônus ao bater a meta (%)")).toHaveValue("1,5");
+    expect(dialog().getByText("Comissão calculada").nextElementSibling).toHaveTextContent("R$ 97,50");
+
+    await userEvent.click(dialog().getByRole("button", { name: "Histórico de vendas" }));
+    expect(dialog().getByRole("heading", { name: "Histórico de vendas · Ana Vendas" })).toBeInTheDocument();
+    expect(dialog().getByText("26 out · #PDV-084").nextElementSibling).toHaveTextContent("R$ 1.000,00 · Comissão R$ 50,00");
+    await userEvent.click(dialog().getByRole("button", { name: "Voltar às comissões" }));
+    expect(dialog().getByRole("heading", { name: "Comissão e meta · Ana Vendas" })).toBeInTheDocument();
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver detalhes de Bruno Loja" }));
+    await userEvent.click(dialog().getByRole("button", { name: "Histórico de vendas" }));
+    expect(dialog().getByText("Nenhuma venda presencial nesta competência")).toBeInTheDocument();
+  });
+
+  it("salva taxa, meta e bônus como taxas, criando a meta individual da competência", async () => {
+    patchMock.mockResolvedValue({});
+    postMock.mockResolvedValue({});
+    await renderCommissions();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver detalhes de Ana Vendas" }));
+    await userEvent.clear(dialog().getByLabelText("Taxa de comissão (%)"));
+    await userEvent.type(dialog().getByLabelText("Taxa de comissão (%)"), "4,5");
+    await userEvent.clear(dialog().getByLabelText("Meta de vendas (R$)"));
+    await userEvent.type(dialog().getByLabelText("Meta de vendas (R$)"), "12000");
+    await userEvent.clear(dialog().getByLabelText("Bônus ao bater a meta (%)"));
+    await userEvent.type(dialog().getByLabelText("Bônus ao bater a meta (%)"), "2");
+    await userEvent.click(dialog().getByRole("button", { name: "Salvar configuração" }));
+
+    expect(patchMock).toHaveBeenCalledWith("/employees/111", { taxa_comissao: 0.045, meta_vendas: 12000 });
+    expect(postMock).toHaveBeenCalledWith("/sales-goals", {
+      cpfFuncionario: "111",
+      mes: 10,
+      ano: 2026,
+      valorMeta: 12000,
+      valorBonus: 0.02,
+    });
+    expect(await screen.findByText("Alterações salvas")).toBeInTheDocument();
+    expect(dialog().getByText("Resultado").nextElementSibling).toHaveTextContent(
+      "Comissão e meta de Ana Vendas salvas para outubro / 2026",
+    );
+  });
+
+  it("atualiza a meta existente, zera o bônus desligado e avisa quando falha", async () => {
+    backend([{ idGoal: 7, cpfFuncionario: "222", mes: 10, ano: 2026, valorMeta: "2000", valorBonus: "0.01" }]);
+    patchMock.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("500"));
+    await renderCommissions();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver detalhes de Bruno Loja" }));
+    await userEvent.selectOptions(dialog().getByLabelText("Bônus habilitado"), "nao");
+    expect(dialog().queryByLabelText("Bônus ao bater a meta (%)")).not.toBeInTheDocument();
+    await userEvent.click(dialog().getByRole("button", { name: "Salvar configuração" }));
+
+    await waitFor(() =>
+      expect(patchMock).toHaveBeenCalledWith("/sales-goals/7", expect.objectContaining({ valorBonus: 0 })),
+    );
+    expect(await dialog().findByRole("alert")).toHaveTextContent("Não foi possível salvar a configuração de comissão.");
+
+    await userEvent.clear(dialog().getByLabelText("Meta de vendas (R$)"));
+    await userEvent.type(dialog().getByLabelText("Meta de vendas (R$)"), "-1");
+    await userEvent.click(dialog().getByRole("button", { name: "Salvar configuração" }));
+    expect(dialog().getByRole("alert")).toHaveTextContent("Informe valores numéricos não negativos.");
+  });
+
+  it("configura a meta da equipe da competência", async () => {
+    backend([{ idGoal: 1, cpfFuncionario: null, mes: 10, ano: 2026, valorMeta: "50000", valorBonus: "0.01" }]);
+    patchMock.mockResolvedValue({});
+    await renderCommissions();
+
+    await userEvent.click(screen.getByRole("button", { name: "Configurar metas" }));
+    expect(dialog().getByLabelText("Meta de vendas (R$)")).toHaveValue(50000);
+    expect(dialog().getByLabelText("Bônus ao bater a meta (%)")).toHaveValue("1");
+    await userEvent.clear(dialog().getByLabelText("Meta de vendas (R$)"));
+    await userEvent.type(dialog().getByLabelText("Meta de vendas (R$)"), "60000");
+    await userEvent.click(dialog().getByRole("button", { name: "Salvar meta" }));
+
+    expect(patchMock).toHaveBeenCalledWith("/sales-goals/1", {
+      cpfFuncionario: null,
+      mes: 10,
+      ano: 2026,
+      valorMeta: 60000,
+      valorBonus: 0.01,
+    });
+    expect(await screen.findByText("Meta da equipe salva para outubro / 2026")).toBeInTheDocument();
+  });
+
+  it("gerente consulta sem editar e sem buscar as metas", async () => {
     await renderCommissions(manager);
 
-    expect(screen.getByText("Apenas o Super Admin pode alterar taxas de comissão e metas.")).toBeInTheDocument();
-    expect(within(card("Ana Vendas")).getAllByRole("button")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Configurar metas" })).not.toBeInTheDocument();
+    expect(getMock).not.toHaveBeenCalledWith(expect.stringContaining("/sales-goals"));
+    await userEvent.click(screen.getByRole("button", { name: "Ver detalhes de Ana Vendas" }));
+    expect(dialog().getByText("Bônus ao bater a meta (%)").nextElementSibling).toHaveTextContent("1,5");
+    expect(dialog().queryByRole("button", { name: "Salvar configuração" })).not.toBeInTheDocument();
+    await userEvent.click(dialog().getByRole("button", { name: "Fechar" }));
   });
 
-  it("edita taxa, meta e bônus criando a meta do mês", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.mocked(api.patch).mockResolvedValue({});
-    vi.mocked(api.post).mockResolvedValue({});
-    await renderCommissions();
+  it("mostra o erro de carregamento e tenta de novo", async () => {
+    getMock.mockRejectedValueOnce(new Error("offline"));
+    renderWithProviders(<Commissions now={NOW} />, { user: superadmin });
 
-    await userEvent.click(within(card("Ana Vendas")).getAllByRole("button")[0]);
-    const [taxa, meta, bonus] = within(card("Ana Vendas")).getAllByRole("spinbutton");
-    expect(taxa).toHaveValue(5);
-    expect(meta).toHaveValue(1000);
-    expect(bonus).toHaveValue(100);
-    fireEvent.change(taxa, { target: { value: "6" } });
-    fireEvent.change(meta, { target: { value: "1200" } });
-    fireEvent.change(bonus, { target: { value: "150" } });
-
-    await userEvent.click(within(card("Ana Vendas")).getAllByRole("button")[0]);
-
-    expect(api.patch).toHaveBeenCalledWith("/employees/111", { taxa_comissao: 0.06, meta_vendas: 1200 });
-    expect(api.post).toHaveBeenCalledWith("/sales-goals", expect.objectContaining({ cpfFuncionario: "111", valorMeta: 1200, valorBonus: 150 }));
-    expect(await screen.findByText("Salvo!")).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(2000));
-    expect(screen.queryByText("Salvo!")).not.toBeInTheDocument();
-  });
-
-  it("atualiza a meta existente e zera o bônus desativado", async () => {
-    backend([{ idGoal: 7, cpfFuncionario: "222" }]);
-    vi.mocked(api.patch).mockResolvedValue({});
-    await renderCommissions();
-
-    await userEvent.click(within(card("Bruno Loja")).getAllByRole("button")[0]);
-    const checkbox = within(card("Bruno Loja")).getByRole("checkbox");
-    expect(checkbox).not.toBeChecked();
-    await userEvent.click(checkbox);
-    await userEvent.click(checkbox);
-    await userEvent.click(within(card("Bruno Loja")).getAllByRole("button")[0]);
-
-    expect(await screen.findByText("Salvo!")).toBeInTheDocument();
-    expect(api.patch).toHaveBeenCalledWith("/sales-goals/7", expect.objectContaining({ valorBonus: 0 }));
-    expect(api.post).not.toHaveBeenCalled();
-  });
-
-  it("cancela a edição e avisa quando salvar falha", async () => {
-    const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
-    vi.mocked(api.patch).mockRejectedValueOnce(new Error("500"));
-    await renderCommissions();
-
-    await userEvent.click(within(card("Carla Nova")).getAllByRole("button")[0]);
-    expect(within(card("Carla Nova")).getAllByRole("spinbutton")).toHaveLength(3);
-    await userEvent.click(within(card("Carla Nova")).getAllByRole("button")[1]);
-    expect(within(card("Carla Nova")).queryAllByRole("spinbutton")).toHaveLength(0);
-
-    await userEvent.click(within(card("Carla Nova")).getAllByRole("button")[0]);
-    await userEvent.click(within(card("Carla Nova")).getAllByRole("button")[0]);
-    expect(alert).toHaveBeenCalledWith("Erro ao salvar as configurações de comissão");
-  });
-
-  it("mostra lista vazia quando a API de funcionários falha", async () => {
-    getMock.mockRejectedValue(new Error("offline"));
-    await renderCommissions();
-
-    expect(screen.getByText("Metas Atingidas").parentElement).toHaveTextContent("0 / 0");
+    expect(await screen.findByText("Não foi possível carregar os dados")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByText("Ana Vendas")).toBeInTheDocument();
   });
 });

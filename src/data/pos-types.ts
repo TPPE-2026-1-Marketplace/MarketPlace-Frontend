@@ -1,8 +1,14 @@
+import type { CatalogImage } from "@/lib/catalog";
+
 export interface ApiVariant {
   codigoSku: string;
   precoVariante: number;
   cor: string | null;
   tamanho: string | null;
+  ativo?: boolean;
+  images?: CatalogImage[];
+  /** Ausente quando não foi possível consultar o estoque. */
+  stock?: { qtdOnline: number; qtdLojaFisica: number };
 }
 
 export interface ApiOrder {
@@ -59,4 +65,10 @@ export interface POSSale {
   customerEmail?: string;
   date: string;
   timestamp: number;
+}
+
+export interface POSSeller {
+  cpf: string;
+  name: string;
+  code: string | null;
 }

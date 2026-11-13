@@ -89,8 +89,8 @@ describe("ManagerDashboard", () => {
   it.each([
     ["estoque", /Estoque/],
     ["pedidos", /Pedidos/],
-    ["vendas-pdv", "Vendas Presenciais (PDV)"],
-    ["relatorios", "Relatórios e Análises"],
+    ["vendas-pdv", "Vendas PDV"],
+    ["relatorios", "Relatórios"],
     ["comissoes", /Comiss/],
     ["exportar", "Clientes"],
     ["usuarios", /Usuários|Funcionários/],
@@ -104,6 +104,12 @@ describe("ManagerDashboard", () => {
     renderPanel("/painel/banners");
 
     expect(screen.getByText(/^Painel \//)).toHaveTextContent("Painel / Banners");
+  });
+
+  it("abre a aba de retirada em loja", () => {
+    renderPanel("/painel/retirada");
+
+    expect(screen.getByText(/^Painel \//)).toHaveTextContent("Painel / Retirada em loja");
   });
 
   it("super admin vê a aba de cupons", async () => {
