@@ -38,7 +38,26 @@ O uso do antigo prefixo `NEXT_PUBLIC_` não funcionará.
 
 ## Infraestrutura e Execução
 
-- **Desenvolvimento Local:** Use `pnpm dev` ou o Docker Compose de dev.
+- **Desenvolvimento Local:** Use `make dev-up` (Docker) ou `make dev` (host). `make help` lista todos os comandos, com os mesmos nomes do backend; testes e checagens com `make dev-test` / `make dev-ci`.
 - **Produção:** O `Dockerfile` está configurado com multi-stage build. A primeira etapa realiza o `pnpm run build` gerando estáticos no Vite, e a segunda etapa utiliza uma imagem `nginx:alpine` superleve para servir o diretório `dist/`.
+- **Setup, variáveis de ambiente e CI/CD:** ver `README.md`. Testes E2E: `tests/selenium/README.md`.
+
+### Ambiente Docker de desenvolvimento
+
+O código é montado no container por bind mount e o `node_modules` fica em um volume
+próprio. Por isso, alterar código em `src/` aparece na hora (hot reload), sem rebuild.
+
+| Situação | Comando |
+| --- | --- |
+| Mudou código, estilos ou componentes | nada: o Vite recarrega sozinho |
+| Mudou `Dockerfile`, `package.json` ou `pnpm-lock.yaml` | `make dev-rebuild` |
+| Ambiente inconsistente (dependências quebradas, volume velho) | `make dev-reset` e depois `make dev-rebuild` |
+
+`make dev-reset` apaga os volumes (inclusive o `node_modules`). Instale dependências
+**dentro do container** (`make dev-shell` e `pnpm add ...`): rodar `pnpm install` no
+host gera um `node_modules` diferente do usado pelo container.
+
+Em produção não há hot reload: o código é empacotado na imagem no build, e mudar
+uma variável `VITE_*` exige gerar a imagem de novo.
 
 > Siga estas regras rigorosamente para manter a consistência com a decisão arquitetural da equipe!

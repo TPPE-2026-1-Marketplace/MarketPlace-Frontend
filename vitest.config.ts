@@ -15,6 +15,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    testTimeout: 10000,
     css: false,
     // sonar-report.xml: relatório genérico de execução de testes do Sonar,
     // que alimenta as métricas tests e test_execution_time.

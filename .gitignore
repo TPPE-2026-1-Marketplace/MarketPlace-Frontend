@@ -18,3 +18,11 @@ yarn-error.log*
 .DS_Store
 .scannerwork
 .temp/
+
+# Saída do tsc -b (vai para node_modules/.tmp; isto evita recommitar se mudar)
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Arquivos de editores/IDEs
+.marscode/

@@ -653,6 +653,8 @@ test("administrador navega pelos modulos gerenciais sem alterar dados", async (t
     ["/painel/relatorios", "Relatórios"],
     ["/painel/comissoes", "Comissões"],
     ["/painel/cupons", "Cupons"],
+    ["/painel/retirada", "Retirada em loja"],
+    ["/painel/banners", "Banners"],
   ];
 
   for (const [path, heading] of sections) {
