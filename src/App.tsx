@@ -12,6 +12,8 @@ import HomePage from './pages/page';
 import ProdutosPage from './pages/produtos/page';
 import ProdutoDetailsPage from './pages/produtos/[id]/page';
 import LoginPage from './pages/login/page';
+import EsqueciSenhaPage from './pages/esqueci-senha/page';
+import RedefinirSenhaPage from './pages/redefinir-senha/page';
 import ContaPage from './pages/conta/page';
 import PoliticasPage from './pages/politicas/page';
 import CarrinhoPage from './pages/carrinho/page';
@@ -50,6 +52,8 @@ export default function App() {
           <Route path="/pedido" element={<PedidoConfirmacaoPage />} />
           <Route path="/pedido/:idPedido" element={<PedidoConfirmacaoPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/esqueci-senha" element={<EsqueciSenhaPage />} />
+          <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
           <Route path="/conta" element={<ContaPage />} />
           <Route path="/politicas" element={<PoliticasPage />} />
           <Route path="/favoritos" element={<FavoritesPage />} />
