@@ -1,6 +1,7 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import HeroSection from "@/components/sections/HeroSection";
 import { renderWithProviders } from "@/test/render";
 import { Banners } from "./Banners";
 
@@ -105,5 +106,55 @@ describe("Banners", () => {
     expect(screen.getByText("Nenhum banner cadastrado.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Criar primeiro banner" }));
     expect(screen.getByRole("heading", { name: "Novo Banner" })).toBeInTheDocument();
+  });
+
+  it("reordena os banners via drag-and-drop", () => {
+    renderWithProviders(<Banners />);
+
+    const items = screen.getAllByRole("listitem");
+    expect(titles()).toEqual([
+      "Elegância que transforma cada momento",
+      "Sua conquista merece o vestido perfeito",
+      "Vestidos que contam histórias inesquecíveis",
+    ]);
+
+    fireEvent.dragStart(items[2]);
+    fireEvent.dragOver(items[0]);
+    fireEvent.drop(items[0]);
+    fireEvent.dragEnd(items[2]);
+
+    expect(titles()).toEqual([
+      "Vestidos que contam histórias inesquecíveis",
+      "Elegância que transforma cada momento",
+      "Sua conquista merece o vestido perfeito",
+    ]);
+  });
+
+  it("reflete reordenação e desativação no carrossel da vitrine", async () => {
+    renderWithProviders(
+      <>
+        <Banners />
+        <HeroSection />
+      </>,
+    );
+
+    const hero = screen.getByLabelText("Banner principal");
+    expect(within(hero).getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Elegância que transforma cada momento",
+    );
+
+    await userEvent.click(screen.getAllByLabelText("Desativar banner")[0]);
+    expect(within(hero).getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Sua conquista merece o vestido perfeito",
+    );
+    expect(within(hero).getByText("01 / 02")).toBeInTheDocument();
+
+    const items = screen.getAllByRole("listitem");
+    fireEvent.dragStart(items[2]);
+    fireEvent.dragOver(items[0]);
+    fireEvent.drop(items[0]);
+    expect(within(hero).getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Vestidos que contam histórias inesquecíveis",
+    );
   });
 });
