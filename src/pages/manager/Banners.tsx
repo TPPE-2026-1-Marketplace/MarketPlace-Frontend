@@ -148,10 +148,9 @@ export function Banners() {
 
       {banners.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div
-            role="group"
+          <fieldset
             aria-label="Filtrar banners por status"
-            className="flex flex-wrap items-center gap-2"
+            className="m-0 flex flex-wrap items-center gap-2 border-0 p-0"
           >
             {filterOptions.map((option) => {
               const selected = statusFilter === option.key;
@@ -172,7 +171,7 @@ export function Banners() {
                 </button>
               );
             })}
-          </div>
+          </fieldset>
           {isFiltered && (
             <p className="text-xs text-[var(--foreground-muted)]">
               Exibindo apenas banners filtrados — selecione "Todos" para reordenar o carrossel.
@@ -199,15 +198,14 @@ export function Banners() {
       )}
 
       {filteredBanners.length > 0 && (
-        <div role="list" aria-label="Lista de banners do carrossel" className="space-y-3">
+        <ul aria-label="Lista de banners do carrossel" className="m-0 list-none space-y-3 p-0">
           {filteredBanners.map((banner, idx) => {
             const isDragging = draggedId === banner.id;
             const isDragOver = dragOverId === banner.id && draggedId !== banner.id;
 
             return (
-              <div
+              <li
                 key={banner.id}
-                role="listitem"
                 draggable={canReorder}
                 onDragStart={(e) => {
                   if (!canReorder) return;
@@ -375,10 +373,10 @@ export function Banners() {
                     <Trash2 className="size-4" aria-hidden="true" />
                   </button>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       {banners.length > 0 && (

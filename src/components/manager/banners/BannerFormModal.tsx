@@ -44,12 +44,12 @@ export function BannerFormModal({
   isEditing,
   onSave,
   onClose,
-}: {
+}: Readonly<{
   initial?: BannerFormState;
   isEditing: boolean;
   onSave: (data: BannerFormState) => void;
   onClose: () => void;
-}) {
+}>) {
   const initialState = initial ?? EMPTY_BANNER_FORM;
   const [form, setForm] = useState<BannerFormState>(initialState);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -153,14 +153,8 @@ export function BannerFormModal({
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4"
-        onClick={requestClose}
-      >
-        <div
-          className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] shadow-lg"
-          onClick={(e) => e.stopPropagation()}
-        >
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4">
+        <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] shadow-lg">
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background-card)] px-6 py-4">
             <h3 className="text-lg font-semibold text-[var(--foreground)]">
               {isEditing ? "Editar Banner" : "Novo Banner"}

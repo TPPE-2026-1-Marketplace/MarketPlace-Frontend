@@ -7,19 +7,13 @@ import { BannerThumbnail } from "./BannerThumbnail";
 export function BannerPreviewModal({
   banner,
   onClose,
-}: {
+}: Readonly<{
   banner: Banner;
   onClose: () => void;
-}) {
+}>) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[var(--overlay)] p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative flex min-h-[260px] w-full max-w-3xl flex-col justify-end overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] shadow-lg sm:aspect-[16/7] sm:min-h-[320px]"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[var(--overlay)] p-4">
+      <div className="relative flex min-h-[260px] w-full max-w-3xl flex-col justify-end overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] shadow-lg sm:aspect-[16/7] sm:min-h-[320px]">
         <div className="pointer-events-none absolute inset-0">
           <BannerThumbnail
             src={banner.image}

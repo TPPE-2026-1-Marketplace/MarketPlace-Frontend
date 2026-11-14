@@ -5,11 +5,11 @@ export function BannerDeleteDialog({
   bannerTitle,
   onConfirm,
   onCancel,
-}: {
+}: Readonly<{
   bannerTitle: string;
   onConfirm: () => void;
   onCancel: () => void;
-}) {
+}>) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4">
       <div className="w-full max-w-sm rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] p-6 shadow-lg">

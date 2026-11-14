@@ -8,12 +8,12 @@ export function BannerThumbnail({
   alt,
   className,
   iconClassName = "size-6 text-[var(--foreground-muted)]",
-}: {
+}: Readonly<{
   src: string;
   alt: string;
   className?: string;
   iconClassName?: string;
-}) {
+}>) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const trimmed = src.trim();
   const canShowImage = Boolean(trimmed) && failedSrc !== trimmed;
@@ -42,7 +42,7 @@ export function BannerThumbnail({
 }
 
 /** Selo de status indicando se o banner está ativo ou inativo no carrossel. */
-export function StatusPill({ active }: { active: boolean }) {
+export function StatusPill({ active }: Readonly<{ active: boolean }>) {
   return (
     <span
       className={cn(

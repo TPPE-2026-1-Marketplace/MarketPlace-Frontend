@@ -57,15 +57,15 @@ function centeredOffset(natural: Size, zoom: number, frame: Size): Offset {
 
 interface ImageCropDialogProps {
   /** Imagem a recortar (data URL ou URL pública); null fecha o dialog. */
-  src: string | null;
+  readonly src: string | null;
   /** Proporção do recorte: 3:4 para produtos ou 16:7 para banners Hero. */
-  aspectPreset?: ImageCropPreset;
-  onClose: () => void;
-  onApply: (dataUrl: string) => void;
+  readonly aspectPreset?: ImageCropPreset;
+  readonly onClose: () => void;
+  readonly onApply: (dataUrl: string) => void;
 }
 
 /** Dialog de recorte com proporção fixa configurável (padrão 3:4), zoom e enquadramento. */
-export default function ImageCropDialog(props: ImageCropDialogProps) {
+export default function ImageCropDialog(props: Readonly<ImageCropDialogProps>) {
   return <ImageCropContent key={`${props.aspectPreset ?? "product-3-4"}:${props.src ?? "fechado"}`} {...props} />;
 }
 
@@ -74,7 +74,7 @@ function ImageCropContent({
   aspectPreset = "product-3-4",
   onClose,
   onApply,
-}: ImageCropDialogProps) {
+}: Readonly<ImageCropDialogProps>) {
   const preset = ASPECT_PRESETS[aspectPreset];
   const frame: Size = { width: preset.frameWidth, height: preset.frameHeight };
   const imageRef = useRef<HTMLImageElement | null>(null);
