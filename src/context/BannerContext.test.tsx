@@ -74,4 +74,31 @@ describe("BannerContext", () => {
     act(() => result.current.moveDown("b-001"));
     expect(ids(result.current.banners)).toEqual(["b-003", "b-001", "b-002"]);
   });
+
+  it("reordena banners via reorderBanners e normaliza a sequência", () => {
+    const { result } = renderHook(() => useBanners(), { wrapper });
+
+    act(() => result.current.reorderBanners("b-003", "b-001"));
+    expect(ids(result.current.banners)).toEqual(["b-003", "b-001", "b-002"]);
+    expect(result.current.banners.map((b) => b.order)).toEqual([1, 2, 3]);
+
+    act(() => result.current.reorderBanners("b-001", "b-001"));
+    act(() => result.current.reorderBanners("b-001", "inexistente"));
+    expect(ids(result.current.banners)).toEqual(["b-003", "b-001", "b-002"]);
+  });
+
+  it("persiste alterações de banners no localStorage entre montagens", () => {
+    const first = renderHook(() => useBanners(), { wrapper });
+    const base = first.result.current.banners[0];
+
+    act(() => {
+      first.result.current.addBanner({ ...base, title: "Persistido", active: true });
+      first.result.current.reorderBanners("b-003", "b-001");
+    });
+
+    const second = renderHook(() => useBanners(), { wrapper });
+    expect(second.result.current.banners).toHaveLength(4);
+    expect(second.result.current.banners[0].id).toBe("b-003");
+    expect(second.result.current.banners.some((b) => b.title === "Persistido")).toBe(true);
+  });
 });

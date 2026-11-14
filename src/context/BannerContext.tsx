@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 export interface Banner {
   id: string;
@@ -13,6 +13,8 @@ export interface Banner {
   active: boolean;
   order: number;
 }
+
+const STORAGE_KEY = "dk_banners";
 
 /** Converts a category key to a route path — reuses existing URL convention */
 export function categoryToPath(cat: string): string {
@@ -79,6 +81,47 @@ const INITIAL_BANNERS: Banner[] = [
   },
 ];
 
+function isValidBanner(value: unknown): value is Banner {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<Banner>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.image === "string" &&
+    typeof item.title === "string" &&
+    typeof item.active === "boolean" &&
+    typeof item.order === "number"
+  );
+}
+
+function normalizeBanners(list: Banner[]): Banner[] {
+  return [...list]
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+    .map((banner, index) => ({ ...banner, order: index + 1 }));
+}
+
+function loadBanners(): Banner[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed: unknown = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.every(isValidBanner)) {
+        return normalizeBanners(parsed);
+      }
+    }
+  } catch {
+    // Dados corrompidos no armazenamento — usa lista inicial padrão.
+  }
+  return INITIAL_BANNERS;
+}
+
+function saveBanners(list: Banner[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    // Ignora falhas de quota em armazenamento local.
+  }
+}
+
 interface BannerContextType {
   banners: Banner[];
   activeBanners: Banner[];
@@ -88,66 +131,86 @@ interface BannerContextType {
   toggleActive: (id: string) => void;
   moveUp: (id: string) => void;
   moveDown: (id: string) => void;
+  reorderBanners: (sourceId: string, targetId: string) => void;
 }
 
 const BannerContext = createContext<BannerContextType | undefined>(undefined);
 
 export function BannerProvider({ children }: { children: ReactNode }) {
-  const [banners, setBanners] = useState<Banner[]>(INITIAL_BANNERS);
+  const [banners, setBanners] = useState<Banner[]>(loadBanners);
 
-  const sorted = [...banners].sort((a, b) => a.order - b.order);
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === STORAGE_KEY) {
+        setBanners(loadBanners());
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  const sorted = [...banners].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   const activeBanners = sorted.filter((b) => b.active);
 
+  const commit = (updater: (prev: Banner[]) => Banner[]) => {
+    setBanners((prev) => {
+      const next = normalizeBanners(updater(prev));
+      saveBanners(next);
+      return next;
+    });
+  };
+
   const addBanner = (data: Omit<Banner, "id" | "order">) => {
-    const maxOrder = banners.length > 0 ? Math.max(...banners.map((b) => b.order)) : 0;
-    setBanners((prev) => [
-      ...prev,
-      { ...data, id: `b-${Date.now()}`, order: maxOrder + 1 },
-    ]);
+    commit((prev) => {
+      const maxOrder = prev.length > 0 ? Math.max(...prev.map((b) => b.order)) : 0;
+      return [
+        ...prev,
+        { ...data, id: `b-${Date.now()}-${prev.length}`, order: maxOrder + 1 },
+      ];
+    });
   };
 
   const updateBanner = (id: string, data: Partial<Banner>) => {
-    setBanners((prev) => prev.map((b) => (b.id === id ? { ...b, ...data } : b)));
+    commit((prev) => prev.map((b) => (b.id === id ? { ...b, ...data } : b)));
   };
 
   const deleteBanner = (id: string) => {
-    setBanners((prev) => prev.filter((b) => b.id !== id));
+    commit((prev) => prev.filter((b) => b.id !== id));
   };
 
   const toggleActive = (id: string) => {
-    setBanners((prev) =>
+    commit((prev) =>
       prev.map((b) => (b.id === id ? { ...b, active: !b.active } : b))
     );
   };
 
-  const moveUp = (id: string) => {
-    const s = [...banners].sort((a, b) => a.order - b.order);
-    const idx = s.findIndex((b) => b.id === id);
-    if (idx <= 0) return;
-    const prev = s[idx - 1];
-    const curr = s[idx];
-    setBanners((all) =>
-      all.map((b) => {
-        if (b.id === curr.id) return { ...b, order: prev.order };
-        if (b.id === prev.id) return { ...b, order: curr.order };
-        return b;
-      })
-    );
+  const moveByOffset = (id: string, offset: -1 | 1) => {
+    commit((prev) => {
+      const ordered = [...prev].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+      const idx = ordered.findIndex((b) => b.id === id);
+      const targetIdx = idx + offset;
+      if (idx === -1 || targetIdx < 0 || targetIdx >= ordered.length) return ordered;
+      const [item] = ordered.splice(idx, 1);
+      ordered.splice(targetIdx, 0, item);
+      return ordered.map((banner, index) => ({ ...banner, order: index + 1 }));
+    });
   };
 
-  const moveDown = (id: string) => {
-    const s = [...banners].sort((a, b) => a.order - b.order);
-    const idx = s.findIndex((b) => b.id === id);
-    if (idx >= s.length - 1) return;
-    const next = s[idx + 1];
-    const curr = s[idx];
-    setBanners((all) =>
-      all.map((b) => {
-        if (b.id === curr.id) return { ...b, order: next.order };
-        if (b.id === next.id) return { ...b, order: curr.order };
-        return b;
-      })
-    );
+  const moveUp = (id: string) => moveByOffset(id, -1);
+
+  const moveDown = (id: string) => moveByOffset(id, 1);
+
+  const reorderBanners = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    commit((prev) => {
+      const ordered = [...prev].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+      const fromIndex = ordered.findIndex((b) => b.id === sourceId);
+      const toIndex = ordered.findIndex((b) => b.id === targetId);
+      if (fromIndex === -1 || toIndex === -1) return ordered;
+      const [moved] = ordered.splice(fromIndex, 1);
+      ordered.splice(toIndex, 0, moved);
+      return ordered.map((banner, index) => ({ ...banner, order: index + 1 }));
+    });
   };
 
   return (
@@ -161,6 +224,7 @@ export function BannerProvider({ children }: { children: ReactNode }) {
         toggleActive,
         moveUp,
         moveDown,
+        reorderBanners,
       }}
     >
       {children}
