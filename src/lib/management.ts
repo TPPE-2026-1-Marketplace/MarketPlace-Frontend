@@ -62,6 +62,18 @@ export const fetchPeople = () =>
 export const fetchOrderVerificationCode = (idPedido: number) =>
   api.get<{ codigoVerificacaoRetirada: string }>(`/orders/${idPedido}/verification-code`);
 
+/** Resposta do envio do código de retirada (backend #247). */
+export interface PickupCodeDelivery {
+  idPedido: number;
+  /** E-mail de destino mascarado ("ma***@gmail.com"). */
+  destinatario: string;
+  enviadoEm: string;
+}
+
+/** Envia (ou reenvia) por e-mail o código de retirada gravado no pedido. */
+export const sendOrderPickupCode = (idPedido: number) =>
+  api.post<PickupCodeDelivery>(`/orders/${idPedido}/send-pickup-code`);
+
 export const confirmOrderPickup = (idPedido: number, pin: string) =>
   api.post<ApiOrder>(`/orders/${idPedido}/confirm-pickup`, { pin });
 

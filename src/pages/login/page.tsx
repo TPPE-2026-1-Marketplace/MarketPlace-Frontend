@@ -20,7 +20,12 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(mode === "cadastro");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  // Volta da tela de redefinição (/redefinir-senha) com a senha já trocada.
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(
+    searchParams.get("senha") === "redefinida"
+      ? { type: "success", text: "Senha redefinida. Entre com a nova senha." }
+      : null,
+  );
   
   const { login, register, isAuthenticated, user } = useAuth();
 
@@ -230,7 +235,7 @@ export default function LoginPage() {
 
             {!isRegister && (
               <div className="text-right">
-                <Link to="#" className="text-xs text-[#C8427C] hover:underline">
+                <Link to="/esqueci-senha" className="text-xs text-[#C8427C] hover:underline">
                   Esqueci minha senha
                 </Link>
               </div>

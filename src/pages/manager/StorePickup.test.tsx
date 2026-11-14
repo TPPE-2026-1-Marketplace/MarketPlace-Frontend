@@ -1,10 +1,12 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api";
 import {
   confirmOrderPickup,
   fetchManagementOrders,
   fetchPeople,
+  sendOrderPickupCode,
   type ApiOrder,
 } from "@/lib/management";
 import { customer, renderWithProviders, superadmin } from "@/test/render";
@@ -15,10 +17,11 @@ vi.mock("@/lib/management", async (importOriginal) => ({
   fetchManagementOrders: vi.fn(),
   fetchPeople: vi.fn(),
   confirmOrderPickup: vi.fn(),
-  fetchOrderVerificationCode: vi.fn(),
+  sendOrderPickupCode: vi.fn(),
 }));
 
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
   api: {
     get: vi.fn(),
     post: vi.fn(),
@@ -27,6 +30,7 @@ vi.mock("@/lib/api", () => ({
 
 const fetchOrdersMock = vi.mocked(fetchManagementOrders);
 const fetchPeopleMock = vi.mocked(fetchPeople);
+const sendCodeMock = vi.mocked(sendOrderPickupCode);
 
 const NOW = new Date("2026-10-27T12:00:00");
 
@@ -137,6 +141,11 @@ describe("StorePickup", () => {
       data: mockPeople,
       meta: { page: 1, limit: 100, total: mockPeople.length, totalPages: 1 },
     });
+    sendCodeMock.mockResolvedValue({
+      idPedido: 1047,
+      destinatario: "ma***@dk.com",
+      enviadoEm: "2026-10-27T12:00:00.000Z",
+    });
     vi.mocked(confirmOrderPickup).mockImplementation(async (_id, pin) => {
       if (pin !== "123456") {
         throw new Error("PIN incorreto");
@@ -242,8 +251,9 @@ describe("StorePickup", () => {
       dialog().getByRole("heading", { name: "2 · Validar código de retirada" }),
     ).toBeInTheDocument();
     expect(dialog().getByText("#1047 · Marina Silva")).toBeInTheDocument();
+    expect(sendCodeMock).toHaveBeenCalledWith(1047);
     expect(
-      dialog().getByText("E-mail cadastrado da cliente (marina@dk.com)"),
+      dialog().getByText("E-mail cadastrado da cliente (ma***@dk.com)"),
     ).toBeInTheDocument();
     expect(dialog().getByLabelText("Código 2FA *")).toBeInTheDocument();
   });
@@ -268,8 +278,9 @@ describe("StorePickup", () => {
 
     await userEvent.click(dialog().getByRole("button", { name: "Reenviar código" }));
     expect(
-      dialog().getByText("Novo código enviado para o e-mail cadastrado."),
+      dialog().getByText("Código reenviado para o e-mail cadastrado."),
     ).toBeInTheDocument();
+    expect(sendCodeMock).toHaveBeenCalledTimes(2);
     expect(codeInput).toHaveValue("");
   });
 
@@ -323,6 +334,67 @@ describe("StorePickup", () => {
     expect(kpi("Aguardando retirada")).toHaveTextContent("01");
     expect(kpi("Retirados hoje")).toHaveTextContent("02");
     expect(rows()[0]).toHaveTextContent("Retirado");
+  });
+
+  it("mantém o Passo 1 e mostra o motivo quando o envio do código falha", async () => {
+    sendCodeMock.mockRejectedValueOnce(
+      new ApiError(503, "Envio de e-mail não configurado. Defina as variáveis SMTP_* (ou GMAIL_*) no servidor."),
+    );
+    await renderPickup();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Iniciar retirada do pedido #1047" }),
+    );
+    await userEvent.click(dialog().getByRole("button", { name: "Enviar código 2FA" }));
+
+    expect(dialog().getByRole("alert")).toHaveTextContent("Envio de e-mail não configurado");
+    expect(
+      dialog().getByRole("heading", { name: "1 · Conferir pedido #1047" }),
+    ).toBeInTheDocument();
+
+    // Nova tentativa funciona e limpa o erro.
+    await userEvent.click(dialog().getByRole("button", { name: "Enviar código 2FA" }));
+    expect(
+      dialog().getByRole("heading", { name: "2 · Validar código de retirada" }),
+    ).toBeInTheDocument();
+    expect(dialog().queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("avisa sobre o limite de envios no reenvio", async () => {
+    await renderPickup();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Iniciar retirada do pedido #1047" }),
+    );
+    await userEvent.click(dialog().getByRole("button", { name: "Enviar código 2FA" }));
+    sendCodeMock.mockRejectedValueOnce(new ApiError(429, "ThrottlerException: Too Many Requests"));
+    await userEvent.click(dialog().getByRole("button", { name: "Reenviar código" }));
+
+    expect(dialog().getByRole("alert")).toHaveTextContent(
+      "Muitos envios seguidos. Aguarde um minuto e tente de novo.",
+    );
+    expect(dialog().queryByText("Código reenviado para o e-mail cadastrado.")).not.toBeInTheDocument();
+  });
+
+  it("não confirma a retirada no navegador quando a API falha por outro motivo", async () => {
+    vi.mocked(confirmOrderPickup).mockRejectedValue(new ApiError(500, "erro"));
+    await renderPickup();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Iniciar retirada do pedido #1047" }),
+    );
+    await userEvent.click(dialog().getByRole("button", { name: "Enviar código 2FA" }));
+    await userEvent.type(dialog().getByLabelText("Código 2FA *"), "123456");
+    await userEvent.click(
+      dialog().getByRole("button", { name: "Validar e confirmar retirada" }),
+    );
+
+    expect(dialog().getByRole("alert")).toHaveTextContent(
+      "Não foi possível validar o código agora. Tente novamente.",
+    );
+    expect(
+      dialog().getByRole("heading", { name: "2 · Validar código de retirada" }),
+    ).toBeInTheDocument();
   });
 
   it("mostra estado de erro e permite tentar novamente", async () => {
