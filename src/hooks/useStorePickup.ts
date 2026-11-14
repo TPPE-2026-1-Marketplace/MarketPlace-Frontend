@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ApiError } from "@/lib/api";
 import {
   confirmOrderPickup,
   fetchManagementOrders,
-  fetchOrderVerificationCode,
   fetchPeople,
+  sendOrderPickupCode,
   type ApiOrder,
   type ApiPerson,
 } from "@/lib/management";
@@ -17,8 +18,13 @@ function isToday(dateStr: string, now: Date): boolean {
   );
 }
 
-function generateLocalCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+/** Mensagem para a equipe quando o envio do código falha. */
+function sendErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 429) return "Muitos envios seguidos. Aguarde um minuto e tente de novo.";
+    if (error.status === 400 || error.status === 503) return error.message;
+  }
+  return "Não foi possível enviar o código agora. Tente novamente.";
 }
 
 /** Hook da camada de apresentação para Retirada em Loja (Issue #175 / Figma 850:5726). */
@@ -26,7 +32,6 @@ export function useStorePickup(enabled: boolean, now: Date = new Date()) {
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [peopleMap, setPeopleMap] = useState<Map<string, ApiPerson>>(new Map());
   const [sessionDeliveredIds, setSessionDeliveredIds] = useState<Set<number>>(new Set());
-  const [activeCodes, setActiveCodes] = useState<Map<number, string>>(new Map());
   const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,76 +89,42 @@ export function useStorePickup(enabled: boolean, now: Date = new Date()) {
     }).length;
   }, [orders, now, sessionDeliveredIds]);
 
-  const sendCode = useCallback(
-    async (order: ApiOrder): Promise<string> => {
-      // 1. Se já existir código em memória, reutiliza
-      const existing = activeCodes.get(order.idPedido);
-      if (existing) return existing;
+  /**
+   * Envia (ou reenvia) o código gravado no pedido para o e-mail da cliente.
+   * Devolve o destino mascarado; em falha, lança um Error com a mensagem para a equipe.
+   */
+  const sendCode = useCallback(async (order: ApiOrder): Promise<string> => {
+    try {
+      const delivery = await sendOrderPickupCode(order.idPedido);
+      return delivery.destinatario;
+    } catch (err) {
+      throw new Error(sendErrorMessage(err));
+    }
+  }, []);
 
-      // 2. Se o pedido já tiver código vindo do backend, usa-o
-      if (order.codigoVerificacaoRetirada) {
-        setActiveCodes((prev) => new Map(prev).set(order.idPedido, order.codigoVerificacaoRetirada!));
-        return order.codigoVerificacaoRetirada;
-      }
-
-      // 3. Tenta buscar da API
-      try {
-        const res = await fetchOrderVerificationCode(order.idPedido);
-        if (res?.codigoVerificacaoRetirada) {
-          setActiveCodes((prev) => new Map(prev).set(order.idPedido, res.codigoVerificacaoRetirada));
-          return res.codigoVerificacaoRetirada;
-        }
-      } catch {
-        // Fallback local se o endpoint falhar ou em ambiente mock
-      }
-
-      // 4. Fallback gerado localmente
-      const localCode = generateLocalCode();
-      setActiveCodes((prev) => new Map(prev).set(order.idPedido, localCode));
-      return localCode;
-    },
-    [activeCodes],
-  );
-
-  const resendCode = useCallback(
-    async (order: ApiOrder): Promise<string> => {
-      // Gera um novo código e armazena
-      const nextCode = generateLocalCode();
-      setActiveCodes((prev) => new Map(prev).set(order.idPedido, nextCode));
-      return nextCode;
-    },
-    [],
-  );
-
+  /** Confirma a retirada no backend, que confere o PIN; nada é validado só no navegador. */
   const validateCode = useCallback(
     async (
       order: ApiOrder,
       enteredPin: string,
     ): Promise<{ success: boolean; error?: string }> => {
-      const pin = enteredPin.trim();
-      const expectedCode = activeCodes.get(order.idPedido) || order.codigoVerificacaoRetirada;
-
       try {
-        await confirmOrderPickup(order.idPedido, pin);
-        // Sucesso na API
-        setOrders((prev) =>
-          prev.map((o) => (o.idPedido === order.idPedido ? { ...o, status: "delivered" } : o)),
-        );
-        setSessionDeliveredIds((prev) => new Set(prev).add(order.idPedido));
-        return { success: true };
-      } catch {
-        // Se a API retornou erro mas temos um código local em memória e o PIN confere (fallback local / mock)
-        if (expectedCode && expectedCode === pin) {
-          setOrders((prev) =>
-            prev.map((o) => (o.idPedido === order.idPedido ? { ...o, status: "delivered" } : o)),
-          );
-          setSessionDeliveredIds((prev) => new Set(prev).add(order.idPedido));
-          return { success: true };
+        await confirmOrderPickup(order.idPedido, enteredPin.trim());
+      } catch (err) {
+        // 400 = PIN que não confere (ou pedido fora do estado de retirada).
+        if (err instanceof ApiError && err.status !== 400) {
+          return { success: false, error: "Não foi possível validar o código agora. Tente novamente." };
         }
         return { success: false, error: "invalid_code" };
       }
+
+      setOrders((prev) =>
+        prev.map((o) => (o.idPedido === order.idPedido ? { ...o, status: "delivered" } : o)),
+      );
+      setSessionDeliveredIds((prev) => new Set(prev).add(order.idPedido));
+      return { success: true };
     },
-    [activeCodes],
+    [],
   );
 
   return {
@@ -165,7 +136,7 @@ export function useStorePickup(enabled: boolean, now: Date = new Date()) {
     error,
     refetch,
     sendCode,
-    resendCode,
+    resendCode: sendCode,
     validateCode,
   };
 }
