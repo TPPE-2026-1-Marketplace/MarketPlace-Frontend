@@ -56,13 +56,37 @@ export function BannerFormModal({
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof BannerFormState, string>>>({});
+
+  const isDirty =
+    form.image !== initialState.image ||
+    form.tag !== initialState.tag ||
+    form.title !== initialState.title ||
+    form.subtitle !== initialState.subtitle ||
+    form.primaryCta !== initialState.primaryCta ||
+    form.primaryCategory !== initialState.primaryCategory ||
+    form.secondaryCta !== initialState.secondaryCta ||
+    form.secondaryCategory !== initialState.secondaryCategory ||
+    form.active !== initialState.active;
 
   const set = (key: keyof BannerFormState, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (confirmDiscard) {
+      setConfirmDiscard(false);
+    }
     if (errors[key]) {
       setErrors((prev) => ({ ...prev, [key]: undefined }));
     }
+  };
+
+  const requestClose = () => {
+    if (isUploading) return;
+    if (isDirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
   };
 
   const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -127,16 +151,23 @@ export function BannerFormModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4">
-        <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] shadow-lg">
+      <div
+        className="fixed inset-0 z-40 flex items-center justify-center bg-[var(--overlay)] p-4"
+        onClick={requestClose}
+      >
+        <div
+          className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background-card)] px-6 py-4">
             <h3 className="text-lg font-semibold text-[var(--foreground)]">
               {isEditing ? "Editar Banner" : "Novo Banner"}
             </h3>
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-[var(--radius-sm)] p-2 text-[var(--foreground-muted)] transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--foreground)]"
+              onClick={requestClose}
+              disabled={isUploading}
+              className="rounded-[var(--radius-sm)] p-2 text-[var(--foreground-muted)] transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Fechar"
             >
               <X className="size-5" aria-hidden="true" />
@@ -350,36 +381,67 @@ export function BannerFormModal({
             </div>
           </div>
 
-          <div className="sticky bottom-0 flex gap-3 border-t border-[var(--border)] bg-[var(--background-card)] px-6 py-4">
-            <Button
-              type="button"
-              variant="outline-neutral"
-              size="sm"
-              className="rounded-[var(--radius-sm)] px-4 py-2.5"
-              onClick={() => setPreviewOpen(true)}
-            >
-              <ImageIcon className="size-4" aria-hidden="true" />
-              Preview
-            </Button>
-            <Button
-              type="button"
-              variant="outline-neutral"
-              size="sm"
-              className="flex-1 rounded-[var(--radius-sm)] py-2.5"
-              onClick={onClose}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              variant="action"
-              size="sm"
-              className="flex-1 rounded-[var(--radius-sm)] py-2.5"
-              disabled={isUploading}
-              onClick={handleSave}
-            >
-              Salvar
-            </Button>
+          <div className="sticky bottom-0 space-y-3 border-t border-[var(--border)] bg-[var(--background-card)] px-6 py-4">
+            {confirmDiscard && (
+              <div
+                role="alert"
+                className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--color-error)] bg-[var(--background-error-subtle)] p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <p className="text-xs font-medium text-[var(--color-error-text)]">
+                  Você tem alterações não salvas. Deseja descartá-las?
+                </p>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline-neutral"
+                    size="sm"
+                    className="rounded-[var(--radius-sm)] px-3 py-1.5 text-xs"
+                    onClick={() => setConfirmDiscard(false)}
+                  >
+                    Continuar editando
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="rounded-[var(--radius-sm)] bg-[var(--color-error)] px-3 py-1.5 text-xs font-medium text-[var(--color-white)] transition-opacity hover:opacity-90"
+                  >
+                    Descartar alterações
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline-neutral"
+                size="sm"
+                className="rounded-[var(--radius-sm)] px-4 py-2.5"
+                onClick={() => setPreviewOpen(true)}
+              >
+                <ImageIcon className="size-4" aria-hidden="true" />
+                Preview
+              </Button>
+              <Button
+                type="button"
+                variant="outline-neutral"
+                size="sm"
+                className="flex-1 rounded-[var(--radius-sm)] py-2.5"
+                disabled={isUploading}
+                onClick={requestClose}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="action"
+                size="sm"
+                className="flex-1 rounded-[var(--radius-sm)] py-2.5"
+                disabled={isUploading}
+                onClick={handleSave}
+              >
+                Salvar
+              </Button>
+            </div>
           </div>
         </div>
       </div>

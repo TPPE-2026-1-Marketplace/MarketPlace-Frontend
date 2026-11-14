@@ -11,6 +11,7 @@ import {
   ToggleRight,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import AdminPageHeader from "@/components/manager/AdminPageHeader";
 import {
   adminButtonClassName,
@@ -34,6 +35,8 @@ import {
 } from "@/context/BannerContext";
 import { cn } from "@/lib/utils";
 
+type StatusFilter = "all" | "active" | "inactive";
+
 /** Página administrativa para listagem, ordenação, pré-visualização e edição de banners Hero. */
 export function Banners() {
   const {
@@ -54,6 +57,16 @@ export function Banners() {
   const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const inactiveCount = banners.length - activeBanners.length;
+  const isFiltered = statusFilter !== "all";
+  const canReorder = !isFiltered && banners.length > 1;
+  const filteredBanners = banners.filter((banner) => {
+    if (statusFilter === "active") return banner.active;
+    if (statusFilter === "inactive") return !banner.active;
+    return true;
+  });
 
   const openNew = () => {
     setEditingBanner(null);
@@ -68,17 +81,35 @@ export function Banners() {
   const handleSave = (data: BannerFormState) => {
     if (editingBanner) {
       updateBanner(editingBanner.id, data);
+      toast.success("Banner atualizado com sucesso.");
     } else {
       addBanner(data);
+      toast.success("Banner criado com sucesso.");
     }
     setFormOpen(false);
     setEditingBanner(null);
+  };
+
+  const handleToggleActive = (banner: Banner) => {
+    toggleActive(banner.id);
+    toast.success(banner.active ? "Banner desativado." : "Banner ativado no carrossel.");
   };
 
   const resetDrag = () => {
     setDraggedId(null);
     setDragOverId(null);
   };
+
+  const selectFilter = (next: StatusFilter) => {
+    setStatusFilter(next);
+    resetDrag();
+  };
+
+  const filterOptions: Array<{ key: StatusFilter; label: string }> = [
+    { key: "all", label: `Todos (${banners.length})` },
+    { key: "active", label: `Ativos (${activeBanners.length})` },
+    { key: "inactive", label: `Inativos (${inactiveCount})` },
+  ];
 
   return (
     <div className="space-y-6">
@@ -116,8 +147,60 @@ export function Banners() {
       )}
 
       {banners.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div
+            role="group"
+            aria-label="Filtrar banners por status"
+            className="flex flex-wrap items-center gap-2"
+          >
+            {filterOptions.map((option) => {
+              const selected = statusFilter === option.key;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => selectFilter(option.key)}
+                  className={cn(
+                    "rounded-[var(--radius-full)] border px-3 py-1.5 text-xs font-medium transition-colors",
+                    selected
+                      ? "border-[var(--color-brand)] bg-[var(--background-brand-subtle)] text-[var(--color-brand)]"
+                      : "border-[var(--border)] bg-[var(--background-card)] text-[var(--foreground-secondary)] hover:bg-[var(--background-secondary)]",
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          {isFiltered && (
+            <p className="text-xs text-[var(--foreground-muted)]">
+              Exibindo apenas banners filtrados — selecione "Todos" para reordenar o carrossel.
+            </p>
+          )}
+        </div>
+      )}
+
+      {banners.length > 0 && filteredBanners.length === 0 && (
+        <div className={cn(adminCardClassName, "p-8 text-center")}>
+          <p className="text-sm text-[var(--foreground-secondary)]">
+            Nenhum banner encontrado para este filtro.
+          </p>
+          <Button
+            type="button"
+            variant="outline-neutral"
+            size="sm"
+            className="mt-4 rounded-[var(--radius-sm)]"
+            onClick={() => selectFilter("all")}
+          >
+            Ver todos os banners
+          </Button>
+        </div>
+      )}
+
+      {filteredBanners.length > 0 && (
         <div role="list" aria-label="Lista de banners do carrossel" className="space-y-3">
-          {banners.map((banner, idx) => {
+          {filteredBanners.map((banner, idx) => {
             const isDragging = draggedId === banner.id;
             const isDragOver = dragOverId === banner.id && draggedId !== banner.id;
 
@@ -125,8 +208,9 @@ export function Banners() {
               <div
                 key={banner.id}
                 role="listitem"
-                draggable={banners.length > 1}
+                draggable={canReorder}
                 onDragStart={(e) => {
+                  if (!canReorder) return;
                   setDraggedId(banner.id);
                   if (e.dataTransfer) {
                     e.dataTransfer.effectAllowed = "move";
@@ -134,6 +218,7 @@ export function Banners() {
                   }
                 }}
                 onDragOver={(e) => {
+                  if (!canReorder) return;
                   e.preventDefault();
                   if (e.dataTransfer) {
                     e.dataTransfer.dropEffect = "move";
@@ -146,6 +231,7 @@ export function Banners() {
                   }
                 }}
                 onDrop={(e) => {
+                  if (!canReorder) return;
                   e.preventDefault();
                   const sourceId = draggedId || e.dataTransfer?.getData("text/plain");
                   if (sourceId && sourceId !== banner.id) {
@@ -167,9 +253,9 @@ export function Banners() {
                 <div
                   className={cn(
                     "flex shrink-0 items-center border-r border-[var(--border)] bg-[var(--background-store)]/60",
-                    banners.length > 1 && "cursor-grab active:cursor-grabbing",
+                    canReorder && "cursor-grab active:cursor-grabbing",
                   )}
-                  title={banners.length > 1 ? "Arraste para reordenar" : undefined}
+                  title={canReorder ? "Arraste para reordenar" : undefined}
                 >
                   <div className="hidden items-center justify-center pl-2 text-[var(--foreground-subtle)] sm:flex">
                     <GripVertical className="size-4" aria-hidden="true" />
@@ -178,19 +264,19 @@ export function Banners() {
                     <button
                       type="button"
                       onClick={() => moveUp(banner.id)}
-                      disabled={idx === 0}
+                      disabled={isFiltered || idx === 0}
                       className="flex flex-1 items-center justify-center px-2.5 text-[var(--foreground-muted)] transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-30"
                       aria-label="Mover para cima"
                     >
                       <ChevronUp className="size-4" aria-hidden="true" />
                     </button>
                     <div className="select-none border-y border-[var(--border)] px-2.5 py-1 text-center text-xs font-medium tabular-nums text-[var(--foreground-secondary)]">
-                      {idx + 1}
+                      {banner.order}
                     </div>
                     <button
                       type="button"
                       onClick={() => moveDown(banner.id)}
-                      disabled={idx === banners.length - 1}
+                      disabled={isFiltered || idx === filteredBanners.length - 1}
                       className="flex flex-1 items-center justify-center px-2.5 text-[var(--foreground-muted)] transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-30"
                       aria-label="Mover para baixo"
                     >
@@ -254,7 +340,7 @@ export function Banners() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => toggleActive(banner.id)}
+                    onClick={() => handleToggleActive(banner)}
                     className={cn(
                       "rounded-[var(--radius-sm)] p-2 transition-colors hover:bg-[var(--background-secondary)]",
                       banner.active
@@ -341,6 +427,7 @@ export function Banners() {
           onConfirm={() => {
             deleteBanner(deleteTarget.id);
             setDeleteTarget(null);
+            toast.success("Banner removido com sucesso.");
           }}
           onCancel={() => setDeleteTarget(null)}
         />
