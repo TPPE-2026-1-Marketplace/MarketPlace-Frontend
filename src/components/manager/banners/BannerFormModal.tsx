@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { type ChangeEvent, useState } from "react";
 import {
   ExternalLink,
   Image as ImageIcon,
   ToggleLeft,
   ToggleRight,
+  Upload,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
+import ImageCropDialog from "@/components/manager/ImageCropDialog";
 import {
   adminControlClassName,
   adminLabelClassName,
@@ -16,6 +19,7 @@ import {
   CATEGORY_OPTIONS,
   categoryToPath,
 } from "@/context/BannerContext";
+import { readFileAsDataUrl, uploadBannerImageDataUrl } from "@/lib/imageUpload";
 import { cn } from "@/lib/utils";
 import { BannerPreviewModal } from "./BannerPreviewModal";
 import { BannerThumbnail } from "./BannerThumbnail";
@@ -49,12 +53,54 @@ export function BannerFormModal({
   const initialState = initial ?? EMPTY_BANNER_FORM;
   const [form, setForm] = useState<BannerFormState>(initialState);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof BannerFormState, string>>>({});
 
   const set = (key: keyof BannerFormState, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) {
       setErrors((prev) => ({ ...prev, [key]: undefined }));
+    }
+  };
+
+  const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setUploadError("Envie uma imagem JPG, PNG ou WebP.");
+      return;
+    }
+
+    setUploadError(null);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setCropSrc(dataUrl);
+    } catch {
+      setUploadError("Não foi possível ler o arquivo selecionado.");
+    }
+  };
+
+  const handleCropApply = async (croppedDataUrl: string) => {
+    setCropSrc(null);
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const uploadedUrl = await uploadBannerImageDataUrl(croppedDataUrl, {
+        descricao: form.title || form.tag || "Banner",
+      });
+      set("image", uploadedUrl);
+      toast.success("Imagem enviada com sucesso.");
+    } catch {
+      setUploadError(
+        "Não foi possível enviar a imagem para o servidor. Tente novamente ou informe uma URL abaixo.",
+      );
+      toast.error("Não foi possível enviar a imagem do banner.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -68,7 +114,7 @@ export function BannerFormModal({
   };
 
   const handleSave = () => {
-    if (validate()) onSave(form);
+    if (!isUploading && validate()) onSave(form);
   };
 
   const fieldClass = (key: keyof BannerFormState) =>
@@ -122,7 +168,44 @@ export function BannerFormModal({
             </div>
 
             <div>
-              <label htmlFor="banner-image-url" className={cn(adminLabelClassName, "mb-1.5 block")}>
+              <span className={cn(adminLabelClassName, "mb-1.5 block")}>
+                Imagem do Banner <span className="text-[var(--color-error-text)]">*</span>
+              </span>
+              <label
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--background-store)] p-3 transition-colors hover:border-[var(--color-brand)]",
+                  isUploading && "cursor-not-allowed opacity-60",
+                )}
+              >
+                <Upload className="size-5 shrink-0 text-[var(--color-brand)]" aria-hidden="true" />
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-sm font-medium text-[var(--foreground)]">
+                    {isUploading ? "Enviando imagem para o servidor..." : "Enviar imagem do computador"}
+                  </span>
+                  <span className="text-xs text-[var(--foreground-muted)]">
+                    JPG, PNG ou WebP · Recorte panorâmico 16:7 (hospedado via ImgBB)
+                  </span>
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  aria-label="Enviar imagem do computador"
+                  disabled={isUploading}
+                  onChange={(e) => void handleFileSelect(e)}
+                />
+              </label>
+
+              {uploadError && (
+                <p role="alert" className="mt-1.5 text-xs text-[var(--color-error-text)]">
+                  {uploadError}
+                </p>
+              )}
+
+              <label
+                htmlFor="banner-image-url"
+                className={cn(adminLabelClassName, "mt-3 mb-1.5 block")}
+              >
                 URL da Imagem <span className="text-[var(--color-error-text)]">*</span>
               </label>
               <input
@@ -131,6 +214,7 @@ export function BannerFormModal({
                 value={form.image}
                 onChange={(e) => set("image", e.target.value)}
                 placeholder="https://..."
+                disabled={isUploading}
                 className={fieldClass("image")}
               />
               {errors.image && (
@@ -291,6 +375,7 @@ export function BannerFormModal({
               variant="action"
               size="sm"
               className="flex-1 rounded-[var(--radius-sm)] py-2.5"
+              disabled={isUploading}
               onClick={handleSave}
             >
               Salvar
@@ -298,6 +383,13 @@ export function BannerFormModal({
           </div>
         </div>
       </div>
+
+      <ImageCropDialog
+        src={cropSrc}
+        aspectPreset="banner-16-7"
+        onClose={() => setCropSrc(null)}
+        onApply={(croppedDataUrl) => void handleCropApply(croppedDataUrl)}
+      />
 
       {previewOpen && (
         <BannerPreviewModal

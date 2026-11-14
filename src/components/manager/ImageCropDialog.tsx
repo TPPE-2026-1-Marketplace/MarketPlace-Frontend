@@ -3,12 +3,27 @@ import Button from "@/components/ui/Button";
 import WideDialog from "./WideDialog";
 import { adminButtonClassName } from "./adminClasses";
 
-/** Moldura 3:4 do protótipo (282 × 376 dentro da área de 442px). */
-const FRAME_WIDTH = 282;
-const FRAME_HEIGHT = 376;
-/** Tamanho final da foto recortada (3:4). */
-const OUTPUT_WIDTH = 900;
-const OUTPUT_HEIGHT = 1200;
+const ASPECT_PRESETS = {
+  "product-3-4": {
+    frameWidth: 282,
+    frameHeight: 376,
+    outputWidth: 900,
+    outputHeight: 1200,
+    label: "Proporção fixa 3:4",
+    containerHeightClass: "h-[442px]",
+  },
+  "banner-16-7": {
+    frameWidth: 288,
+    frameHeight: 126,
+    outputWidth: 1600,
+    outputHeight: 700,
+    label: "Proporção fixa 16:7",
+    containerHeightClass: "h-[260px] sm:h-[320px]",
+  },
+} as const;
+
+export type ImageCropPreset = keyof typeof ASPECT_PRESETS;
+
 const MIN_ZOOM = 100;
 const MAX_ZOOM = 300;
 const ZOOM_STEP = 10;
@@ -24,34 +39,44 @@ interface Offset {
 }
 
 /** Escala que faz a imagem cobrir a moldura em zoom 100%. */
-const coverScale = ({ width, height }: Size) => Math.max(FRAME_WIDTH / width, FRAME_HEIGHT / height);
+const coverScale = (natural: Size, frame: Size) =>
+  Math.max(frame.width / natural.width, frame.height / natural.height);
 
 /** Mantém a imagem cobrindo a moldura inteira. */
-function clampOffset(offset: Offset, natural: Size, zoom: number): Offset {
-  const scale = coverScale(natural) * (zoom / 100);
-  const minX = FRAME_WIDTH - natural.width * scale;
-  const minY = FRAME_HEIGHT - natural.height * scale;
+function clampOffset(offset: Offset, natural: Size, zoom: number, frame: Size): Offset {
+  const scale = coverScale(natural, frame) * (zoom / 100);
+  const minX = frame.width - natural.width * scale;
+  const minY = frame.height - natural.height * scale;
   return { x: Math.min(0, Math.max(minX, offset.x)), y: Math.min(0, Math.max(minY, offset.y)) };
 }
 
-function centeredOffset(natural: Size, zoom: number): Offset {
-  const scale = coverScale(natural) * (zoom / 100);
-  return { x: (FRAME_WIDTH - natural.width * scale) / 2, y: (FRAME_HEIGHT - natural.height * scale) / 2 };
+function centeredOffset(natural: Size, zoom: number, frame: Size): Offset {
+  const scale = coverScale(natural, frame) * (zoom / 100);
+  return { x: (frame.width - natural.width * scale) / 2, y: (frame.height - natural.height * scale) / 2 };
 }
 
 interface ImageCropDialogProps {
   /** Imagem a recortar (data URL ou URL pública); null fecha o dialog. */
   src: string | null;
+  /** Proporção do recorte: 3:4 para produtos ou 16:7 para banners Hero. */
+  aspectPreset?: ImageCropPreset;
   onClose: () => void;
   onApply: (dataUrl: string) => void;
 }
 
-/** Frame "Produto / Recortar imagem" (764:14786): proporção fixa 3:4, zoom e enquadramento. */
+/** Dialog de recorte com proporção fixa configurável (padrão 3:4), zoom e enquadramento. */
 export default function ImageCropDialog(props: ImageCropDialogProps) {
-  return <ImageCropContent key={props.src ?? "fechado"} {...props} />;
+  return <ImageCropContent key={`${props.aspectPreset ?? "product-3-4"}:${props.src ?? "fechado"}`} {...props} />;
 }
 
-function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
+function ImageCropContent({
+  src,
+  aspectPreset = "product-3-4",
+  onClose,
+  onApply,
+}: ImageCropDialogProps) {
+  const preset = ASPECT_PRESETS[aspectPreset];
+  const frame: Size = { width: preset.frameWidth, height: preset.frameHeight };
   const imageRef = useRef<HTMLImageElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; origin: Offset } | null>(null);
   const [natural, setNatural] = useState<Size | null>(null);
@@ -68,11 +93,11 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
       imageRef.current = image;
       const size = { width: image.naturalWidth, height: image.naturalHeight };
       setNatural(size);
-      setOffset(centeredOffset(size, MIN_ZOOM));
+      setOffset(centeredOffset(size, MIN_ZOOM, { width: preset.frameWidth, height: preset.frameHeight }));
     };
     image.onerror = () => setError("Não foi possível carregar esta imagem para recorte.");
     image.src = src;
-  }, [src]);
+  }, [src, preset.frameWidth, preset.frameHeight]);
 
   const changeZoom = (next: number) => {
     const value = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
@@ -82,13 +107,14 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
     }
     // Mantém o centro da moldura no mesmo ponto da foto ao aproximar ou afastar.
     const ratio = value / zoom;
-    const centerX = FRAME_WIDTH / 2;
-    const centerY = FRAME_HEIGHT / 2;
+    const centerX = frame.width / 2;
+    const centerY = frame.height / 2;
     setOffset(
       clampOffset(
         { x: centerX - (centerX - offset.x) * ratio, y: centerY - (centerY - offset.y) * ratio },
         natural,
         value,
+        frame,
       ),
     );
     setZoom(value);
@@ -96,7 +122,7 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
 
   const reset = () => {
     setZoom(MIN_ZOOM);
-    if (natural) setOffset(centeredOffset(natural, MIN_ZOOM));
+    if (natural) setOffset(centeredOffset(natural, MIN_ZOOM, frame));
   };
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -112,6 +138,7 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
         { x: drag.origin.x + event.clientX - drag.startX, y: drag.origin.y + event.clientY - drag.startY },
         natural,
         zoom,
+        frame,
       ),
     );
   };
@@ -119,10 +146,10 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
   const apply = () => {
     const image = imageRef.current;
     if (!image || !natural) return;
-    const scale = coverScale(natural) * (zoom / 100);
+    const scale = coverScale(natural, frame) * (zoom / 100);
     const canvas = document.createElement("canvas");
-    canvas.width = OUTPUT_WIDTH;
-    canvas.height = OUTPUT_HEIGHT;
+    canvas.width = preset.outputWidth;
+    canvas.height = preset.outputHeight;
     const context = canvas.getContext("2d");
     try {
       if (!context) throw new Error("Canvas indisponível");
@@ -131,12 +158,12 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
         image,
         0 - offset.x / scale,
         0 - offset.y / scale,
-        FRAME_WIDTH / scale,
-        FRAME_HEIGHT / scale,
+        frame.width / scale,
+        frame.height / scale,
         0,
         0,
-        OUTPUT_WIDTH,
-        OUTPUT_HEIGHT,
+        preset.outputWidth,
+        preset.outputHeight,
       );
       onApply(canvas.toDataURL("image/jpeg", 0.9));
     } catch (cropError) {
@@ -145,7 +172,7 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
     }
   };
 
-  const scale = natural ? coverScale(natural) * (zoom / 100) : 1;
+  const scale = natural ? coverScale(natural, frame) * (zoom / 100) : 1;
 
   return (
     <WideDialog
@@ -175,11 +202,11 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
           {error}
         </p>
       )}
-      <div className="flex h-[442px] w-full items-center justify-center overflow-hidden rounded-[8px] bg-[var(--action-primary)]">
+      <div className={`flex ${preset.containerHeightClass} w-full items-center justify-center overflow-hidden rounded-[8px] bg-[var(--action-primary)]`}>
         <div
           data-testid="crop-frame"
           className="relative cursor-grab touch-none active:cursor-grabbing"
-          style={{ width: FRAME_WIDTH, height: FRAME_HEIGHT }}
+          style={{ width: frame.width, height: frame.height }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={() => (dragRef.current = null)}
@@ -207,7 +234,7 @@ function ImageCropContent({ src, onClose, onApply }: ImageCropDialogProps) {
         </div>
       </div>
       <div className="flex items-start justify-between text-xs leading-[18px] text-[var(--foreground-muted)]">
-        <span className="font-medium">Proporção fixa 3:4</span>
+        <span className="font-medium">{preset.label}</span>
         <span>Zoom {zoom}%</span>
       </div>
       <div className="flex items-center gap-3">
