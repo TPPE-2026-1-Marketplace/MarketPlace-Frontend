@@ -56,6 +56,7 @@ export function BannerFormModal({
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof BannerFormState, string>>>({});
 
@@ -119,6 +120,7 @@ export function BannerFormModal({
       set("image", uploadedUrl);
       toast.success("Imagem enviada com sucesso.");
     } catch {
+      setShowUrlInput(true);
       setUploadError(
         "Não foi possível enviar a imagem para o servidor. Tente novamente ou informe uma URL abaixo.",
       );
@@ -233,21 +235,42 @@ export function BannerFormModal({
                 </p>
               )}
 
-              <label
-                htmlFor="banner-image-url"
-                className={cn(adminLabelClassName, "mt-3 mb-1.5 block")}
-              >
-                URL da Imagem <span className="text-[var(--color-error-text)]">*</span>
-              </label>
-              <input
-                id="banner-image-url"
-                type="url"
-                value={form.image}
-                onChange={(e) => set("image", e.target.value)}
-                placeholder="https://..."
-                disabled={isUploading}
-                className={fieldClass("image")}
-              />
+              {!showUrlInput ? (
+                <div className="mt-1.5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlInput(true)}
+                    className="text-xs font-medium text-[var(--color-brand)] transition-colors hover:underline"
+                  >
+                    Adição manual de URL
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-store)]/60 p-3">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <label htmlFor="banner-image-url" className={adminLabelClassName}>
+                      URL da Imagem <span className="text-[var(--color-error-text)]">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowUrlInput(false)}
+                      className="text-xs font-medium text-[var(--foreground-muted)] transition-colors hover:text-[var(--foreground)] hover:underline"
+                    >
+                      Ocultar adição manual de URL
+                    </button>
+                  </div>
+                  <input
+                    id="banner-image-url"
+                    type="url"
+                    value={form.image}
+                    onChange={(e) => set("image", e.target.value)}
+                    placeholder="https://..."
+                    disabled={isUploading}
+                    className={fieldClass("image")}
+                  />
+                </div>
+              )}
+
               {errors.image && (
                 <p className="mt-1 text-xs text-[var(--color-error-text)]">{errors.image}</p>
               )}

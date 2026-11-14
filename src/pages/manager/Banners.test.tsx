@@ -58,6 +58,13 @@ describe("Banners", () => {
     expect(screen.getByText("Título é obrigatório")).toBeInTheDocument();
     expect(screen.getByText("Botão principal é obrigatório")).toBeInTheDocument();
 
+    expect(screen.queryByPlaceholderText("https://...")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Adição manual de URL" }));
+    expect(screen.getByPlaceholderText("https://...")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Ocultar adição manual de URL" }));
+    expect(screen.queryByPlaceholderText("https://...")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Adição manual de URL" }));
     await userEvent.type(screen.getByPlaceholderText("https://..."), "https://img/novo.jpg");
     await userEvent.type(screen.getByPlaceholderText("ex: Nova Coleção 2026"), "Lançamento");
     await userEvent.type(screen.getByPlaceholderText("Título principal do banner"), "Banner Novo");
