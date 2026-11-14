@@ -125,6 +125,17 @@ describe("ImageCropDialog", () => {
     expect(onApply).toHaveBeenCalledWith("data:image/jpeg;base64,RECORTE");
   });
 
+  it("exporta na proporção 16:7 (1600 × 700) quando configurado para banner", async () => {
+    const onApply = vi.fn();
+    render(<ImageCropDialog src="data:image/png;base64,AAA" aspectPreset="banner-16-7" onClose={vi.fn()} onApply={onApply} />);
+    await waitFor(() => expect(screen.getByAltText("Foto em ajuste")).toBeInTheDocument());
+
+    expect(screen.getByText("Proporção fixa 16:7")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar recorte" }));
+    expect(drawImage).toHaveBeenCalledWith(expect.any(LoadedImage), 0, 268.75, 600, 262.5, 0, 0, 1600, 700);
+    expect(onApply).toHaveBeenCalledWith("data:image/jpeg;base64,RECORTE");
+  });
+
   it("avisa quando a imagem não carrega ou não pode ser recortada", async () => {
     const { unmount } = render(<ImageCropDialog src="https://img/quebrada.jpg" onClose={vi.fn()} onApply={vi.fn()} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível carregar esta imagem");
