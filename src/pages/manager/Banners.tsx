@@ -105,52 +105,45 @@ function BannerPreviewModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[var(--overlay)] p-4"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] shadow-lg"
-        style={{ aspectRatio: "16/7" }}
+        className="relative flex min-h-[260px] w-full max-w-3xl flex-col justify-end overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background-card)] shadow-lg sm:aspect-[16/7] sm:min-h-[320px]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="absolute inset-0">
+        <div className="pointer-events-none absolute inset-0">
           <BannerThumbnail
             src={banner.image}
             alt={banner.title}
             iconClassName="size-12 text-[var(--foreground-muted)]"
           />
         </div>
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(90deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.52) 40%, rgba(0, 0, 0, 0.08) 100%)",
-          }}
-        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/55 to-black/25 sm:bg-gradient-to-r sm:from-black/80 sm:via-black/45 sm:to-black/10" />
 
-        <div className="absolute inset-0 flex items-end p-6 sm:p-8">
+        <div className="relative z-10 mt-auto flex flex-col justify-end p-4 pt-14 sm:p-8 sm:pt-16">
           <div className="max-w-md">
             {banner.tag && (
-              <p className="mb-2 font-sans text-xs font-medium tracking-[2px] text-[var(--color-white)]/85 uppercase">
+              <p className="mb-1.5 font-sans text-[11px] font-medium tracking-[1.5px] text-[var(--color-white)]/85 uppercase sm:mb-2 sm:text-xs sm:tracking-[2px]">
                 {banner.tag}
               </p>
             )}
-            <h3 className="mb-2 font-serif text-xl leading-tight text-[var(--color-white)] sm:text-2xl">
+            <h3 className="mb-1.5 font-serif text-lg leading-snug text-[var(--color-white)] sm:mb-2 sm:text-2xl sm:leading-tight">
               {banner.title || "Título do banner"}
             </h3>
             {banner.subtitle && (
-              <p className="mb-4 line-clamp-2 font-sans text-xs leading-relaxed text-[var(--color-white)]/85">
+              <p className="mb-3 line-clamp-3 font-sans text-xs leading-relaxed text-[var(--color-white)]/85 sm:mb-4 sm:line-clamp-2">
                 {banner.subtitle}
               </p>
             )}
             <div className="flex flex-wrap gap-2">
               {banner.primaryCta && (
-                <span className="rounded-[var(--radius-sm)] bg-[var(--background-card)] px-5 py-2 text-xs font-medium text-[var(--foreground)]">
+                <span className="rounded-[var(--radius-sm)] bg-[var(--background-card)] px-3.5 py-1.5 text-xs font-medium text-[var(--foreground)] sm:px-5 sm:py-2">
                   {banner.primaryCta}
                 </span>
               )}
               {banner.secondaryCta && (
-                <span className="rounded-[var(--radius-sm)] border border-[var(--color-white)]/45 bg-black/25 px-5 py-2 text-xs font-medium text-[var(--color-white)] backdrop-blur-sm">
+                <span className="rounded-[var(--radius-sm)] border border-[var(--color-white)]/45 bg-black/25 px-3.5 py-1.5 text-xs font-medium text-[var(--color-white)] backdrop-blur-sm sm:px-5 sm:py-2">
                   {banner.secondaryCta}
                 </span>
               )}
@@ -161,13 +154,13 @@ function BannerPreviewModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-3 right-3 flex size-8 items-center justify-center rounded-[var(--radius-sm)] bg-black/55 text-[var(--color-white)] transition-colors hover:bg-black/75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand)]"
+          className="absolute top-3 right-3 z-20 flex size-8 items-center justify-center rounded-[var(--radius-sm)] bg-black/55 text-[var(--color-white)] transition-colors hover:bg-black/75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand)]"
           aria-label="Fechar preview"
         >
           <X className="size-4" aria-hidden="true" />
         </button>
 
-        <div className="absolute top-3 left-3">
+        <div className="absolute top-3 left-3 z-20">
           <span
             className={cn(
               "rounded-[var(--radius-full)] px-2.5 py-1 text-xs font-medium",
