@@ -17,6 +17,7 @@ interface StorePickupDialogProps {
   order: ApiOrder | null;
   customerEmail: string | null;
   onClose: () => void;
+  /** Envia o código por e-mail e devolve o destino mascarado; lança Error com a mensagem em falha. */
   onSendCode: (order: ApiOrder) => Promise<string>;
   onResendCode: (order: ApiOrder) => Promise<string>;
   onValidateCode: (
@@ -62,33 +63,34 @@ function StorePickupDialogContent({
   const [codeError, setCodeError] = useState<string | null>(null);
   const [isResent, setIsResent] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   if (!open || !order) return <AdminDialog open={false} onClose={onClose} title="" />;
 
-  const handleSendCode = async () => {
+  // Envio e reenvio usam o mesmo código do pedido; só muda o aviso exibido.
+  const deliverCode = async (send: (order: ApiOrder) => Promise<string>, resent: boolean) => {
+    setIsSending(true);
+    setSendError(null);
     try {
-      await onSendCode(order);
-      setStep("step2");
+      setSentTo(await send(order));
+      setIsResent(resent);
       setCode("");
       setCodeError(null);
-      setIsResent(false);
-    } catch {
       setStep("step2");
+    } catch (err) {
+      setIsResent(false);
+      setSendError(err instanceof Error ? err.message : "Não foi possível enviar o código.");
+      // Falha no reenvio volta para a validação, onde o erro aparece; no primeiro envio fica no Passo 1.
+      if (resent) setStep("step2");
+    } finally {
+      setIsSending(false);
     }
   };
 
-  const handleResendCode = async () => {
-    try {
-      await onResendCode(order);
-      setIsResent(true);
-      setCode("");
-      setCodeError(null);
-      setStep("step2");
-    } catch {
-      setIsResent(true);
-      setStep("step2");
-    }
-  };
+  const handleSendCode = () => deliverCode(onSendCode, false);
+  const handleResendCode = () => deliverCode(onResendCode, true);
 
   const handleValidate = async () => {
     const trimmed = code.trim();
@@ -103,6 +105,8 @@ function StorePickupDialogContent({
       const res = await onValidateCode(order, trimmed);
       if (res.success) {
         setStep("completed");
+      } else if (res.error && res.error !== "invalid_code") {
+        setCodeError(res.error);
       } else {
         setStep("invalid");
       }
@@ -114,6 +118,7 @@ function StorePickupDialogContent({
   };
 
   const handleRetry = () => {
+    setSendError(null);
     setCode("");
     setCodeError(null);
     setIsResent(false);
@@ -140,6 +145,7 @@ function StorePickupDialogContent({
               size="sm"
               className={`${adminButtonClassName} whitespace-nowrap`}
               onClick={handleSendCode}
+              disabled={isSending}
             >
               Enviar código 2FA
             </Button>
@@ -154,6 +160,11 @@ function StorePickupDialogContent({
           </>
         }
       >
+        {sendError && (
+          <p role="alert" className="text-xs text-[var(--color-error-text)]">
+            {sendError}
+          </p>
+        )}
         <AdminField label="Cliente" value={orderCustomerName(order)} />
         <AdminField label="Pedido" value={`#${order.idPedido}`} />
         <AdminField label="Itens" value={formatOrderItems(order)} />
@@ -165,8 +176,10 @@ function StorePickupDialogContent({
 
   // 2. Passo 2 · Validar código de retirada (755:5622 / 755:5656)
   if (step === "step2") {
-    const channelText = customerEmail
-      ? `E-mail cadastrado da cliente (${customerEmail})`
+    // O backend devolve o destino mascarado; sem ele, o e-mail conhecido pelo painel.
+    const destination = sentTo ?? customerEmail;
+    const channelText = destination
+      ? `E-mail cadastrado da cliente (${destination})`
       : "E-mail cadastrado da cliente";
 
     return (
@@ -181,6 +194,7 @@ function StorePickupDialogContent({
               size="sm"
               className={adminButtonClassName}
               onClick={handleResendCode}
+              disabled={isSending}
             >
               Reenviar código
             </Button>
@@ -206,7 +220,12 @@ function StorePickupDialogContent({
       >
         {isResent && (
           <p className="text-xs text-[var(--foreground)]">
-            Novo código enviado para o e-mail cadastrado.
+            Código reenviado para o e-mail cadastrado.
+          </p>
+        )}
+        {sendError && (
+          <p role="alert" className="text-xs text-[var(--color-error-text)]">
+            {sendError}
           </p>
         )}
         {codeError && (
@@ -255,6 +274,7 @@ function StorePickupDialogContent({
               size="sm"
               className={adminButtonClassName}
               onClick={handleResendCode}
+              disabled={isSending}
             >
               Reenviar código
             </Button>
