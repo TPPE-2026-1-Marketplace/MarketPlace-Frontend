@@ -593,12 +593,16 @@ export function Banners() {
                 draggable={banners.length > 1}
                 onDragStart={(e) => {
                   setDraggedId(banner.id);
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData("text/plain", banner.id);
+                  if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", banner.id);
+                  }
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
+                  if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = "move";
+                  }
                   if (dragOverId !== banner.id) setDragOverId(banner.id);
                 }}
                 onDragLeave={(e) => {
@@ -608,7 +612,7 @@ export function Banners() {
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  const sourceId = draggedId || e.dataTransfer.getData("text/plain");
+                  const sourceId = draggedId || e.dataTransfer?.getData("text/plain");
                   if (sourceId && sourceId !== banner.id) {
                     reorderBanners(sourceId, banner.id);
                   }
@@ -703,7 +707,7 @@ export function Banners() {
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-1 pr-3">
+                <div className="grid shrink-0 grid-cols-2 content-center gap-0.5 pr-2 sm:flex sm:items-center sm:gap-1 sm:pr-3">
                   <button
                     type="button"
                     onClick={() => setPreviewBanner(banner)}

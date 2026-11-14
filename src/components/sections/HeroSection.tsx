@@ -27,15 +27,12 @@ export default function HeroSection() {
   const safeCurrent = current < slides.length ? current : 0;
 
   useEffect(() => {
-    if (current >= slides.length) {
-      setCurrent(0);
-    }
-  }, [current, slides.length]);
-
-  useEffect(() => {
     if (slides.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrent((prev) => (prev >= slides.length - 1 ? 0 : prev + 1));
+      setCurrent((prev) => {
+        const base = prev < slides.length ? prev : 0;
+        return base >= slides.length - 1 ? 0 : base + 1;
+      });
     }, 6000);
     return () => clearInterval(interval);
   }, [slides.length]);
