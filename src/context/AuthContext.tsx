@@ -3,22 +3,6 @@ import { api, ApiError } from "@/lib/api";
 
 export type UserRole = "customer" | "manager" | "superadmin" | "employee" | "cashier";
 
-export interface ManagedUser {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  role: UserRole;
-  phone?: string;
-  sellerCode?: string;
-  commissionRate?: number;
-  salesTarget?: number;
-  bonusEnabled?: boolean;
-  bonusAmount?: number;
-  active: boolean;
-  createdAt: string;
-}
-
 export interface User {
   id: string;
   name: string;
@@ -76,7 +60,6 @@ const mapRole = (backendRole: string): UserRole => {
 
 interface AuthContextType {
   user: User | null;
-  users: ManagedUser[];
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   register: (name: string, email: string, password: string, phone: string, cpf: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
@@ -92,80 +75,9 @@ interface AuthContextType {
   canEditOrders: boolean;
   canEditCommissions: boolean;
   canEditBanners: boolean;
-  addUser: (userData: Omit<ManagedUser, "id" | "createdAt">) => { success: boolean; message: string };
-  updateUser: (id: string, userData: Partial<ManagedUser>) => { success: boolean; message: string };
-  deleteUser: (id: string) => { success: boolean; message: string };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const INITIAL_USERS: ManagedUser[] = [
-  {
-    id: "u-001",
-    name: "Super Admin DK",
-    email: "superadmin@dkfestas.com.br",
-    password: "super123",
-    role: "superadmin",
-    phone: "(11) 99999-0001",
-    active: true,
-    createdAt: "2024-01-01",
-  },
-  {
-    id: "u-002",
-    name: "Gerente DK",
-    email: "gerente@dkfestas.com.br",
-    password: "gerente123",
-    role: "manager",
-    phone: "(11) 99999-0000",
-    active: true,
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "u-003",
-    name: "Ana Vendas",
-    email: "ana.vendas@dkfestas.com.br",
-    password: "ana123",
-    role: "employee",
-    phone: "(11) 98888-1111",
-    sellerCode: "ANA01",
-    commissionRate: 5,
-    salesTarget: 20000,
-    bonusEnabled: true,
-    bonusAmount: 500,
-    active: true,
-    createdAt: "2024-02-01",
-  },
-  {
-    id: "u-004",
-    name: "Carlos Moda",
-    email: "carlos.moda@dkfestas.com.br",
-    password: "carlos123",
-    role: "employee",
-    phone: "(11) 98888-2222",
-    sellerCode: "CARLOS23",
-    commissionRate: 4.5,
-    salesTarget: 18000,
-    bonusEnabled: true,
-    bonusAmount: 400,
-    active: true,
-    createdAt: "2024-03-01",
-  },
-  {
-    id: "u-005",
-    name: "Beatriz Estilo",
-    email: "beatriz.estilo@dkfestas.com.br",
-    password: "beatriz123",
-    role: "employee",
-    phone: "(11) 98888-3333",
-    sellerCode: "BEA05",
-    commissionRate: 5.5,
-    salesTarget: 22000,
-    bonusEnabled: false,
-    bonusAmount: 600,
-    active: true,
-    createdAt: "2024-04-01",
-  },
-];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -179,7 +91,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
   });
-  const [users, setUsers] = useState<ManagedUser[]>(INITIAL_USERS);
 
   React.useEffect(() => {
     if (user) {
@@ -189,11 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  /**
-   * Attempts login via the backend API first.
-   * Falls back to the local users list for internal roles (manager, superadmin, employee)
-   * that may not exist in the database yet.
-   */
+  /** Authenticates user via the backend API (POST /auth/login) and fetches profile. */
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     try {
       const response = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
@@ -326,34 +233,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new Event("clear-cart"));
   };
 
-  const addUser = (userData: Omit<ManagedUser, "id" | "createdAt">) => {
-    if (users.some((u) => u.email === userData.email)) {
-      return { success: false, message: "E-mail já cadastrado." };
-    }
-    const newUser: ManagedUser = {
-      ...userData,
-      id: `u-${Date.now()}`,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    setUsers((prev) => [...prev, newUser]);
-    return { success: true, message: "Usuário cadastrado com sucesso!" };
-  };
-
-  const updateUser = (id: string, userData: Partial<ManagedUser>) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, ...userData } : u))
-    );
-    return { success: true, message: "Usuário atualizado com sucesso!" };
-  };
-
-  const deleteUser = (id: string) => {
-    if (id === user?.id) {
-      return { success: false, message: "Não é possível remover o próprio usuário." };
-    }
-    setUsers((prev) => prev.filter((u) => u.id !== id));
-    return { success: true, message: "Usuário removido com sucesso!" };
-  };
-
   const isManager = user?.role === "manager" || user?.role === "superadmin";
   const isSuperAdmin = user?.role === "superadmin";
   const isEmployee = user?.role === "employee";
@@ -372,7 +251,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        users,
         login,
         register,
         logout,
@@ -388,9 +266,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canEditOrders,
         canEditCommissions,
         canEditBanners,
-        addUser,
-        updateUser,
-        deleteUser,
       }}
     >
       {children}

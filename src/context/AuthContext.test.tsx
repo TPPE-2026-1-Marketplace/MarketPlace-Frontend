@@ -41,7 +41,6 @@ describe("AuthContext", () => {
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.isInternalUser).toBe(false);
     expect(localStorage.getItem("dk_user")).toBeNull();
-    expect(result.current.users).toHaveLength(5);
   });
 
   it("restaura a sessão salva e calcula as permissões de gerente", () => {
@@ -209,46 +208,6 @@ describe("AuthContext", () => {
     expect(localStorage.getItem("dk_user")).toBeNull();
     expect(listener).toHaveBeenCalledTimes(1);
     window.removeEventListener("clear-cart", listener);
-  });
-
-  it("gerencia usuários internos", () => {
-    localStorage.setItem(
-      "dk_user",
-      JSON.stringify({ id: "u-001", name: "Super", email: "superadmin@dkfestas.com.br", role: "superadmin" }),
-    );
-    const { result } = setup();
-
-    expect(
-      result.current.addUser({
-        name: "Dup",
-        email: "gerente@dkfestas.com.br",
-        password: "x",
-        role: "employee",
-        active: true,
-      }),
-    ).toEqual({ success: false, message: "E-mail já cadastrado." });
-
-    act(() => {
-      expect(
-        result.current.addUser({ name: "Nova", email: "nova@dk.com", password: "x", role: "cashier", active: true }),
-      ).toEqual({ success: true, message: "Usuário cadastrado com sucesso!" });
-    });
-    const nova = result.current.users.find((u) => u.email === "nova@dk.com");
-    expect(nova).toMatchObject({ role: "cashier", createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
-
-    act(() => {
-      result.current.updateUser(nova!.id, { name: "Nova Caixa" });
-    });
-    expect(result.current.users.find((u) => u.id === nova!.id)?.name).toBe("Nova Caixa");
-
-    expect(result.current.deleteUser("u-001")).toEqual({
-      success: false,
-      message: "Não é possível remover o próprio usuário.",
-    });
-    act(() => {
-      result.current.deleteUser(nova!.id);
-    });
-    expect(result.current.users.some((u) => u.id === nova!.id)).toBe(false);
   });
 
   it.each([
