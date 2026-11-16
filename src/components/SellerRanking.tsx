@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Trophy, TrendingUp, Users } from "lucide-react";
+import { adminCardClassName, adminLabelClassName } from "@/components/manager/adminClasses";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 /** Item retornado por GET /api/employees/ranking (já ordenado por vendas, DESC). */
 interface RankingEntry {
@@ -10,7 +12,11 @@ interface RankingEntry {
   posicao: number;
 }
 
-const MEDAL_COLORS = ["#c8a840", "#a0a0a0", "#c87840"];
+interface SellerRankingProps {
+  compact?: boolean;
+  mes?: number;
+  ano?: number;
+}
 
 function formatBRL(value: number, fractionDigits = 0): string {
   return value.toLocaleString("pt-BR", {
@@ -19,15 +25,22 @@ function formatBRL(value: number, fractionDigits = 0): string {
   });
 }
 
-export function SellerRanking({ compact = false }: { compact?: boolean }) {
+function positionBadgeClass(position: number): string {
+  if (position === 1) return "bg-[var(--color-brand)] text-[var(--color-white)]";
+  if (position === 2) return "bg-[var(--foreground)] text-[var(--color-white)]";
+  if (position === 3) return "bg-[var(--foreground-secondary)] text-[var(--color-white)]";
+  return "bg-[var(--background-secondary)] text-[var(--foreground-secondary)]";
+}
+
+export function SellerRanking({ compact = false, mes: mesProp, ano: anoProp }: Readonly<SellerRankingProps>) {
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const now = new Date();
-  const mes = now.getMonth() + 1;
-  const ano = now.getFullYear();
-  const periodo = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const [now] = useState(() => new Date());
+  const mes = mesProp ?? now.getMonth() + 1;
+  const ano = anoProp ?? now.getFullYear();
+  const periodo = new Date(ano, mes - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   useEffect(() => {
     let cancelled = false;
@@ -35,15 +48,17 @@ export function SellerRanking({ compact = false }: { compact?: boolean }) {
     api
       .get<RankingEntry[]>("/employees/ranking", { mes, ano })
       .then((data) => {
-        if (!cancelled) setRanking(data);
+        if (!cancelled) {
+          setError(null);
+          setRanking(Array.isArray(data) ? data : []);
+          setIsLoading(false);
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Erro ao carregar o ranking");
+          setIsLoading(false);
         }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
       });
 
     return () => {
@@ -52,19 +67,31 @@ export function SellerRanking({ compact = false }: { compact?: boolean }) {
   }, [mes, ano]);
 
   if (isLoading) {
-    return <p className="text-sm text-gray-500">Carregando ranking...</p>;
+    return (
+      <div className={cn(adminCardClassName, "p-6")}>
+        <p className="text-xs leading-[18px] text-[var(--foreground-muted)]">Carregando ranking...</p>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <p role="alert" className="text-sm text-red-600">
-        Não foi possível carregar o ranking: {error}
-      </p>
+      <div className={cn(adminCardClassName, "p-6")}>
+        <p role="alert" className="text-xs leading-[18px] text-[var(--color-error-text)]">
+          Não foi possível carregar o ranking: {error}
+        </p>
+      </div>
     );
   }
 
   if (ranking.length === 0) {
-    return <p className="text-sm text-gray-500">Nenhum vendedor no ranking deste mês.</p>;
+    return (
+      <div className={cn(adminCardClassName, "p-6")}>
+        <p className="text-xs leading-[18px] text-[var(--foreground-muted)]">
+          Nenhum vendedor no ranking deste mês.
+        </p>
+      </div>
+    );
   }
 
   const topSales = Math.max(...ranking.map((seller) => seller.total_vendas));
@@ -79,25 +106,27 @@ export function SellerRanking({ compact = false }: { compact?: boolean }) {
         {ranking.slice(0, 3).map((seller) => (
           <div key={seller.codigo_funcionario} className="flex items-center gap-3">
             <div
-              className="w-7 h-7 flex items-center justify-center text-white text-xs shrink-0"
-              style={{ backgroundColor: MEDAL_COLORS[seller.posicao - 1] ?? "#1a1a1a" }}
+              className={cn(
+                "flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-xs font-medium",
+                positionBadgeClass(seller.posicao),
+              )}
             >
               {seller.posicao}°
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm text-gray-800 truncate">{seller.nome}</span>
-                <span className="text-xs text-gray-500 shrink-0 ml-2">
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="truncate text-sm font-medium text-[var(--foreground)]">{seller.nome}</span>
+                <span className="ml-2 shrink-0 text-xs text-[var(--foreground-muted)]">
                   R$ {formatBRL(seller.total_vendas)}
                 </span>
               </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-1.5 overflow-hidden rounded-[var(--radius-full)] bg-[var(--background-secondary)]">
                 <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${shareOfLeader(seller.total_vendas)}%`,
-                    backgroundColor: seller.posicao === 1 ? "#c8a840" : "#1a1a1a",
-                  }}
+                  className={cn(
+                    "h-full rounded-[var(--radius-full)] transition-all duration-500",
+                    seller.posicao === 1 ? "bg-[var(--color-brand)]" : "bg-[var(--foreground)]",
+                  )}
+                  style={{ width: `${shareOfLeader(seller.total_vendas)}%` }}
                 />
               </div>
             </div>
@@ -108,68 +137,71 @@ export function SellerRanking({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <section aria-label="Ranking de Vendedores" className={cn(adminCardClassName, "flex flex-col gap-5 p-6")}>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#1a1a1a] flex items-center justify-center text-white">
-          <Trophy className="w-5 h-5" />
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--foreground)] text-[var(--color-white)]">
+          <Trophy className="size-5" aria-hidden="true" />
         </div>
         <div>
-          <h2 className="text-gray-900">Ranking de Vendedores</h2>
-          <p className="text-gray-500 text-sm">Vendas na loja — {periodo}</p>
+          <h2 className="text-xl leading-7 font-semibold text-[var(--foreground)]">Ranking de Vendedores</h2>
+          <p className="text-xs leading-[18px] text-[var(--foreground-secondary)]">Vendas na loja — {periodo}</p>
         </div>
       </div>
 
-      {/* Individual ranking */}
-      <div className="bg-white border border-gray-100 p-5">
-        <h3 className="text-gray-900 mb-5">Ranking Individual</h3>
-        <div className="space-y-5">
+      <div className="space-y-3">
+        <h3 className={adminLabelClassName}>Ranking Individual</h3>
+        <div className="space-y-3">
           {ranking.map((seller) => {
             const isLeader = seller.posicao === 1 && hasSales;
             const share = shareOfLeader(seller.total_vendas);
             return (
               <div
                 key={seller.codigo_funcionario}
-                className={`p-4 border transition-all ${
-                  isLeader ? "border-amber-200 bg-amber-50" : "border-gray-100"
-                }`}
+                className={cn(
+                  "rounded-[var(--radius-md)] border p-4 transition-colors",
+                  isLeader
+                    ? "border-[var(--border-accent)] bg-[var(--background-brand-subtle)]"
+                    : "border-[var(--border)] bg-[var(--background-card)]",
+                )}
               >
-                <div className="flex items-center gap-4 mb-3">
+                <div className="mb-3 flex items-center gap-3">
                   <div
-                    className="w-10 h-10 flex items-center justify-center text-white text-sm shrink-0"
-                    style={{ backgroundColor: MEDAL_COLORS[seller.posicao - 1] ?? "#1a1a1a" }}
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-xs font-semibold",
+                      positionBadgeClass(seller.posicao),
+                    )}
                   >
                     {seller.posicao}°
                   </div>
 
-                  <div className="w-10 h-10 bg-gray-200 flex items-center justify-center text-gray-700 shrink-0">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-full)] bg-[var(--background-secondary)] text-xs font-semibold text-[var(--foreground)]">
                     {seller.nome.charAt(0).toUpperCase()}
                   </div>
 
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-gray-900">{seller.nome}</p>
+                      <p className="truncate text-sm font-medium text-[var(--foreground)]">{seller.nome}</p>
                       {isLeader && (
-                        <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 flex items-center gap-1">
-                          <Trophy className="w-3 h-3" /> Líder
+                        <span className="inline-flex items-center gap-1 rounded-[var(--radius-full)] bg-[var(--color-brand)] px-2 py-0.5 text-xs font-medium text-[var(--color-white)]">
+                          <Trophy className="size-3" aria-hidden="true" /> Líder
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400">Código {seller.codigo_funcionario}</p>
+                    <p className="text-xs text-[var(--foreground-muted)]">Código {seller.codigo_funcionario}</p>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <p className="text-gray-900">R$ {formatBRL(seller.total_vendas, 2)}</p>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold text-[var(--foreground)]">R$ {formatBRL(seller.total_vendas, 2)}</p>
                   </div>
                 </div>
 
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 overflow-hidden rounded-[var(--radius-full)] bg-[var(--background-secondary)]">
                   <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${share}%`,
-                      backgroundColor: isLeader ? "#c8a840" : "#1a1a1a",
-                    }}
+                    className={cn(
+                      "h-full rounded-[var(--radius-full)] transition-all duration-700",
+                      isLeader ? "bg-[var(--color-brand)]" : "bg-[var(--foreground)]",
+                    )}
+                    style={{ width: `${share}%` }}
                   />
                 </div>
               </div>
@@ -178,25 +210,24 @@ export function SellerRanking({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white border border-gray-100 p-4">
-          <div className="flex items-center gap-2 mb-2 text-gray-500">
-            <TrendingUp className="w-4 h-4" />
-            <span className="text-xs text-gray-400">Total de Vendas</span>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className={cn(adminCardClassName, "p-4")}>
+          <div className="mb-1 flex items-center gap-2 text-[var(--foreground-muted)]">
+            <TrendingUp className="size-4" aria-hidden="true" />
+            <span className={adminLabelClassName}>Total de Vendas</span>
           </div>
-          <p className="text-gray-900">R$ {formatBRL(totalTeamSales, 2)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Equipe completa</p>
+          <p className="text-lg font-semibold text-[var(--foreground)]">R$ {formatBRL(totalTeamSales, 2)}</p>
+          <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">Equipe completa</p>
         </div>
-        <div className="bg-white border border-gray-100 p-4">
-          <div className="flex items-center gap-2 mb-2 text-gray-500">
-            <Users className="w-4 h-4" />
-            <span className="text-xs text-gray-400">Vendedores</span>
+        <div className={cn(adminCardClassName, "p-4")}>
+          <div className="mb-1 flex items-center gap-2 text-[var(--foreground-muted)]">
+            <Users className="size-4" aria-hidden="true" />
+            <span className={adminLabelClassName}>Vendedores</span>
           </div>
-          <p className="text-gray-900">{ranking.length}</p>
-          <p className="text-xs text-gray-400 mt-0.5">No ranking do mês</p>
+          <p className="text-lg font-semibold text-[var(--foreground)]">{ranking.length}</p>
+          <p className="mt-0.5 text-xs text-[var(--foreground-muted)]">No ranking do mês</p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

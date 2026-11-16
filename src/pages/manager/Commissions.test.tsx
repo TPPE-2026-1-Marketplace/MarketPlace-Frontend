@@ -43,13 +43,14 @@ const reports = {
   "222": { total_vendas: 1000, comissao: 40, meta_batida: false, meta_vendas: 2000, valor_bonus: 0.01, pedidos: [] },
 };
 
-function backend(goals: unknown[] = []) {
+function backend(goals: unknown[] = [], ranking: unknown[] = []) {
   getMock.mockImplementation(
     apiRouter({
       "/employees?limit=100": employees,
       "/employees/111/commissions": reports["111"],
       "/employees/222/commissions": reports["222"],
       "/employees/333/commissions": () => Promise.reject(new Error("sem relatório")),
+      "/employees/ranking": ranking,
       "/sales-goals": goals,
     }) as never,
   );
@@ -254,5 +255,18 @@ describe("Commissions", () => {
     );
     await userEvent.click(dialog().getByRole("button", { name: "Descartar alterações" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("exibe o ranking de vendedores alinhado à competência selecionada", async () => {
+    backend([], [
+      { nome: "Beatriz Top", codigo_funcionario: "BEA01", total_vendas: 3200, posicao: 1 },
+      { nome: "Diego Vendas", codigo_funcionario: "DIE02", total_vendas: 1200, posicao: 2 },
+    ]);
+    await renderCommissions();
+
+    expect(await screen.findByRole("heading", { name: "Ranking de Vendedores" })).toBeInTheDocument();
+    expect(screen.getByText("Beatriz Top")).toBeInTheDocument();
+    expect(screen.getByText("Líder")).toBeInTheDocument();
+    expect(getMock).toHaveBeenCalledWith("/employees/ranking", { mes: 10, ano: 2026 });
   });
 });
