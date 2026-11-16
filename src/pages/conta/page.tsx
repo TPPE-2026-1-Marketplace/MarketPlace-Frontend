@@ -8,12 +8,12 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { PHONE_INVALID_MESSAGE, isValidPhone } from "@/lib/br-validators";
 import { maskCpf, maskPhone, onlyDigits } from "@/lib/utils";
-import AccountHeader from "./components/AccountHeader";
-import AccountNav, { type AccountTabKey } from "./components/AccountNav";
-import MeusDados from "./components/MeusDados";
-import MeusEnderecos from "./components/MeusEnderecos";
-import MeusPedidos from "./components/MeusPedidos";
-import MeusSeguranca from "./components/MeusSeguranca";
+import AccountHeader from "@/components/account/AccountHeader";
+import AccountNav, { type AccountTabKey } from "@/components/account/AccountNav";
+import MeusDados from "@/components/account/MeusDados";
+import MeusEnderecos from "@/components/account/MeusEnderecos";
+import MeusPedidos from "@/components/account/MeusPedidos";
+import MeusSeguranca from "@/components/account/MeusSeguranca";
 
 interface UserProfile {
   cpf: string;

@@ -6,11 +6,11 @@ import { buttonClassName } from "@/components/ui/button-variants";
 import ChangePasswordModal from "./ChangePasswordModal";
 
 interface MeusSegurancaProps {
-  cpf: string;
-  onLogout: () => void;
+  readonly cpf: string;
+  readonly onLogout: () => void;
 }
 
-export default function MeusSeguranca({ cpf, onLogout }: MeusSegurancaProps) {
+export default function MeusSeguranca({ cpf, onLogout }: Readonly<MeusSegurancaProps>) {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
