@@ -21,27 +21,63 @@ interface LoginApiResponse {
   access_token: string;
 }
 
+const VALID_ROLES = new Set<UserRole>(["customer", "manager", "superadmin", "employee", "cashier"]);
+
+const SENSITIVE_STORAGE_KEYS = [
+  "dk_last_order",
+  "dk_pending_order",
+  "dk_checkout_draft",
+  "dk_product_draft",
+  "dk_product_wizard_draft_v1",
+] as const;
+
 /**
- * Decodifica o payload de um JWT sem validar assinatura.
- * Usado apenas para extrair dados do token após login bem-sucedido.
+ * Decodifica o payload de um JWT (formato Base64URL) sem validar assinatura.
+ * Usado apenas para extrair claims do token emitido pela API.
  */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    const payload = token.split('.')[1];
-    return JSON.parse(atob(payload));
+    const parts = token.split(".");
+    if (parts.length < 2 || !parts[1]) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    return JSON.parse(window.atob(padded)) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
-const decodeJwt = (token: string) => {
+
+function isTokenExpired(token: string | null): boolean {
+  if (!token) return false;
+  const payload = decodeJwtPayload(token);
+  return typeof payload?.exp === "number" && payload.exp * 1000 <= Date.now();
+}
+
+function parseStoredUser(raw: string | null): User | null {
+  if (!raw) return null;
   try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(window.atob(base64));
+    const parsed = JSON.parse(raw) as Partial<User> | null;
+    if (!parsed || typeof parsed !== "object" || typeof parsed.id !== "string" || typeof parsed.email !== "string") {
+      return null;
+    }
+    const role: UserRole =
+      typeof parsed.role === "string" && VALID_ROLES.has(parsed.role as UserRole)
+        ? (parsed.role as UserRole)
+        : "customer";
+    return { ...parsed, role } as User;
   } catch {
-    return {};
+    return null;
   }
-};
+}
+
+function clearAuthStorage() {
+  localStorage.removeItem("dk_token");
+  localStorage.removeItem("dk_user");
+  for (const key of SENSITIVE_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  }
+}
 
 const mapRole = (backendRole: string): UserRole => {
   // Backend usa papéis em português
@@ -62,6 +98,7 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   register: (name: string, email: string, password: string, phone: string, cpf: string) => Promise<{ success: boolean; message: string }>;
+  updateUserProfile: (data: Partial<Pick<User, "name" | "email" | "phone">>) => void;
   logout: () => void;
   isManager: boolean;
   isSuperAdmin: boolean;
@@ -82,14 +119,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem("dk_user");
-    if (!stored) return null;
-    try {
-      return JSON.parse(stored) as User;
-    } catch {
-      // Corrupt stored session — clear it instead of white-screening the app
+    const token = localStorage.getItem("dk_token");
+    if (isTokenExpired(token)) {
+      localStorage.removeItem("dk_token");
       localStorage.removeItem("dk_user");
       return null;
     }
+    const parsed = parseStoredUser(stored);
+    if (stored && !parsed) {
+      // Corrupt stored session — clear it instead of white-screening the app
+      localStorage.removeItem("dk_user");
+    }
+    return parsed;
   });
 
   React.useEffect(() => {
@@ -208,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (isApiError && err.status === 400) {
         let errorMsg = err.message || "Dados inválidos. Verifique os campos.";
-        const errors = (err.data as any)?.errors;
+        const errors = (err.data as { errors?: { message: string }[] } | undefined)?.errors;
         if (Array.isArray(errors)) {
           errorMsg = errors.map((e) => e.message).join(", ");
         }
@@ -226,12 +267,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const updateUserProfile = React.useCallback((data: Partial<Pick<User, "name" | "email" | "phone">>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const next = { ...prev, ...data };
+      try {
+        localStorage.setItem("dk_user", JSON.stringify(next));
+      } catch {
+        // Ignore storage write failure.
+      }
+      return next;
+    });
+  }, []);
+
+  const logout = React.useCallback(() => {
     setUser(null);
-    localStorage.removeItem("dk_token");
-    localStorage.removeItem("dk_user");
+    clearAuthStorage();
     window.dispatchEvent(new Event("clear-cart"));
-  };
+  }, []);
+
+  React.useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === null || (event.key === "dk_token" && !event.newValue)) {
+        setUser(null);
+        return;
+      }
+      if (event.key === "dk_user") {
+        setUser(parseStoredUser(event.newValue));
+      }
+    };
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("auth:unauthorized", handleUnauthorized);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [logout]);
 
   const isManager = user?.role === "manager" || user?.role === "superadmin";
   const isSuperAdmin = user?.role === "superadmin";
@@ -253,6 +327,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         login,
         register,
+        updateUserProfile,
         logout,
         isManager,
         isSuperAdmin,

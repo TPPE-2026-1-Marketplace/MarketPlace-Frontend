@@ -250,7 +250,7 @@ describe("useCheckout — envio", () => {
       metodoPagamento: "credit_card",
       parcelas: 3,
     });
-    expect(localStorage.getItem("dk_pending_order")).toBe("1042");
+    expect(sessionStorage.getItem("dk_pending_order")).toBe("1042");
   });
 
   it("logado com PIX na loja: usa as rotas autenticadas e parcela única", async () => {
