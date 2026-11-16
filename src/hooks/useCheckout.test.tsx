@@ -9,6 +9,7 @@ import { CartProvider, useCart } from "./useCart";
 import {
   buildInstallmentOptions,
   buildOrderPayload,
+  CHECKOUT_DRAFT_STORAGE_KEY,
   getCurrentStep,
   getFirstInvalidField,
   useCheckout,
@@ -298,5 +299,28 @@ describe("useCheckout — envio", () => {
     const orderCalls = vi.mocked(api.post).mock.calls.filter(([path]) => path.startsWith("/orders"));
     expect(orderCalls).toHaveLength(1);
     expect(assignMock).toHaveBeenCalledWith("https://pay.example/1042");
+  });
+
+  it("salva rascunho no sessionStorage, restaura ao reabrir e limpa ao concluir", async () => {
+    mockApi({ paymentStatus: "paid" });
+    const first = renderCheckout();
+    act(() => {
+      first.result.current.checkout.setField("nome", "Mariana Rascunho");
+      first.result.current.checkout.setField("email", "rascunho@email.com");
+    });
+
+    expect(JSON.parse(sessionStorage.getItem(CHECKOUT_DRAFT_STORAGE_KEY) ?? "{}")).toMatchObject({
+      nome: "Mariana Rascunho",
+      email: "rascunho@email.com",
+    });
+    first.unmount();
+
+    const second = renderCheckout();
+    expect(second.result.current.checkout.form.nome).toBe("Mariana Rascunho");
+    expect(second.result.current.checkout.form.email).toBe("rascunho@email.com");
+
+    await fillValidForm(second.result);
+    await act(() => second.result.current.checkout.submit());
+    expect(sessionStorage.getItem(CHECKOUT_DRAFT_STORAGE_KEY)).toBeNull();
   });
 });

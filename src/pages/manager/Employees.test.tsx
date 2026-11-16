@@ -220,6 +220,11 @@ describe("Employees", () => {
     expect((patchMock.mock.calls[0][1] as { telefone?: string | null }).telefone).toBeNull();
     expect(await dialog().findByRole("alert")).toHaveTextContent("E-mail em uso");
     await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    expect(dialog().getByRole("alert")).toHaveTextContent("Você tem alterações não salvas. Deseja descartá-las?");
+    await userEvent.click(dialog().getByRole("button", { name: "Continuar editando" }));
+    expect(dialog().getByRole("heading", { name: "Usuário · Ana Vendas" })).toBeInTheDocument();
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(dialog().getByRole("button", { name: "Descartar alterações" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 

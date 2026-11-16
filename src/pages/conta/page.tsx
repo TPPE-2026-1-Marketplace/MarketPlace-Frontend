@@ -8,12 +8,12 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { PHONE_INVALID_MESSAGE, isValidPhone } from "@/lib/br-validators";
 import { maskCpf, maskPhone, onlyDigits } from "@/lib/utils";
-import AccountHeader from "./components/AccountHeader";
-import AccountNav, { type AccountTabKey } from "./components/AccountNav";
-import MeusDados from "./components/MeusDados";
-import MeusEnderecos from "./components/MeusEnderecos";
-import MeusPedidos from "./components/MeusPedidos";
-import MeusSeguranca from "./components/MeusSeguranca";
+import AccountHeader from "@/components/account/AccountHeader";
+import AccountNav, { type AccountTabKey } from "@/components/account/AccountNav";
+import MeusDados from "@/components/account/MeusDados";
+import MeusEnderecos from "@/components/account/MeusEnderecos";
+import MeusPedidos from "@/components/account/MeusPedidos";
+import MeusSeguranca from "@/components/account/MeusSeguranca";
 
 interface UserProfile {
   cpf: string;
@@ -42,6 +42,8 @@ export default function ContaPage() {
 
   // Profile data from the backend (may have more fields than the auth context)
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [pendingTab, setPendingTab] = useState<AccountTabKey | null>(null);
+  const [confirmCancelEdit, setConfirmCancelEdit] = useState(false);
   const [form, setForm] = useState<AccountForm>({
     name: "",
     email: "",
@@ -100,14 +102,29 @@ export default function ContaPage() {
     navigate("/");
   };
 
+  const baselineName = profile ? profile.nome || "" : user?.name || "";
+  const baselineEmail = profile ? profile.email || "" : user?.email || "";
+  const baselinePhone = onlyDigits(profile ? profile.telefone ?? "" : user?.phone ?? "");
+  const baselineBirthdate = profile?.dataNascimento ?? "";
+  const isDadosDirty =
+    isEditing &&
+    (form.name !== baselineName ||
+      form.email !== baselineEmail ||
+      onlyDigits(form.telefone) !== baselinePhone ||
+      form.dataNascimento !== baselineBirthdate);
+
   const handleEdit = () => {
     setIsEditing(true);
+    setConfirmCancelEdit(false);
+    setPendingTab(null);
     setMessage(null);
     setTelefoneError(null);
   };
 
   const handleCancel = () => {
     setIsEditing(false);
+    setConfirmCancelEdit(false);
+    setPendingTab(null);
     setMessage(null);
     setTelefoneError(null);
     // Reset form to current profile data
@@ -118,6 +135,35 @@ export default function ContaPage() {
       dataNascimento: profile?.dataNascimento ?? "",
       cpf: maskCpf(profile?.cpf ?? ""),
     });
+  };
+
+  const requestCancelEdit = () => {
+    if (isDadosDirty) {
+      setConfirmCancelEdit(true);
+      return;
+    }
+    handleCancel();
+  };
+
+  const requestTabChange = (nextTab: AccountTabKey) => {
+    if (nextTab === tab) return;
+    if (isDadosDirty) {
+      setPendingTab(nextTab);
+      setConfirmCancelEdit(true);
+      return;
+    }
+    setTab(nextTab);
+  };
+
+  const handleContinueEditing = () => {
+    setConfirmCancelEdit(false);
+    setPendingTab(null);
+  };
+
+  const handleDiscardChanges = () => {
+    const targetTab = pendingTab;
+    handleCancel();
+    if (targetTab) setTab(targetTab);
   };
 
   const handleFieldChange = (key: keyof AccountForm, raw: string) => {
@@ -232,7 +278,7 @@ export default function ContaPage() {
     <div className="min-h-screen bg-[var(--background)] font-sans">
       <AccountHeader />
 
-      <Tabs value={tab} onValueChange={(value) => setTab(value as AccountTabKey)} orientation="vertical">
+      <Tabs value={tab} onValueChange={(value) => requestTabChange(value as AccountTabKey)} orientation="vertical">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:px-8">
           <aside className="shrink-0 lg:w-60">
             <AccountNav displayName={displayName} onLogout={handleLogout} />
@@ -251,11 +297,14 @@ export default function ContaPage() {
                 displayPhone={displayPhone}
                 displayBirthdate={displayBirthdate}
                 displayCpf={displayCpf}
+                confirmDiscard={isDadosDirty && confirmCancelEdit}
+                onContinueEditing={handleContinueEditing}
+                onDiscardChanges={handleDiscardChanges}
                 onEdit={handleEdit}
-                onCancel={handleCancel}
+                onCancel={requestCancelEdit}
                 onSave={handleSave}
                 onFieldChange={handleFieldChange}
-                onSelectTab={setTab}
+                onSelectTab={requestTabChange}
               />
             </TabsContent>
             <TabsContent value="pedidos">

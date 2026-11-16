@@ -216,4 +216,22 @@ describe("Orders", () => {
     expect(await screen.findByText("#10")).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
+
+  it("protege contra perda de alterações ao cancelar pedido modificado", async () => {
+    await renderOrders();
+
+    const dialog = await openOrder(10);
+    await userEvent.type(within(dialog).getByLabelText("Rastreio"), "BR123");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Continuar editando" }));
+    expect(within(dialog).getByLabelText("Rastreio")).toHaveValue("BR123");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Descartar alterações" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
 });

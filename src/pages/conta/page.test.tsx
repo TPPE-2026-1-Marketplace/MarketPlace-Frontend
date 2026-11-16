@@ -108,7 +108,7 @@ describe("ContaPage", () => {
     expect(await meusDados().findByText("Nome Novo")).toBeInTheDocument();
   });
 
-  it("cancela a edição restaurando os dados", async () => {
+  it("cancela a edição restaurando os dados após confirmar o descarte e bloqueia troca de aba", async () => {
     renderConta();
     await startEditing();
     const email = screen.getByPlaceholderText("Informe seu e-mail");
@@ -116,6 +116,20 @@ describe("ContaPage", () => {
     await userEvent.type(email, "outro@dk.com");
 
     await userEvent.click(screen.getByRole("button", { name: /Cancelar/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+    expect(screen.getByPlaceholderText("Informe seu e-mail")).toHaveValue("outro@dk.com");
+
+    await userEvent.click(screen.getByRole("tab", { name: /Meus pedidos/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Descartar alterações" }));
+    expect(await screen.findByText("Você ainda não tem pedidos.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: /Meus dados/ }));
     await userEvent.click(screen.getByRole("button", { name: /Editar/ }));
     expect(screen.getByPlaceholderText("Informe seu e-mail")).toHaveValue("perfil@dk.com");
   });
@@ -226,6 +240,25 @@ describe("ContaPage", () => {
       await userEvent.click(screen.getByRole("button", { name: /Remover/ }));
       await waitFor(() => expect(deleteMock).toHaveBeenCalledWith("/addresses/1"));
     });
+
+    it("protege contra descarte ao fechar o modal de endereço após alterações", async () => {
+      renderConta();
+      await userEvent.click(screen.getByRole("tab", { name: /Endereços/ }));
+      await userEvent.click(await screen.findByRole("button", { name: /Adicionar endereço/ }));
+
+      await userEvent.type(screen.getByLabelText("Nome do endereço"), "Escritório");
+      await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Você tem alterações não salvas. Deseja descartá-las?",
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+      expect(screen.getByLabelText("Nome do endereço")).toHaveValue("Escritório");
+
+      await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
+      await userEvent.click(screen.getByRole("button", { name: "Descartar alterações" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
   });
 
   describe("Segurança", () => {
@@ -273,6 +306,22 @@ describe("ContaPage", () => {
       await userEvent.click(screen.getByRole("button", { name: "Sair" }));
 
       expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
+    });
+
+    it("protege contra descarte ao fechar alteração de senha após digitar", async () => {
+      renderConta();
+
+      await userEvent.click(screen.getByRole("tab", { name: /Segurança/ }));
+      await userEvent.click(screen.getByRole("button", { name: /Alterar senha/ }));
+      await userEvent.type(screen.getByLabelText("Senha atual"), "atual123");
+
+      await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Você tem alterações não salvas. Deseja descartá-las?",
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Descartar alterações" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     });
   });
 

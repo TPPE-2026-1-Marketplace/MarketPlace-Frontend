@@ -97,6 +97,25 @@ describe("ProductImagesDialog", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Salvar imagens" }));
     expect(onSave).toHaveBeenCalledWith([expect.objectContaining({ src: "data:image/jpeg;base64,RECORTE" })]);
   });
+
+  it("protege contra descarte ao cancelar após adicionar foto ou link", async () => {
+    const onClose = vi.fn();
+    render(<ProductImagesDialog color={color()} productSku="DK-009" onClose={onClose} onSave={vi.fn()} />);
+
+    await userEvent.type(dialog().getByLabelText("Ou adicionar por link"), "https://img/pendente.jpg");
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(dialog().getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+
+    await userEvent.click(dialog().getByRole("button", { name: "Continuar editando" }));
+    expect(dialog().getByLabelText("Ou adicionar por link")).toHaveValue("https://img/pendente.jpg");
+
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(dialog().getByRole("button", { name: "Descartar alterações" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("ImageCropDialog", () => {

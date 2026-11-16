@@ -12,11 +12,11 @@ const TABS: Array<{ key: AccountTabKey; label: string; icon: ReactNode }> = [
 ];
 
 interface AccountNavProps {
-  displayName: string;
-  onLogout: () => void;
+  readonly displayName: string;
+  readonly onLogout: () => void;
 }
 
-export default function AccountNav({ displayName, onLogout }: AccountNavProps) {
+export default function AccountNav({ displayName, onLogout }: Readonly<AccountNavProps>) {
   return (
     <div className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-card)] p-4">
       <div className="flex items-center gap-3">

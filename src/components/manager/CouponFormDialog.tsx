@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import type { ApiCoupon, CouponPayload } from "@/hooks/useManagementCoupons";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import { ApiError } from "@/lib/api";
 import AdminDialog from "./AdminDialog";
 import AdminField from "./AdminField";
@@ -68,29 +69,47 @@ function toPayload(form: CouponForm): CouponPayload {
 type Step = "form" | "confirmDeactivate" | "confirmDelete";
 
 interface CouponFormDialogProps {
-  open: boolean;
+  readonly open: boolean;
   /** null = novo cupom. */
-  coupon: ApiCoupon | null;
-  onClose: () => void;
-  onCreate: (payload: CouponPayload) => Promise<void>;
-  onUpdate: (code: string, payload: Partial<CouponPayload>) => Promise<void>;
-  onDelete: (code: string) => Promise<void>;
+  readonly coupon: ApiCoupon | null;
+  readonly onClose: () => void;
+  readonly onCreate: (payload: CouponPayload) => Promise<void>;
+  readonly onUpdate: (code: string, payload: Partial<CouponPayload>) => Promise<void>;
+  readonly onDelete: (code: string) => Promise<void>;
 }
 
 /**
  * Frames "Cupons / Detalhe ou edição" (755:3374), "Novo cadastro" (755:3473),
  * "Cupom / Confirmar desativação" (764:14879) e "Confirmação" (755:3451).
  */
-export default function CouponFormDialog(props: CouponFormDialogProps) {
+export default function CouponFormDialog(props: Readonly<CouponFormDialogProps>) {
   return <CouponFormContent key={`${props.open}-${props.coupon?.numeroDoCupom ?? "novo"}`} {...props} />;
 }
 
-function CouponFormContent({ open, coupon, onClose, onCreate, onUpdate, onDelete }: CouponFormDialogProps) {
-  const [form, setForm] = useState<CouponForm>(() => toForm(coupon));
+function CouponFormContent({
+  open,
+  coupon,
+  onClose,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: Readonly<CouponFormDialogProps>) {
+  const initialForm = toForm(coupon);
+  const [form, setForm] = useState<CouponForm>(initialForm);
   const [step, setStep] = useState<Step>("form");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+
+  const isDirty = open && !savedMessage && JSON.stringify(form) !== JSON.stringify(initialForm);
+  const baseGuard = useDiscardGuard(isDirty, onClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   if (!open) return <AdminDialog open={false} onClose={onClose} title="" />;
 
@@ -186,6 +205,7 @@ function CouponFormContent({ open, coupon, onClose, onCreate, onUpdate, onDelete
     <AdminDialog
       open
       onClose={onClose}
+      discardGuard={discardGuard}
       title={coupon ? `Cupom · ${coupon.numeroDoCupom}` : "Novo cupom"}
       description="Revise os dados antes de continuar."
       actions={
@@ -216,7 +236,12 @@ function CouponFormContent({ open, coupon, onClose, onCreate, onUpdate, onDelete
               Excluir cupom
             </Button>
           )}
-          <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onClose}>
+          <Button
+            variant="outline-neutral"
+            size="sm"
+            className={adminButtonClassName}
+            onClick={discardGuard.requestClose}
+          >
             Cancelar
           </Button>
         </>

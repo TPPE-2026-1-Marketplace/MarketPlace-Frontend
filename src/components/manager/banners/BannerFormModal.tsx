@@ -14,6 +14,7 @@ import {
   adminLabelClassName,
 } from "@/components/manager/adminClasses";
 import Button from "@/components/ui/Button";
+import { DiscardChangesAlert } from "@/components/ui/DiscardChangesAlert";
 import {
   type Banner,
   CATEGORY_OPTIONS,
@@ -400,32 +401,7 @@ export function BannerFormModal({
 
           <div className="sticky bottom-0 space-y-3 border-t border-[var(--border)] bg-[var(--background-card)] px-6 py-4">
             {confirmDiscard && (
-              <div
-                role="alert"
-                className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--color-error)] bg-[var(--background-error-subtle)] p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <p className="text-xs font-medium text-[var(--color-error-text)]">
-                  Você tem alterações não salvas. Deseja descartá-las?
-                </p>
-                <div className="flex shrink-0 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline-neutral"
-                    size="sm"
-                    className="rounded-[var(--radius-sm)] px-3 py-1.5 text-xs"
-                    onClick={() => setConfirmDiscard(false)}
-                  >
-                    Continuar editando
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="rounded-[var(--radius-sm)] bg-[var(--color-error)] px-3 py-1.5 text-xs font-medium text-[var(--color-white)] transition-opacity hover:opacity-90"
-                  >
-                    Descartar alterações
-                  </button>
-                </div>
-              </div>
+              <DiscardChangesAlert onContinue={() => setConfirmDiscard(false)} onDiscard={onClose} />
             )}
             <div className="flex gap-3">
               <Button

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Button from "@/components/ui/Button";
 import type { ApiCategory, SaveResult } from "@/hooks/useProductPersistence";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import { ApiError } from "@/lib/api";
 import type { Product } from "@/lib/catalog";
 import { TIPOS } from "@/lib/categories";
@@ -57,26 +58,27 @@ type View = "steps" | "review" | "saved";
 
 interface ProductWizardDialogProps {
   /** null fecha o dialog. */
-  mode: Mode | null;
-  categories: ApiCategory[];
-  onClose: () => void;
-  onCreate: (draft: ProductDraft) => Promise<SaveResult>;
-  onUpdate: (idProduto: number, original: ProductDraft, draft: ProductDraft) => Promise<SaveResult>;
+  readonly mode: Mode | null;
+  readonly categories: ApiCategory[];
+  readonly onClose: () => void;
+  readonly onCreate: (draft: ProductDraft) => Promise<SaveResult>;
+  readonly onUpdate: (idProduto: number, original: ProductDraft, draft: ProductDraft) => Promise<SaveResult>;
 }
 
 /**
  * Cadastro (Figma 847:5998) e edição (850:5697) de produto em 4 etapas, com a revisão
  * antes de publicar/salvar e a confirmação. As fotos de cada cor abrem "Imagens do produto".
  */
-export default function ProductWizardDialog(props: ProductWizardDialogProps) {
+export default function ProductWizardDialog(props: Readonly<ProductWizardDialogProps>) {
   const key = props.mode === null ? "fechado" : props.mode.kind === "edit" ? `edit-${props.mode.product.idProduto}` : "create";
   return <ProductWizardContent key={key} {...props} />;
 }
 
-function ProductWizardContent({ mode, categories, onClose, onCreate, onUpdate }: ProductWizardDialogProps) {
+function ProductWizardContent({ mode, categories, onClose, onCreate, onUpdate }: Readonly<ProductWizardDialogProps>) {
   const isEdit = mode?.kind === "edit";
   const original = useMemo(() => (mode?.kind === "edit" ? draftFromProduct(mode.product) : null), [mode]);
   const [restored] = useState(() => (mode?.kind === "create" ? loadStoredDraft() : null));
+  const [baseline, setBaseline] = useState<ProductDraft>(() => original ?? restored ?? EMPTY_DRAFT);
   const [draft, setDraft] = useState<ProductDraft>(() => original ?? restored ?? EMPTY_DRAFT);
   const [step, setStep] = useState(0);
   // Etapa mais avançada já visitada: o stepper só leva até ela.
@@ -91,6 +93,16 @@ function ProductWizardContent({ mode, categories, onClose, onCreate, onUpdate }:
   const [notice, setNotice] = useState<string | null>(restored ? "Rascunho restaurado" : null);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<SaveResult | null>(null);
+
+  const isDirty = mode !== null && view !== "saved" && JSON.stringify(draft) !== JSON.stringify(baseline);
+  const baseGuard = useDiscardGuard(isDirty, onClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   if (!mode) return <WideDialog open={false} onClose={onClose} title="">{null}</WideDialog>;
 
@@ -125,6 +137,7 @@ function ProductWizardContent({ mode, categories, onClose, onCreate, onUpdate }:
   const saveDraft = () => {
     try {
       storeDraft(draft);
+      setBaseline(draft);
       setNotice("Rascunho salvo neste navegador");
     } catch {
       setNotice("Não foi possível salvar o rascunho neste navegador");
@@ -189,6 +202,7 @@ function ProductWizardContent({ mode, categories, onClose, onCreate, onUpdate }:
       <WideDialog
         open
         onClose={onClose}
+        discardGuard={discardGuard}
         title={isEdit ? "Revisar alterações" : "Revisar cadastro"}
         description={isEdit ? `${draft.sku} · ${original?.title}` : "Confira os dados antes de publicar."}
         footer={
@@ -228,6 +242,7 @@ function ProductWizardContent({ mode, categories, onClose, onCreate, onUpdate }:
       <WideDialog
         open={imagesColor === null}
         onClose={onClose}
+        discardGuard={discardGuard}
         title={isEdit ? "Editar produto" : "Cadastrar produto"}
         description={isEdit ? `${draft.sku} · Altere os dados e revise antes de salvar.` : "Preencha os dados e configure as variantes do produto."}
         footer={
@@ -237,7 +252,7 @@ function ProductWizardContent({ mode, categories, onClose, onCreate, onUpdate }:
                 variant="outline-neutral"
                 size="sm"
                 className={`${adminButtonClassName} md:min-w-[140px]`}
-                onClick={() => (step === 0 ? onClose() : goTo(step - 1))}
+                onClick={() => (step === 0 ? discardGuard.requestClose() : goTo(step - 1))}
               >
                 {step === 0 ? "Cancelar" : "Anterior"}
               </Button>
@@ -666,13 +681,13 @@ function ProductWizardContent({ mode, categories, onClose, onCreate, onUpdate }:
 }
 
 interface StockStepProps {
-  draft: ProductDraft;
-  bulk: { online: string; physical: string; price: string };
-  setBulk: (bulk: { online: string; physical: string; price: string }) => void;
-  onChange: (variants: DraftVariant[]) => void;
+  readonly draft: ProductDraft;
+  readonly bulk: { online: string; physical: string; price: string };
+  readonly setBulk: (bulk: { online: string; physical: string; price: string }) => void;
+  readonly onChange: (variants: DraftVariant[]) => void;
 }
 
-function Summary({ label, value }: { label: string; value: ReactNode }) {
+function Summary({ label, value }: Readonly<{ label: string; value: ReactNode }>) {
   return (
     <div className="flex flex-col gap-1 bg-[var(--background-secondary)] p-4">
       <span className="text-xs leading-[18px] text-[var(--foreground-muted)]">{label}</span>
@@ -684,7 +699,7 @@ function Summary({ label, value }: { label: string; value: ReactNode }) {
 const quantity = (value: string) => Math.max(0, Math.floor(Number(value) || 0));
 
 /** Etapa 4 (755:5504): resumo por canal, aplicar a todas e estoque/preço por variante. */
-function StockStep({ draft, bulk, setBulk, onChange }: StockStepProps) {
+function StockStep({ draft, bulk, setBulk, onChange }: Readonly<StockStepProps>) {
   const totals = draft.variants.reduce(
     (sum, variant) => ({ online: sum.online + variant.online, physical: sum.physical + variant.physical }),
     { online: 0, physical: 0 },

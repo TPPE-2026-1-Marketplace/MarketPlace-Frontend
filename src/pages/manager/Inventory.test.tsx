@@ -188,6 +188,24 @@ describe("Inventory", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     await waitFor(() => expect(vi.mocked(fetchProducts).mock.calls.length).toBeGreaterThan(calls));
   });
+
+  it("confirma antes de descartar quantidades alteradas no ajuste de estoque", async () => {
+    await renderInventory();
+
+    const dialog = await openAdjust("ROSA-P");
+    fireEvent.change(within(dialog).getByLabelText("Quantidade online"), { target: { value: "9" } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Continuar editando" }));
+    expect(within(dialog).getByLabelText("Quantidade online")).toHaveValue(9);
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Descartar alterações" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
 });
 
 describe("Inventory - cadastro e edição de produto", () => {

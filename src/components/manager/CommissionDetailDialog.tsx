@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import type { Competence, SellerCommission, SellerSettings } from "@/hooks/useCommissions";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import { formatCurrency } from "@/lib/utils";
 import AdminDialog from "./AdminDialog";
 import AdminField from "./AdminField";
@@ -10,33 +11,61 @@ import { formatCompetence, formatPercentInput, formatShortDate, parsePercentInpu
 import { formatPosSaleId } from "./posSales";
 
 interface CommissionDetailDialogProps {
-  seller: SellerCommission | null;
-  competence: Competence;
+  readonly seller: SellerCommission | null;
+  readonly competence: Competence;
   /** Só o administrador altera taxa, meta e bônus (regra do backend). */
-  readOnly: boolean;
-  onClose: () => void;
-  onSave: (cpf: string, settings: SellerSettings) => Promise<void>;
+  readonly readOnly: boolean;
+  readonly onClose: () => void;
+  readonly onSave: (cpf: string, settings: SellerSettings) => Promise<void>;
 }
 
 /**
  * Frames "Comissões / Detalhe ou edição" (755:2911), "Histórico" (755:5868) e
  * "Confirmação" (755:2974).
  */
-export default function CommissionDetailDialog(props: CommissionDetailDialogProps) {
+export default function CommissionDetailDialog(props: Readonly<CommissionDetailDialogProps>) {
   // A key reinicia o formulário a cada vendedor aberto.
   return <CommissionDetailContent key={props.seller?.employee.cpf ?? "fechado"} {...props} />;
 }
 
-function CommissionDetailContent({ seller, competence, readOnly, onClose, onSave }: CommissionDetailDialogProps) {
+function CommissionDetailContent({
+  seller,
+  competence,
+  readOnly,
+  onClose,
+  onSave,
+}: Readonly<CommissionDetailDialogProps>) {
   const report = seller?.report;
-  const [rate, setRate] = useState(() => formatPercentInput(Number(seller?.employee.taxa_comissao ?? 0)));
-  const [target, setTarget] = useState(() => String(report?.meta_vendas || Number(seller?.employee.meta_vendas) || 0));
-  const [bonusEnabled, setBonusEnabled] = useState(() => (report?.valor_bonus ?? 0) > 0);
-  const [bonusRate, setBonusRate] = useState(() => formatPercentInput(report?.valor_bonus ?? 0));
+  const initialRate = formatPercentInput(Number(seller?.employee.taxa_comissao ?? 0));
+  const initialTarget = String(report?.meta_vendas || Number(seller?.employee.meta_vendas) || 0);
+  const initialBonusEnabled = (report?.valor_bonus ?? 0) > 0;
+  const initialBonusRate = formatPercentInput(report?.valor_bonus ?? 0);
+
+  const [rate, setRate] = useState(initialRate);
+  const [target, setTarget] = useState(initialTarget);
+  const [bonusEnabled, setBonusEnabled] = useState(initialBonusEnabled);
+  const [bonusRate, setBonusRate] = useState(initialBonusRate);
   const [view, setView] = useState<"detail" | "history">("detail");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  const isDirty =
+    Boolean(seller) &&
+    !readOnly &&
+    !saved &&
+    (rate !== initialRate ||
+      target !== initialTarget ||
+      bonusEnabled !== initialBonusEnabled ||
+      bonusRate !== initialBonusRate);
+  const baseGuard = useDiscardGuard(isDirty, onClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   if (!seller) return <AdminDialog open={false} onClose={onClose} title="" />;
 
@@ -60,13 +89,19 @@ function CommissionDetailContent({ seller, competence, readOnly, onClose, onSave
       <AdminDialog
         open
         onClose={onClose}
+        discardGuard={discardGuard}
         title={`Histórico de vendas · ${name}`}
         actions={
           <>
             <Button variant="action" size="sm" className={adminButtonClassName} onClick={() => setView("detail")}>
               Voltar às comissões
             </Button>
-            <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onClose}>
+            <Button
+              variant="outline-neutral"
+              size="sm"
+              className={adminButtonClassName}
+              onClick={discardGuard.requestClose}
+            >
               Cancelar
             </Button>
           </>
@@ -112,6 +147,7 @@ function CommissionDetailContent({ seller, competence, readOnly, onClose, onSave
     <AdminDialog
       open
       onClose={onClose}
+      discardGuard={discardGuard}
       title={`Comissão e meta · ${name}`}
       description="Revise os dados antes de continuar."
       actions={
@@ -129,7 +165,12 @@ function CommissionDetailContent({ seller, competence, readOnly, onClose, onSave
               Salvar configuração
             </Button>
           )}
-          <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onClose}>
+          <Button
+            variant="outline-neutral"
+            size="sm"
+            className={adminButtonClassName}
+            onClick={discardGuard.requestClose}
+          >
             {readOnly ? "Fechar" : "Cancelar"}
           </Button>
         </>

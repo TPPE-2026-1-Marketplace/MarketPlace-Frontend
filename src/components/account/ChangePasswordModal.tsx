@@ -2,16 +2,18 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useState } from "react";
 import { X } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { DiscardChangesAlert } from "@/components/ui/DiscardChangesAlert";
 import Input from "@/components/ui/Input";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import { api, ApiError } from "@/lib/api";
 
 interface ChangePasswordModalProps {
-  open: boolean;
-  cpf: string;
-  onClose: () => void;
+  readonly open: boolean;
+  readonly cpf: string;
+  readonly onClose: () => void;
 }
 
-export default function ChangePasswordModal({ open, cpf, onClose }: ChangePasswordModalProps) {
+export default function ChangePasswordModal({ open, cpf, onClose }: Readonly<ChangePasswordModalProps>) {
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
@@ -28,6 +30,16 @@ export default function ChangePasswordModal({ open, cpf, onClose }: ChangePasswo
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  const isDirty = open && Boolean(senhaAtual || novaSenha || confirmar);
+  const baseGuard = useDiscardGuard(isDirty, handleClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
   };
 
   const handleSubmit = async () => {
@@ -54,7 +66,7 @@ export default function ChangePasswordModal({ open, cpf, onClose }: ChangePasswo
   };
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && handleClose()}>
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && discardGuard.requestClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)]" />
         <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 flex w-[calc(100%-32px)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-[var(--radius-lg)] bg-[var(--background-card)] p-6 shadow-lg focus:outline-none">
@@ -62,12 +74,14 @@ export default function ChangePasswordModal({ open, cpf, onClose }: ChangePasswo
             <DialogPrimitive.Title className="flex-1 text-xl leading-7 font-semibold text-[var(--foreground)]">
               Alterar senha
             </DialogPrimitive.Title>
-            <DialogPrimitive.Close
+            <button
+              type="button"
               aria-label="Fechar"
+              onClick={discardGuard.requestClose}
               className="flex size-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-control)] text-[var(--foreground)] hover:bg-[var(--background-secondary)]"
             >
               <X className="size-4" aria-hidden="true" />
-            </DialogPrimitive.Close>
+            </button>
           </div>
           <DialogPrimitive.Description className="sr-only">
             Formulário para trocar a senha da conta.
@@ -88,6 +102,13 @@ export default function ChangePasswordModal({ open, cpf, onClose }: ChangePasswo
             error={error ?? undefined}
             helper={error ? undefined : "Use pelo menos 8 caracteres, combinando letras e números."}
           />
+
+          {discardGuard.confirmDiscard && (
+            <DiscardChangesAlert
+              onContinue={discardGuard.cancelDiscard}
+              onDiscard={discardGuard.confirmAndClose}
+            />
+          )}
 
           <Button variant="action" size="touch" fullWidth loading={saving} onClick={handleSubmit}>
             Atualizar senha

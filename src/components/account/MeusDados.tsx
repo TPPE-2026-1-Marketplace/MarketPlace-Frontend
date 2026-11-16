@@ -1,5 +1,6 @@
 import Button from "@/components/ui/Button";
 import { buttonClassName } from "@/components/ui/button-variants";
+import { DiscardChangesAlert } from "@/components/ui/DiscardChangesAlert";
 import Input from "@/components/ui/Input";
 import type { AccountTabKey } from "./AccountNav";
 
@@ -10,32 +11,35 @@ function formatIsoDate(iso: string): string {
 }
 
 interface MeusDadosForm {
-  name: string;
-  email: string;
-  telefone: string;
-  dataNascimento: string;
-  cpf: string;
+  readonly name: string;
+  readonly email: string;
+  readonly telefone: string;
+  readonly dataNascimento: string;
+  readonly cpf: string;
 }
 
 interface MeusDadosProps {
-  isEditing: boolean;
-  saving: boolean;
-  message: { type: "success" | "error"; text: string } | null;
-  telefoneError: string | null;
-  form: MeusDadosForm;
-  displayName: string;
-  displayEmail: string;
-  displayPhone: string;
-  displayBirthdate: string | null;
-  displayCpf: string;
-  onEdit: () => void;
-  onCancel: () => void;
-  onSave: () => void;
-  onFieldChange: (key: keyof MeusDadosForm, value: string) => void;
-  onSelectTab: (tab: AccountTabKey) => void;
+  readonly isEditing: boolean;
+  readonly saving: boolean;
+  readonly message: { type: "success" | "error"; text: string } | null;
+  readonly telefoneError: string | null;
+  readonly form: MeusDadosForm;
+  readonly displayName: string;
+  readonly displayEmail: string;
+  readonly displayPhone: string;
+  readonly displayBirthdate: string | null;
+  readonly displayCpf: string;
+  readonly confirmDiscard?: boolean;
+  readonly onContinueEditing?: () => void;
+  readonly onDiscardChanges?: () => void;
+  readonly onEdit: () => void;
+  readonly onCancel: () => void;
+  readonly onSave: () => void;
+  readonly onFieldChange: (key: keyof MeusDadosForm, value: string) => void;
+  readonly onSelectTab: (tab: AccountTabKey) => void;
 }
 
-function DadoDeLeitura({ rotulo, valor }: { rotulo: string; valor: string }) {
+function DadoDeLeitura({ rotulo, valor }: Readonly<{ rotulo: string; valor: string }>) {
   return (
     <div className="flex flex-1 flex-col gap-2">
       <p className="text-xs text-[var(--foreground-secondary)]">{rotulo}</p>
@@ -55,12 +59,15 @@ export default function MeusDados({
   displayPhone,
   displayBirthdate,
   displayCpf,
+  confirmDiscard = false,
+  onContinueEditing,
+  onDiscardChanges,
   onEdit,
   onCancel,
   onSave,
   onFieldChange,
   onSelectTab,
-}: MeusDadosProps) {
+}: Readonly<MeusDadosProps>) {
   return (
     <div className="flex flex-col gap-6" data-testid="meus-dados">
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -148,6 +155,13 @@ export default function MeusDados({
               helper="O CPF é a chave da sua conta e não pode ser alterado."
               placeholder="Informe seu cpf"
             />
+
+            {confirmDiscard && onContinueEditing && onDiscardChanges && (
+              <DiscardChangesAlert
+                onContinue={onContinueEditing}
+                onDiscard={onDiscardChanges}
+              />
+            )}
 
             <div className="flex items-center gap-3">
               <Button onClick={onSave} disabled={saving} loading={saving} variant="action" size="touch">

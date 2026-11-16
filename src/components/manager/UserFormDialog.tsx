@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import type { UserRole } from "@/context/AuthContext";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import type { EmployeePayload } from "@/hooks/useManagementEmployees";
 import { ApiError } from "@/lib/api";
 import { CPF_INVALID_MESSAGE, PHONE_INVALID_MESSAGE, isValidCpf, isValidPhone } from "@/lib/br-validators";
@@ -99,22 +100,22 @@ function toPayload(form: UserForm, employee: ApiEmployee | null): EmployeePayloa
 
 interface UserFormDialogProps {
   /** null = novo cadastro. */
-  employee: ApiEmployee | null;
-  open: boolean;
+  readonly employee: ApiEmployee | null;
+  readonly open: boolean;
   /** Gerente vê os dados, mas só o administrador altera (regra do backend). */
-  readOnly: boolean;
+  readonly readOnly: boolean;
   /** CPF de quem está logado: não pode desativar a si mesmo. */
-  currentUserCpf?: string;
-  onClose: () => void;
-  onCreate: (payload: EmployeePayload) => Promise<void>;
-  onUpdate: (cpf: string, payload: EmployeePayload) => Promise<void>;
+  readonly currentUserCpf?: string;
+  readonly onClose: () => void;
+  readonly onCreate: (payload: EmployeePayload) => Promise<void>;
+  readonly onUpdate: (cpf: string, payload: EmployeePayload) => Promise<void>;
 }
 
 /**
  * Frames "Usuários / Detalhe ou edição" (755:2275), "Novo cadastro" (755:2388) e
  * "Confirmação" (755:2366). A desativação passa por uma confirmação antes de salvar.
  */
-export default function UserFormDialog(props: UserFormDialogProps) {
+export default function UserFormDialog(props: Readonly<UserFormDialogProps>) {
   // A key reinicia o formulário a cada usuário aberto.
   return <UserFormContent key={`${props.open}-${props.employee?.cpf ?? "novo"}`} {...props} />;
 }
@@ -127,12 +128,23 @@ function UserFormContent({
   onClose,
   onCreate,
   onUpdate,
-}: UserFormDialogProps) {
-  const [form, setForm] = useState<UserForm>(() => (employee ? toForm(employee) : EMPTY_FORM));
+}: Readonly<UserFormDialogProps>) {
+  const initialForm = employee ? toForm(employee) : EMPTY_FORM;
+  const [form, setForm] = useState<UserForm>(initialForm);
   const [step, setStep] = useState<"form" | "confirmDeactivate">("form");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+
+  const isDirty = open && !readOnly && !savedMessage && JSON.stringify(form) !== JSON.stringify(initialForm);
+  const baseGuard = useDiscardGuard(isDirty, onClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   if (!open) return <AdminDialog open={false} onClose={onClose} title="" />;
 
@@ -209,6 +221,7 @@ function UserFormContent({
     <AdminDialog
       open
       onClose={onClose}
+      discardGuard={discardGuard}
       title={isNew ? "Novo usuário" : `Usuário · ${employee.person.nome}`}
       description="Revise os dados antes de continuar."
       actions={
@@ -236,7 +249,12 @@ function UserFormContent({
               Salvar usuário
             </Button>
           )}
-          <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onClose}>
+          <Button
+            variant="outline-neutral"
+            size="sm"
+            className={adminButtonClassName}
+            onClick={discardGuard.requestClose}
+          >
             {readOnly ? "Fechar" : "Cancelar"}
           </Button>
         </>

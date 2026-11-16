@@ -1,24 +1,37 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
+import { DiscardChangesAlert, type DiscardGuard } from "@/components/ui/DiscardChangesAlert";
 
 interface WideDialogProps {
-  open: boolean;
-  onClose: () => void;
-  title: ReactNode;
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly title: ReactNode;
   /** Linha abaixo do título (ex.: orientação do formulário). */
-  description?: ReactNode;
-  children: ReactNode;
+  readonly description?: ReactNode;
+  readonly children: ReactNode;
   /** Barra de ações ao final (Anterior / Salvar rascunho / Próxima etapa). */
-  footer?: ReactNode;
+  readonly footer?: ReactNode;
+  readonly discardGuard?: DiscardGuard;
 }
 
 /**
  * Modal largo do cadastro de produto (Figma 755:5137, 764:14744): 900px, raio 12,
  * cabeçalho com "×", conteúdo rolável e ações ao final. Em telas pequenas ocupa a largura.
  */
-export default function WideDialog({ open, onClose, title, description, children, footer }: WideDialogProps) {
+export default function WideDialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  discardGuard,
+}: Readonly<WideDialogProps>) {
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && onClose()}>
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(next) => !next && (discardGuard ? discardGuard.requestClose() : onClose())}
+    >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)]" />
         <DialogPrimitive.Content
@@ -40,9 +53,19 @@ export default function WideDialog({ open, onClose, title, description, children
             {description && <p className="text-sm leading-[21px] text-[var(--foreground-secondary)]">{description}</p>}
             {children}
           </div>
-          {footer && (
-            <div className="flex flex-col-reverse gap-3 border-t border-[var(--border)] px-4 py-4 md:flex-row md:items-start md:justify-between md:px-8">
-              {footer}
+          {(footer || discardGuard?.confirmDiscard) && (
+            <div className="flex flex-col gap-3 border-t border-[var(--border)] px-4 py-4 md:px-8">
+              {discardGuard?.confirmDiscard && (
+                <DiscardChangesAlert
+                  onContinue={discardGuard.cancelDiscard}
+                  onDiscard={discardGuard.confirmAndClose}
+                />
+              )}
+              {footer && (
+                <div className="flex flex-col-reverse gap-3 md:flex-row md:items-start md:justify-between">
+                  {footer}
+                </div>
+              )}
             </div>
           )}
         </DialogPrimitive.Content>
