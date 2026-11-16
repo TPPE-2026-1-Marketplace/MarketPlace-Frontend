@@ -9,9 +9,11 @@ import { loadPOSProducts, loadPOSSellers, remainingPhysicalStock } from "@/lib/p
 import { CPF_INVALID_MESSAGE, isValidCpf } from "../../lib/br-validators";
 import { maskCpf } from "../../lib/utils";
 import Button from "@/components/ui/Button";
+import { DiscardChangesAlert } from "@/components/ui/DiscardChangesAlert";
 import { adminButtonClassName } from "@/components/manager/adminClasses";
 import SaleCatalog from "@/components/pos/SaleCatalog";
 import SaleCheckout from "@/components/pos/SaleCheckout";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 
 type SaleOutcome =
   | { status: "completed"; saleId: string; customerName?: string; sellerCode: string; total: number }
@@ -207,6 +209,31 @@ export function Cashier() {
     setCustomerEmail("");
   };
 
+  const isCheckoutDirty =
+    showCheckout &&
+    Boolean(
+      customerName.trim() ||
+        customerCpf.trim() ||
+        customerPhone.trim() ||
+        customerEmail.trim(),
+    );
+  const checkoutDiscardGuard = useDiscardGuard(isCheckoutDirty, handleCancelCheckout);
+
+  const hasActiveSale = currentSale.length > 0 && outcome?.status !== "completed";
+  const leavePdvGuard = useDiscardGuard(hasActiveSale, () => {
+    clearSale();
+    navigate("/selecionar-modulo");
+  });
+
+  useEffect(() => {
+    if (!hasActiveSale) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasActiveSale]);
+
   if (!user || !isInternalUser) return null;
 
   return (
@@ -218,8 +245,28 @@ export function Cashier() {
             {user.name} · {user.role === "manager" ? "Gerente" : user.role === "superadmin" ? "Admin" : user.role === "cashier" ? "Caixa" : "Vendedor"}
           </p>
         </div>
-        <Button variant="outline-neutral" size="sm" className={adminButtonClassName + " w-[140px] min-w-0 shrink-0 lg:w-[180px]"} onClick={() => navigate("/selecionar-modulo")}>Painel</Button>
+        <Button
+          variant="outline-neutral"
+          size="sm"
+          className={adminButtonClassName + " w-[140px] min-w-0 shrink-0 lg:w-[180px]"}
+          onClick={() => {
+            setMessage(null);
+            leavePdvGuard.requestClose();
+          }}
+        >
+          Painel
+        </Button>
       </header>
+
+      {leavePdvGuard.confirmDiscard && (
+        <DiscardChangesAlert
+          message="Há uma venda em andamento no caixa. Deseja sair e descartar os itens?"
+          continueLabel="Continuar na venda"
+          discardLabel="Sair do PDV"
+          onContinue={leavePdvGuard.cancelDiscard}
+          onDiscard={leavePdvGuard.confirmAndClose}
+        />
+      )}
 
       {message && (
         <div role={message.type === "error" ? "alert" : "status"} className={"flex items-center gap-2 rounded-[var(--radius-md)] border p-3 text-sm " + (message.type === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-700")}>
@@ -246,6 +293,7 @@ export function Cashier() {
           paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod}
           items={currentSale} total={total} completing={isCompleting}
           onConfirm={handleCompleteSale} onCancel={handleCancelCheckout}
+          discardGuard={checkoutDiscardGuard}
         />
       ) : (
         <SaleCatalog

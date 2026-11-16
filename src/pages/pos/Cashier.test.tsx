@@ -376,4 +376,34 @@ describe("Cashier (PDV)", () => {
     expect(screen.getByRole("button", { name: "Adicionar à venda" })).toBeDisabled();
   });
 
+  it("protege contra saída acidental do PDV com venda aberta e dados de fechamento digitados", async () => {
+    await renderCashier();
+    await addRosa("ROSA-P", "1");
+
+    await userEvent.click(screen.getByRole("button", { name: "Painel" }));
+    expect(location()).toBe("/pdv");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Há uma venda em andamento no caixa. Deseja sair e descartar os itens?",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Continuar na venda" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Finalizar venda" }));
+    await userEvent.type(screen.getByLabelText("Nome da cliente *"), "Maria Oliveira");
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar finalização" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+    expect(screen.getByLabelText("Nome da cliente *")).toHaveValue("Maria Oliveira");
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar finalização" }));
+    await userEvent.click(screen.getByRole("button", { name: "Descartar alterações" }));
+    expect(screen.getByRole("region", { name: "Venda atual" })).toHaveTextContent("Vestido Rosa");
+
+    await userEvent.click(screen.getByRole("button", { name: "Painel" }));
+    await userEvent.click(screen.getByRole("button", { name: "Sair do PDV" }));
+    expect(location()).toBe("/selecionar-modulo");
+  });
 });

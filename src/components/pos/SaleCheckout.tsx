@@ -1,32 +1,34 @@
 import AdminField from "@/components/manager/AdminField";
 import { adminButtonClassName, adminCardClassName, adminControlClassName } from "@/components/manager/adminClasses";
 import Button from "@/components/ui/Button";
+import { DiscardChangesAlert, type DiscardGuard } from "@/components/ui/DiscardChangesAlert";
 import type { POSSaleItem, POSSeller } from "@/data/pos-types";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type PaymentMethod = "card" | "pix" | "dinheiro";
 interface SaleCheckoutProps {
-  sellerCode: string;
-  sellers: POSSeller[];
-  sellersLoading: boolean;
-  sellersError: string;
-  onReloadSellers: () => void;
-  onSellerChange: (value: string) => void;
-  customerName: string;
-  onNameChange: (value: string) => void;
-  customerCpf: string;
-  onCpfChange: (value: string) => void;
-  customerPhone: string;
-  onPhoneChange: (value: string) => void;
-  customerEmail: string;
-  onEmailChange: (value: string) => void;
-  paymentMethod: PaymentMethod;
-  onPaymentChange: (value: PaymentMethod) => void;
-  items: POSSaleItem[];
-  total: number;
-  completing: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
+  readonly sellerCode: string;
+  readonly sellers: POSSeller[];
+  readonly sellersLoading: boolean;
+  readonly sellersError: string;
+  readonly onReloadSellers: () => void;
+  readonly onSellerChange: (value: string) => void;
+  readonly customerName: string;
+  readonly onNameChange: (value: string) => void;
+  readonly customerCpf: string;
+  readonly onCpfChange: (value: string) => void;
+  readonly customerPhone: string;
+  readonly onPhoneChange: (value: string) => void;
+  readonly customerEmail: string;
+  readonly onEmailChange: (value: string) => void;
+  readonly paymentMethod: PaymentMethod;
+  readonly onPaymentChange: (value: PaymentMethod) => void;
+  readonly items: POSSaleItem[];
+  readonly total: number;
+  readonly completing: boolean;
+  readonly onConfirm: () => void;
+  readonly onCancel: () => void;
+  readonly discardGuard?: DiscardGuard;
 }
 
 const paymentMethods: { value: PaymentMethod; label: string; hint: string }[] = [
@@ -36,7 +38,7 @@ const paymentMethods: { value: PaymentMethod; label: string; hint: string }[] = 
 ];
 
 /** Finalização em página, com resumo ao lado no desktop e abaixo no mobile. */
-export default function SaleCheckout(props: SaleCheckoutProps) {
+export default function SaleCheckout(props: Readonly<SaleCheckoutProps>) {
   const selectedSeller = props.sellers.find((seller) => seller.cpf === props.sellerCode.trim() || seller.code?.toLowerCase() === props.sellerCode.trim().toLowerCase());
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,820fr)_minmax(0,532fr)]">
@@ -78,8 +80,24 @@ export default function SaleCheckout(props: SaleCheckoutProps) {
           </div>
           <p className="text-xs leading-[18px] text-[var(--foreground-secondary)]" aria-live="polite">{paymentMethods.find((method) => method.value === props.paymentMethod)?.hint}</p>
         </fieldset>
+        {props.discardGuard?.confirmDiscard && (
+          <DiscardChangesAlert
+            onContinue={props.discardGuard.cancelDiscard}
+            onDiscard={props.discardGuard.confirmAndClose}
+            className="w-full lg:max-w-[760px]"
+          />
+        )}
         <Button type="submit" variant="action" size="sm" className={adminButtonClassName} loading={props.completing}>Confirmar venda</Button>
-        <Button type="button" variant="outline-neutral" size="sm" className={adminButtonClassName} disabled={props.completing} onClick={props.onCancel}>Cancelar finalização</Button>
+        <Button
+          type="button"
+          variant="outline-neutral"
+          size="sm"
+          className={adminButtonClassName}
+          disabled={props.completing}
+          onClick={props.discardGuard ? props.discardGuard.requestClose : props.onCancel}
+        >
+          Cancelar finalização
+        </Button>
       </form>
       <section className={cn(adminCardClassName, "flex min-w-0 flex-col gap-4 p-6")} aria-labelledby="pdv-summary-title">
         <h2 id="pdv-summary-title" className="text-xl font-semibold leading-7">Resumo da venda</h2>
