@@ -46,12 +46,15 @@ function renderPanel(route = "/painel", user = manager) {
 }
 
 describe("ManagerDashboard", () => {
-  it("bloqueia quem não é funcionário", () => {
+  it("bloqueia quem não é funcionário e permite trocar de conta", async () => {
     renderPanel("/painel", customer);
 
     expect(screen.getByRole("heading", { name: "Acesso restrito" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Fazer login" })).toHaveAttribute("href", "/login");
     expect(screen.getByRole("link", { name: "Voltar à loja" })).toHaveAttribute("href", "/");
+    await userEvent.click(screen.getByRole("button", { name: "Trocar de conta" }));
+    expect(location()).toBe("/login");
+    expect(localStorage.getItem("dk_user")).toBeNull();
   });
 
   it("mostra o shell com usuário, contexto e a visão geral", async () => {
@@ -143,8 +146,9 @@ describe("ManagerDashboard", () => {
     await userEvent.click(screen.getByRole("button", { name: "Fechar menu" }));
     expect(screen.queryByRole("dialog", { name: "Painel gerencial" })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Sair do painel" }));
-    expect(location()).toBe("/");
-    expect(localStorage.getItem("dk_user")).toBeNull();
+    expect(screen.getByRole("link", { name: "Voltar à loja" })).toHaveAttribute("href", "/");
+    await userEvent.click(screen.getByRole("link", { name: "Sair do painel" }));
+    expect(location()).toBe("/selecionar-modulo");
+    expect(localStorage.getItem("dk_user")).not.toBeNull();
   });
 });

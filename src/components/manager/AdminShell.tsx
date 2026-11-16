@@ -1,7 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Home } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import Button from "@/components/ui/Button";
 import { buttonClassName } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import AdminNav, { type AdminNavItem } from "./AdminNav";
@@ -15,19 +15,22 @@ interface AdminShellProps<K extends string> {
   roleLabel: string;
   /** Rótulo do período no canto da barra de contexto ("Outubro 2026"). */
   periodLabel: string;
-  onLogout: () => void;
   children: ReactNode;
 }
 
-function PanelActions({ onLogout }: { onLogout: () => void }) {
+function PanelActions() {
   return (
     <div className="flex flex-col items-start gap-2">
+      <Link to="/" className={buttonClassName({ variant: "outline-neutral", size: "sm", className: adminButtonClassName })}>
+        <Home className="size-4" aria-hidden="true" />
+        Voltar à loja
+      </Link>
       <Link to="/pdv" className={buttonClassName({ variant: "outline-neutral", size: "sm", className: adminButtonClassName })}>
         Abrir PDV
       </Link>
-      <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onLogout}>
+      <Link to="/selecionar-modulo" className={buttonClassName({ variant: "outline-neutral", size: "sm", className: adminButtonClassName })}>
         Sair do painel
-      </Button>
+      </Link>
     </div>
   );
 }
@@ -43,9 +46,8 @@ export default function AdminShell<K extends string>({
   userName,
   roleLabel,
   periodLabel,
-  onLogout,
   children,
-}: AdminShellProps<K>) {
+}: Readonly<AdminShellProps<K>>) {
   const [menuOpen, setMenuOpen] = useState(false);
   const activeLabel = items.find((item) => item.key === active)?.label ?? "";
 
@@ -57,13 +59,15 @@ export default function AdminShell<K extends string>({
   return (
     <div className="flex min-h-screen bg-[var(--background-store)]">
       <aside className="sticky top-0 hidden h-screen w-[280px] shrink-0 flex-col gap-2 overflow-y-auto bg-[var(--background-card)] p-4 lg:flex">
-        <p className="text-xl leading-7 font-semibold text-[var(--foreground)]">DK Fashion</p>
+        <Link to="/" className="text-xl leading-7 font-semibold text-[var(--foreground)] transition-opacity hover:opacity-80">
+          DK Fashion
+        </Link>
         <p className="text-xs leading-4 font-medium tracking-[0.5px] text-[var(--foreground-muted)]">PAINEL GERENCIAL</p>
         <p className="text-xs leading-[18px] text-[var(--foreground-secondary)]">
           {userName} · {roleLabel}
         </p>
         <AdminNav items={items} active={active} onSelect={onSelect} label="Navegação administrativa" />
-        <PanelActions onLogout={onLogout} />
+        <PanelActions />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-8">
@@ -93,7 +97,7 @@ export default function AdminShell<K extends string>({
                   {userName} · {roleLabel}
                 </p>
                 <AdminNav items={items} active={active} onSelect={selectFromMenu} label="Menu administrativo" />
-                <PanelActions onLogout={onLogout} />
+                <PanelActions />
                 <DialogPrimitive.Close className="self-start text-sm leading-5 font-medium text-[var(--foreground-secondary)] underline">
                   Fechar menu
                 </DialogPrimitive.Close>

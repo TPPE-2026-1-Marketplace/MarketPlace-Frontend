@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { customer, employee, manager, renderWithProviders, superadmin } from "@/test/render";
+import { cashier, customer, employee, manager, renderWithProviders, superadmin } from "@/test/render";
 import { ModuleSelection } from "./ModuleSelection";
 
 const location = () => screen.getByTestId("location").textContent;
@@ -24,10 +24,12 @@ describe("ModuleSelection", () => {
     expect(screen.queryByRole("button", { name: /Módulo de Gestão/ })).not.toBeInTheDocument();
   });
 
-  it("caixa pode escolher o PDV", () => {
-    renderWithProviders(<ModuleSelection />, { user: { ...employee, role: "cashier" } });
+  it("caixa pode escolher gestão e PDV", () => {
+    renderWithProviders(<ModuleSelection />, { user: cashier });
     expect(screen.getByRole("button", { name: /PDV - Vendas Presenciais/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Módulo de Gestão/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Módulo de Gestão/ })).toBeInTheDocument();
+    expect(screen.getByText("Acesso: Caixa")).toBeInTheDocument();
+    expect(screen.getByText("Caixa")).toBeInTheDocument();
   });
 
   it("gerente acessa gestão e PDV", async () => {
@@ -48,11 +50,12 @@ describe("ModuleSelection", () => {
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
   });
 
-  it("funcionário só vê o PDV, a comissão e pode sair", async () => {
+  it("vendedor vê gestão, PDV, a comissão e pode sair", async () => {
     renderWithProviders(<ModuleSelection />, { user: employee });
 
-    expect(screen.queryByText("Módulo de Gestão")).not.toBeInTheDocument();
-    expect(screen.getByText("Funcionário")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Módulo de Gestão/ })).toBeInTheDocument();
+    expect(screen.getByText("Acesso: Vendedor")).toBeInTheDocument();
+    expect(screen.getByText("Vendedor")).toBeInTheDocument();
     expect(screen.getByText("5%")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Sair do sistema/ }));
