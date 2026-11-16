@@ -1,9 +1,9 @@
 import React from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CATEGORIAS, TIPOS as TIPOS_CATALOGO } from "@/lib/categories";
+import { TIPOS as TIPOS_CATALOGO } from "@/lib/categories";
 
-export const ALL_SIZES = [
+const ALL_SIZES = [
   "PP", "P", "M", "G", "GG", "XG",
   "38", "40", "42", "44", "46", "48", "50", "52", "54", "56", "58",
 ];
@@ -13,7 +13,7 @@ export const ALL_COLORS = [
   "Verde Esmeralda", "Preto", "Champagne", "Nude", "Bordô", "Lavanda",
 ];
 
-export const COLOR_SWATCHES: Record<string, string> = {
+const COLOR_SWATCHES: Record<string, string> = {
   "rosa": "bg-pink-300",
   "rosa antigo": "bg-[var(--color-brand-light)]",
   "rose gold": "bg-rose-200",
@@ -52,7 +52,7 @@ export const COLOR_SWATCHES: Record<string, string> = {
   "magenta": "bg-pink-600",
 };
 
-export function getColorSwatch(color: string): string {
+function getColorSwatch(color: string): string {
   const normalized = color.toLowerCase().trim();
   if (COLOR_SWATCHES[normalized]) return COLOR_SWATCHES[normalized];
 
