@@ -158,6 +158,24 @@ describe("ProductWizardDialog - cadastro", () => {
     expect(await dialog().findByRole("alert")).toHaveTextContent("Não foi possível salvar: SKU já cadastrado");
     expect(localStorage.getItem(PRODUCT_DRAFT_STORAGE_KEY)).not.toBeNull();
   });
+
+  it("exige confirmação ao tentar fechar o assistente com alterações não salvas", async () => {
+    const { onClose } = renderWizard();
+    await fillBasic();
+
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    expect(dialog().getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+
+    await userEvent.click(dialog().getByRole("button", { name: "Continuar editando" }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(dialog().getByLabelText("Título *")).toHaveValue("Princesa Rosé");
+
+    await userEvent.click(dialog().getByRole("button", { name: "Fechar" }));
+    await userEvent.click(dialog().getByRole("button", { name: "Descartar alterações" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("ProductWizardDialog - edição", () => {

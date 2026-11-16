@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from "react";
 import Button from "@/components/ui/Button";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import { localImageId, type DraftColor, type DraftImage } from "@/lib/productDraft";
 import { cn } from "@/lib/utils";
 import ImageCropDialog from "./ImageCropDialog";
@@ -9,17 +10,17 @@ import { adminButtonClassName, adminControlClassName } from "./adminClasses";
 const readFileAsDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
 
 interface ProductImagesDialogProps {
   /** Cor aberta; null fecha o dialog. */
-  color: DraftColor | null;
-  productSku: string;
-  onClose: () => void;
-  onSave: (images: DraftImage[]) => void;
+  readonly color: DraftColor | null;
+  readonly productSku: string;
+  readonly onClose: () => void;
+  readonly onSave: (images: DraftImage[]) => void;
 }
 
 type CropTarget = { kind: "new"; src: string } | { kind: "replace"; index: number };
@@ -29,11 +30,16 @@ type CropTarget = { kind: "new"; src: string } | { kind: "replace"; index: numbe
  * "Recorte aplicado" (866:4242), "Remover imagem" (866:4339) e "Imagem removida" (866:4292).
  * Fotos já salvas no backend só são exibidas: a API não remove nem reordena vínculos.
  */
-export default function ProductImagesDialog(props: ProductImagesDialogProps) {
+export default function ProductImagesDialog(props: Readonly<ProductImagesDialogProps>) {
   return <ProductImagesContent key={props.color?.name ?? "fechado"} {...props} />;
 }
 
-function ProductImagesContent({ color, productSku, onClose, onSave }: ProductImagesDialogProps) {
+function ProductImagesContent({
+  color,
+  productSku,
+  onClose,
+  onSave,
+}: Readonly<ProductImagesDialogProps>) {
   const [images, setImages] = useState<DraftImage[]>(() => color?.images ?? []);
   const [selected, setSelected] = useState(0);
   const [crop, setCrop] = useState<CropTarget | null>(null);
@@ -41,6 +47,18 @@ function ProductImagesContent({ color, productSku, onClose, onSave }: ProductIma
   const [link, setLink] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const isDirty =
+    color !== null &&
+    (JSON.stringify(images) !== JSON.stringify(color.images ?? []) || link.trim().length > 0);
+  const baseGuard = useDiscardGuard(isDirty, onClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   if (!color) return <WideDialog open={false} onClose={onClose} title="">{null}</WideDialog>;
 
@@ -104,9 +122,10 @@ function ProductImagesContent({ color, productSku, onClose, onSave }: ProductIma
         open={crop === null}
         onClose={onClose}
         title="Imagens do produto"
+        discardGuard={discardGuard}
         footer={
           <>
-            <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onClose}>
+            <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={discardGuard.requestClose}>
               Cancelar
             </Button>
             <Button

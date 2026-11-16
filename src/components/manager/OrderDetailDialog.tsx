@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import {
   ORDER_STATUS_LABELS,
   orderCustomerCpf,
@@ -17,11 +18,11 @@ import { adminButtonClassName, adminControlClassName } from "./adminClasses";
 const EDITABLE_STATUSES = (Object.keys(ORDER_STATUS_LABELS) as ApiOrderStatus[]).filter((status) => status !== "paid");
 
 interface OrderDetailDialogProps {
-  order: ApiOrder | null;
-  readOnly: boolean;
-  onClose: () => void;
-  onUpdateStatus: (orderId: number, status: ApiOrderStatus) => Promise<void>;
-  onUpdateTracking: (orderId: number, trackingCode: string) => Promise<void>;
+  readonly order: ApiOrder | null;
+  readonly readOnly: boolean;
+  readonly onClose: () => void;
+  readonly onUpdateStatus: (orderId: number, status: ApiOrderStatus) => Promise<void>;
+  readonly onUpdateTracking: (orderId: number, trackingCode: string) => Promise<void>;
 }
 
 function describeCustomer(order: ApiOrder) {
@@ -30,17 +31,37 @@ function describeCustomer(order: ApiOrder) {
 }
 
 /** Frames "Pedidos / Detalhe ou edição" (755:1004) e "Confirmação" (755:1060). */
-export default function OrderDetailDialog(props: OrderDetailDialogProps) {
+export default function OrderDetailDialog(props: Readonly<OrderDetailDialogProps>) {
   // A key reinicia o formulário a cada pedido aberto.
   return <OrderDetailContent key={props.order?.idPedido ?? "fechado"} {...props} />;
 }
 
-function OrderDetailContent({ order, readOnly, onClose, onUpdateStatus, onUpdateTracking }: OrderDetailDialogProps) {
+function OrderDetailContent({
+  order,
+  readOnly,
+  onClose,
+  onUpdateStatus,
+  onUpdateTracking,
+}: Readonly<OrderDetailDialogProps>) {
   const [status, setStatus] = useState<ApiOrderStatus>(order?.status ?? "pending");
   const [tracking, setTracking] = useState(order?.codigoRastreamento ?? "");
   const [saving, setSaving] = useState<"status" | "tracking" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+
+  const isDirty =
+    Boolean(order) &&
+    !readOnly &&
+    !savedMessage &&
+    (status !== order?.status || tracking !== (order?.codigoRastreamento ?? ""));
+  const baseGuard = useDiscardGuard(isDirty, onClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   if (!order) return <AdminDialog open={false} onClose={onClose} title="" />;
 
@@ -91,6 +112,7 @@ function OrderDetailContent({ order, readOnly, onClose, onUpdateStatus, onUpdate
     <AdminDialog
       open
       onClose={onClose}
+      discardGuard={discardGuard}
       title={`Pedido #${order.idPedido}`}
       description="Revise os dados antes de continuar."
       actions={
@@ -124,7 +146,12 @@ function OrderDetailContent({ order, readOnly, onClose, onUpdateStatus, onUpdate
               Salvar alterações
             </Button>
           )}
-          <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onClose}>
+          <Button
+            variant="outline-neutral"
+            size="sm"
+            className={adminButtonClassName}
+            onClick={discardGuard.requestClose}
+          >
             Cancelar
           </Button>
         </>

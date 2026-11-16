@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import type { Competence, SalesGoal } from "@/hooks/useCommissions";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import AdminDialog from "./AdminDialog";
 import AdminField from "./AdminField";
 import SavedConfirmation from "./SavedConfirmation";
@@ -8,28 +9,40 @@ import { adminButtonClassName, adminControlClassName } from "./adminClasses";
 import { formatCompetence, formatPercentInput, parsePercentInput } from "./format";
 
 interface TeamGoalDialogProps {
-  open: boolean;
-  goal: SalesGoal | null;
-  competence: Competence;
-  onClose: () => void;
-  onSave: (valorMeta: number, valorBonus: number) => Promise<void>;
+  readonly open: boolean;
+  readonly goal: SalesGoal | null;
+  readonly competence: Competence;
+  readonly onClose: () => void;
+  readonly onSave: (valorMeta: number, valorBonus: number) => Promise<void>;
 }
 
 /**
  * "Configurar metas" do protótipo: meta coletiva da competência, usada pelo backend
  * para quem não tem meta individual.
  */
-export default function TeamGoalDialog(props: TeamGoalDialogProps) {
+export default function TeamGoalDialog(props: Readonly<TeamGoalDialogProps>) {
   return <TeamGoalContent key={`${props.open}-${props.goal?.idGoal ?? "nova"}`} {...props} />;
 }
 
-function TeamGoalContent({ open, goal, competence, onClose, onSave }: TeamGoalDialogProps) {
-  const [target, setTarget] = useState(() => String(Number(goal?.valorMeta ?? 0)));
-  const [bonusRate, setBonusRate] = useState(() => formatPercentInput(Number(goal?.valorBonus ?? 0)));
+function TeamGoalContent({ open, goal, competence, onClose, onSave }: Readonly<TeamGoalDialogProps>) {
+  const initialTarget = String(Number(goal?.valorMeta ?? 0));
+  const initialBonusRate = formatPercentInput(Number(goal?.valorBonus ?? 0));
+  const [target, setTarget] = useState(initialTarget);
+  const [bonusRate, setBonusRate] = useState(initialBonusRate);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const label = formatCompetence(competence.mes, competence.ano);
+
+  const isDirty = open && !saved && (target !== initialTarget || bonusRate !== initialBonusRate);
+  const baseGuard = useDiscardGuard(isDirty, onClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   if (saved) {
     return (
@@ -63,6 +76,7 @@ function TeamGoalContent({ open, goal, competence, onClose, onSave }: TeamGoalDi
     <AdminDialog
       open={open}
       onClose={onClose}
+      discardGuard={discardGuard}
       title="Meta da equipe"
       description="Vale para os vendedores sem meta individual na competência."
       actions={
@@ -75,7 +89,12 @@ function TeamGoalContent({ open, goal, competence, onClose, onSave }: TeamGoalDi
           <Button variant="action" size="sm" className={adminButtonClassName} loading={saving} onClick={() => void save()}>
             Salvar meta
           </Button>
-          <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onClose}>
+          <Button
+            variant="outline-neutral"
+            size="sm"
+            className={adminButtonClassName}
+            onClick={discardGuard.requestClose}
+          >
             Cancelar
           </Button>
         </>

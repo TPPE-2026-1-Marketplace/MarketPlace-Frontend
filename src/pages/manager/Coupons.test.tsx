@@ -210,4 +210,22 @@ describe("Coupons", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByText("Primeira compra · BEMVINDA10")).toBeInTheDocument();
   });
+
+  it("protege contra perda de alterações ao cancelar criação de cupom modificado", async () => {
+    await renderCoupons();
+    await userEvent.click(screen.getByRole("button", { name: "Novo cupom" }));
+
+    await userEvent.type(dialog().getByLabelText("Campanha / parceiro"), "Campanha Verão");
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    expect(dialog().getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+
+    await userEvent.click(dialog().getByRole("button", { name: "Continuar editando" }));
+    expect(dialog().getByLabelText("Campanha / parceiro")).toHaveValue("Campanha Verão");
+
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(dialog().getByRole("button", { name: "Descartar alterações" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
 });

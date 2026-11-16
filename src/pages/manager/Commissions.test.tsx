@@ -228,4 +228,31 @@ describe("Commissions", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByText("Ana Vendas")).toBeInTheDocument();
   });
+
+  it("protege contra perda de alterações em comissão individual e meta da equipe", async () => {
+    await renderCommissions();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ver detalhes de Ana Vendas" }));
+    await userEvent.clear(dialog().getByLabelText("Taxa de comissão (%)"));
+    await userEvent.type(dialog().getByLabelText("Taxa de comissão (%)"), "8");
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    expect(dialog().getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+    await userEvent.click(dialog().getByRole("button", { name: "Continuar editando" }));
+    expect(dialog().getByLabelText("Taxa de comissão (%)")).toHaveValue("8");
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(dialog().getByRole("button", { name: "Descartar alterações" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Configurar metas" }));
+    await userEvent.clear(dialog().getByLabelText("Meta de vendas (R$)"));
+    await userEvent.type(dialog().getByLabelText("Meta de vendas (R$)"), "75000");
+    await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+    expect(dialog().getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+    await userEvent.click(dialog().getByRole("button", { name: "Descartar alterações" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
 });
