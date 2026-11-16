@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Star } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { DiscardChangesAlert } from "@/components/ui/DiscardChangesAlert";
 import { Textarea } from "@/components/ui/textarea";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import { cn } from "@/lib/utils";
 
 export const REVIEW_COMMENT_MAX_LENGTH = 2000;
@@ -9,19 +11,19 @@ export const REVIEW_COMMENT_MAX_LENGTH = 2000;
 const RATING_LABELS = ["Ruim", "Regular", "Bom", "Muito bom", "Excelente"];
 
 export interface ReviewFormValues {
-  nota: number;
-  comentario: string;
+  readonly nota: number;
+  readonly comentario: string;
 }
 
 interface ReviewFormProps {
   /** Valores iniciais (modo edição). Sem eles, o formulário começa vazio. */
-  initialValues?: ReviewFormValues;
-  submitLabel: string;
-  isSubmitting?: boolean;
+  readonly initialValues?: ReviewFormValues;
+  readonly submitLabel: string;
+  readonly isSubmitting?: boolean;
   /** Erro devolvido pela API, mostrado acima dos botões. */
-  error?: string | null;
-  onSubmit: (values: ReviewFormValues) => void;
-  onCancel?: () => void;
+  readonly error?: string | null;
+  readonly onSubmit: (values: ReviewFormValues) => void;
+  readonly onCancel?: () => void;
 }
 
 export function ReviewForm({
@@ -31,10 +33,22 @@ export function ReviewForm({
   error = null,
   onSubmit,
   onCancel,
-}: ReviewFormProps) {
+}: Readonly<ReviewFormProps>) {
   const [nota, setNota] = useState(initialValues?.nota ?? 0);
   const [comentario, setComentario] = useState(initialValues?.comentario ?? "");
   const [ratingError, setRatingError] = useState<string | null>(null);
+
+  const isDirty =
+    nota !== (initialValues?.nota ?? 0) ||
+    comentario.trim() !== (initialValues?.comentario ?? "").trim();
+  const baseGuard = useDiscardGuard(Boolean(onCancel) && isDirty, () => onCancel?.());
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setRatingError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -128,12 +142,19 @@ export function ReviewForm({
         </p>
       )}
 
+      {discardGuard.confirmDiscard && (
+        <DiscardChangesAlert
+          onContinue={discardGuard.cancelDiscard}
+          onDiscard={discardGuard.confirmAndClose}
+        />
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" size="sm" loading={isSubmitting}>
           {submitLabel}
         </Button>
         {onCancel && (
-          <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+          <Button type="button" size="sm" variant="ghost" onClick={discardGuard.requestClose} disabled={isSubmitting}>
             Cancelar
           </Button>
         )}

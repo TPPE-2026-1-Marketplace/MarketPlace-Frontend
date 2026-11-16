@@ -2,16 +2,18 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { DiscardChangesAlert } from "@/components/ui/DiscardChangesAlert";
 import Input from "@/components/ui/Input";
 import type { Address, AddressFormValues } from "@/hooks/useAddresses";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import { maskCep, onlyDigits } from "@/lib/utils";
 
 interface AddressFormModalProps {
-  open: boolean;
-  address: Address | null;
-  saving: boolean;
-  onClose: () => void;
-  onSubmit: (values: AddressFormValues) => void;
+  readonly open: boolean;
+  readonly address: Address | null;
+  readonly saving: boolean;
+  readonly onClose: () => void;
+  readonly onSubmit: (values: AddressFormValues) => void;
 }
 
 const EMPTY_FORM: AddressFormValues = {
@@ -25,7 +27,13 @@ const EMPTY_FORM: AddressFormValues = {
   uf: "",
 };
 
-export default function AddressFormModal({ open, address, saving, onClose, onSubmit }: AddressFormModalProps) {
+export default function AddressFormModal({
+  open,
+  address,
+  saving,
+  onClose,
+  onSubmit,
+}: Readonly<AddressFormModalProps>) {
   const [form, setForm] = useState<AddressFormValues>(EMPTY_FORM);
 
   useEffect(() => {
@@ -46,6 +54,21 @@ export default function AddressFormModal({ open, address, saving, onClose, onSub
     );
   }, [open, address]);
 
+  const initialForm: AddressFormValues = address
+    ? {
+        nome: address.nome ?? "",
+        cep: maskCep(address.cep),
+        logradouro: address.logradouro,
+        numero: address.numero,
+        complemento: address.complemento ?? "",
+        bairro: address.bairro,
+        cidade: address.cidade,
+        uf: address.uf,
+      }
+    : EMPTY_FORM;
+  const isDirty = open && JSON.stringify(form) !== JSON.stringify(initialForm);
+  const discardGuard = useDiscardGuard(isDirty, onClose);
+
   const isValid =
     form.cep.replace(/\D/g, "").length === 8 &&
     form.logradouro.trim() &&
@@ -55,7 +78,7 @@ export default function AddressFormModal({ open, address, saving, onClose, onSub
     form.uf.trim().length === 2;
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && onClose()}>
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => !next && discardGuard.requestClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[var(--overlay)]" />
         <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 flex max-h-[90vh] w-[calc(100%-32px)] max-w-[560px] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-[var(--radius-lg)] bg-[var(--background-card)] p-6 shadow-lg focus:outline-none">
@@ -63,12 +86,14 @@ export default function AddressFormModal({ open, address, saving, onClose, onSub
             <DialogPrimitive.Title className="flex-1 text-xl leading-7 font-semibold text-[var(--foreground)]">
               {address ? "Editar endereço" : "Adicionar endereço"}
             </DialogPrimitive.Title>
-            <DialogPrimitive.Close
+            <button
+              type="button"
               aria-label="Fechar"
+              onClick={discardGuard.requestClose}
               className="flex size-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-control)] text-[var(--foreground)] hover:bg-[var(--background-secondary)]"
             >
               <X className="size-4" aria-hidden="true" />
-            </DialogPrimitive.Close>
+            </button>
           </div>
           <DialogPrimitive.Description className="sr-only">
             Formulário de endereço de entrega.
@@ -132,6 +157,13 @@ export default function AddressFormModal({ open, address, saving, onClose, onSub
               containerClassName="w-20"
             />
           </div>
+
+          {discardGuard.confirmDiscard && (
+            <DiscardChangesAlert
+              onContinue={discardGuard.cancelDiscard}
+              onDiscard={discardGuard.confirmAndClose}
+            />
+          )}
 
           <Button
             variant="action"

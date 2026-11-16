@@ -89,6 +89,32 @@ describe("ReviewForm", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
+  it("exige confirmação ao cancelar quando nota ou comentário foram alterados", async () => {
+    const onCancel = vi.fn();
+    render(
+      <ReviewForm
+        initialValues={{ nota: 2, comentario: "Apertado" }}
+        submitLabel="Salvar alterações"
+        onSubmit={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText(/Comentário/), " no ombro");
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Você tem alterações não salvas. Deseja descartá-las?",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Continuar editando" }));
+    expect(screen.getByLabelText(/Comentário/)).toHaveValue("Apertado no ombro");
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    await userEvent.click(screen.getByRole("button", { name: "Descartar alterações" }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it("mostra o erro da API e bloqueia o envio enquanto salva", () => {
     render(
       <ReviewForm

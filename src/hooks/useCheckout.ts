@@ -18,6 +18,18 @@ import type {
 } from "@/types/checkout";
 
 export const MAX_INSTALLMENTS = 6;
+export const CHECKOUT_DRAFT_STORAGE_KEY = "dk_checkout_draft";
+
+function loadCheckoutDraft(): Partial<CheckoutForm> | null {
+  try {
+    const raw = sessionStorage.getItem(CHECKOUT_DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Partial<CheckoutForm>) : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Ordem visual dos campos: o foco vai para o primeiro inválido nesta ordem. */
 export const CHECKOUT_FIELD_ORDER: CheckoutField[] = [
@@ -176,7 +188,7 @@ export function useCheckout() {
   const shipping = useShippingQuote();
   const address = useAddressLookup();
 
-  const [form, setForm] = useState<CheckoutForm>(() => ({
+  const [initialForm] = useState<CheckoutForm>(() => ({
     ...EMPTY_FORM,
     nome: user?.name ?? "",
     email: user?.email ?? "",
@@ -185,6 +197,10 @@ export function useCheckout() {
     telefone: maskPhone(user?.phone ?? ""),
     cep: maskCep(cart.cep ?? ""),
   }));
+  const [form, setForm] = useState<CheckoutForm>(() => {
+    const saved = loadCheckoutDraft();
+    return saved ? { ...initialForm, ...saved } : initialForm;
+  });
   const [errors, setErrors] = useState<CheckoutErrors>({});
   const [delivery, setDelivery] = useState<DeliveryMethod>("entrega");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("credit_card");
@@ -194,6 +210,36 @@ export function useCheckout() {
   /** Verdadeiro depois do envio: o carrinho esvazia, mas a página não deve voltar ao carrinho. */
   const [completed, setCompleted] = useState(false);
   const orderIdRef = useRef<number | null>(null);
+
+  const isFormDirty =
+    !completed &&
+    (Object.keys(form) as (keyof CheckoutForm)[]).some((key) => form[key] !== initialForm[key]);
+
+  useEffect(() => {
+    try {
+      if (completed) {
+        sessionStorage.removeItem(CHECKOUT_DRAFT_STORAGE_KEY);
+        return;
+      }
+      const hasAnyValue = Object.values(form).some((value) => value.trim().length > 0);
+      if (hasAnyValue && isFormDirty) {
+        sessionStorage.setItem(CHECKOUT_DRAFT_STORAGE_KEY, JSON.stringify(form));
+      } else if (!hasAnyValue) {
+        sessionStorage.removeItem(CHECKOUT_DRAFT_STORAGE_KEY);
+      }
+    } catch {
+      // Armazenamento de sessão indisponível em modo restrito.
+    }
+  }, [form, completed, isFormDirty]);
+
+  useEffect(() => {
+    if (!isFormDirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isFormDirty]);
 
   const { calculate, reset } = shipping;
   const { lookup } = address;
@@ -292,6 +338,11 @@ export function useCheckout() {
         criadoEm: new Date().toISOString(),
       });
       setCompleted(true);
+      try {
+        sessionStorage.removeItem(CHECKOUT_DRAFT_STORAGE_KEY);
+      } catch {
+        // Ignora falha de storage.
+      }
       clear();
 
       if (payment.status !== "paid" && payment.redirectUrl) {
