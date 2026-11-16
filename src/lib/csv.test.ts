@@ -16,6 +16,17 @@ describe("buildClientsCsv", () => {
   it("gera só o cabeçalho quando não há clientes", () => {
     expect(buildClientsCsv([])).toBe('"nome","email","telefone","cpf"');
   });
+
+  it("neutraliza fórmulas potenciais contra CSV Injection", () => {
+    const csv = buildClientsCsv([
+      { cpf: "1", nome: "=CMD|'/C calc'!A0", email: "+evil@dk.com", telefone: "-123" },
+      { cpf: "2", nome: "@SUM(A1:A2)", email: "\tmalicioso@dk.com", telefone: "\r456" },
+    ]);
+
+    expect(csv).toBe(
+      '"nome","email","telefone","cpf"\n"\'=CMD|\'/C calc\'!A0","\'+evil@dk.com","\'-123","1"\n"\'@SUM(A1:A2)","\'\tmalicioso@dk.com","\'\r456","2"',
+    );
+  });
 });
 
 describe("clientsCsvFilename", () => {

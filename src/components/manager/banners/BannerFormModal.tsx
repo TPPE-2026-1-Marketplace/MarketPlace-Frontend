@@ -133,7 +133,12 @@ export function BannerFormModal({
 
   const validate = () => {
     const nextErrors: Partial<Record<keyof BannerFormState, string>> = {};
-    if (!form.image.trim()) nextErrors.image = "URL da imagem é obrigatória";
+    const trimmedImage = form.image.trim();
+    if (!trimmedImage) {
+      nextErrors.image = "URL da imagem é obrigatória";
+    } else if (!/^https?:\/\/\S+$/i.test(trimmedImage)) {
+      nextErrors.image = "Informe uma URL válida iniciando com https://";
+    }
     if (!form.title.trim()) nextErrors.title = "Título é obrigatório";
     if (!form.primaryCta.trim()) nextErrors.primaryCta = "Botão principal é obrigatório";
     setErrors(nextErrors);

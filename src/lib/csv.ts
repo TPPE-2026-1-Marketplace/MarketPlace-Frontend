@@ -1,6 +1,8 @@
 import type { ApiPerson } from "@/lib/management";
 
-const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+const sanitizeCsvValue = (value: string) => (FORMULA_PREFIX.test(value) ? `'${value}` : value);
+const csvCell = (value: string) => `"${sanitizeCsvValue(value).replace(/"/g, '""')}"`;
 
 /** CSV da exportação de clientes: nome, e-mail, telefone e CPF, com aspas escapadas. */
 export function buildClientsCsv(clients: ApiPerson[]): string {

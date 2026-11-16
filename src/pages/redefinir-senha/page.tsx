@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Lock } from "lucide-react";
 import AuthCard, { authInputClassName, type AuthMessage } from "@/components/auth/AuthCard";
@@ -10,8 +10,14 @@ const MAX_PASSWORD = 72;
 /** Nova senha a partir do link enviado por e-mail (`/redefinir-senha?token=...`). */
 export default function RedefinirSenhaPage() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token")?.trim() ?? "";
+  const [token] = useState(() => searchParams.get("token")?.trim() ?? "");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (searchParams.has("token") && typeof window !== "undefined") {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [searchParams]);
 
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -48,7 +54,7 @@ export default function RedefinirSenhaPage() {
         subtitle="Redefinir senha"
         message={{ type: "error", text: "Link de redefinição inválido ou incompleto." }}
       >
-        <Link to="/esqueci-senha" className="text-sm text-[#C8427C] hover:underline">
+        <Link to="/esqueci-senha" className="text-sm text-[var(--color-brand)] hover:underline">
           Pedir um novo link
         </Link>
       </AuthCard>
@@ -115,7 +121,7 @@ export default function RedefinirSenhaPage() {
 
       <p className="text-center text-xs text-gray-500 mt-6">
         Link vencido?{" "}
-        <Link to="/esqueci-senha" className="text-[#C8427C] hover:underline">
+        <Link to="/esqueci-senha" className="text-[var(--color-brand)] hover:underline">
           Pedir um novo
         </Link>
       </p>
