@@ -19,7 +19,17 @@ export default function KpiCard({ label, value, help }: KpiCardProps) {
   );
 }
 
-/** Linha "Indicadores": 4 colunas no desktop e 2 no mobile. */
-export function KpiGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{children}</div>;
+interface KpiGridProps {
+  children: ReactNode;
+  /** Colunas no desktop: 4 na maioria das telas, 3 em Vendas PDV (Figma 755:1331). */
+  columns?: 3 | 4;
+}
+
+/** Linha "Indicadores": 4 (ou 3) colunas no desktop e 2 no mobile. */
+export function KpiGrid({ children, columns = 4 }: KpiGridProps) {
+  return (
+    <div className={cn("grid grid-cols-2 gap-4", columns === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4")}>
+      {children}
+    </div>
+  );
 }

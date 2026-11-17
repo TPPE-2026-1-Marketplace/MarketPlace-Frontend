@@ -8,7 +8,6 @@ dist
 README.md
 .env
 .env.*
-!.env.example
 Dockerfile*
 compose*
 .DS_store

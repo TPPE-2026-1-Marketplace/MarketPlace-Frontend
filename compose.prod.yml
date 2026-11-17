@@ -9,8 +9,9 @@ services:
         VITE_API_URL: ${VITE_API_URL:-}
     ports:
       - "${APP_PORT:-3003}:80"
-    env_file:
-      - .env.production
+    # Sem env_file: o runner é um nginx servindo arquivos estáticos e as VITE_*
+    # já foram embutidas no bundle no build. O .env.production só entra pelo
+    # `--env-file` do Makefile, que preenche o build-arg VITE_API_URL acima.
     environment:
       NODE_ENV: production
     restart: unless-stopped

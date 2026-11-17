@@ -129,4 +129,14 @@ describe("LoginPage", () => {
     expect(await screen.findByText("Telefone inválido. Use DDD + número, ex.: (61) 99999-0000.")).toBeInTheDocument();
     expect(postMock).not.toHaveBeenCalled();
   });
+
+  it("leva para a recuperação de senha e mostra o aviso ao voltar dela", async () => {
+    renderWithProviders(<LoginPage />, { route: "/login?senha=redefinida", path: "/login" });
+
+    expect(screen.getByText("Senha redefinida. Entre com a nova senha.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Esqueci minha senha" })).toHaveAttribute(
+      "href",
+      "/esqueci-senha",
+    );
+  });
 });

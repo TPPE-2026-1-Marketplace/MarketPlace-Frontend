@@ -9,11 +9,17 @@ PDV ou alterações administrativas.
 Na raiz do projeto:
 
 ```bash
-SELENIUM_BASE_URL=https://url-publica-da-loja.example make selenium
-make selenium-local
-make selenium-local-ui
-make selenium-prod-ui
+make selenium-local      # Chrome no host contra o front local
+make selenium-prod       # Chrome no host contra a produção
+make selenium-local-ui   # Chrome no container (noVNC) contra o front local
+make selenium-prod-ui    # Chrome no container (noVNC) contra a produção
 ```
+
+Os quatro alvos chamam `scripts/selenium.sh <modo>`, que concentra a lógica:
+carrega o `.env` do modo (`.env.development` nos modos locais,
+`.env.production` nos de produção), espera os serviços responderem e aplica os
+padrões do modo visual. As variáveis do shell (ou `make alvo VAR=valor`) têm
+prioridade sobre as do `.env`, que têm prioridade sobre os padrões do script.
 
 `make selenium-local` espera que o Vite esteja disponível em
 `http://localhost:3000`. Inicie-o com Docker:
@@ -22,16 +28,15 @@ make selenium-prod-ui
 make dev-up
 ```
 
-Também é possível executar os mesmos targets dentro de `front`.
-
 O modo visual local sobe o serviço `selenium/standalone-chrome`, usa o front do
 mesmo Compose pelo alias interno `http://app.internal:3000` e disponibiliza:
 
 - WebDriver: `http://localhost:4444`
 - noVNC: `http://localhost:7900/?autoconnect=1&resize=scale&password=secret`
 
-`make selenium-prod-ui` usa por padrão a URL pública do front em
-`https://marketplace-frontend-jh71.onrender.com/`, sobe apenas o Selenium
+Os modos de produção (`make selenium-prod` e `make selenium-prod-ui`) usam por
+padrão a URL pública do front em
+`https://marketplace-frontend-jh71.onrender.com/`. O `selenium-prod-ui` sobe apenas o Selenium
 remoto local com noVNC e executa a suíte em modo visual contra a produção.
 Abra para acompanhar o navegador:
 
@@ -41,8 +46,8 @@ http://localhost:7900/?autoconnect=1&resize=scale&password=secret
 
 ## Variáveis de ambiente
 
-- `SELENIUM_BASE_URL`: URL alvo. É obrigatória em produção e pode sobrescrever a
-  URL local.
+- `SELENIUM_BASE_URL`: URL alvo. Sobrescreve a URL padrão do modo (local ou
+  produção).
 - `HEADLESS`: use `false` para abrir o navegador; o padrão é `true`.
 - `SELENIUM_REMOTE_URL`: servidor WebDriver remoto, usado pelo modo visual.
 - `SELENIUM_TIMEOUT_MS`: timeout dos waits explícitos em milissegundos; padrão
@@ -79,14 +84,14 @@ criado por `make demo` e `SELENIUM_ADMIN_PASSWORD` deve usar a senha demo
 `admin123`. Essas credenciais devem existir somente em `.env.development`.
 Não as copie para `.env.production`: em produção, informe apenas a URL segura
 por `SELENIUM_BASE_URL` e use uma estratégia de credenciais própria do ambiente.
-Para `make selenium-prod-ui`, defina `SELENIUM_PROD_ADMIN_EMAIL` e
-`SELENIUM_PROD_ADMIN_PASSWORD` no ambiente do shell ou no carregador de
-variáveis que você já usa antes de chamar o alvo.
+Para `make selenium-prod` e `make selenium-prod-ui`, defina
+`SELENIUM_PROD_ADMIN_EMAIL` e `SELENIUM_PROD_ADMIN_PASSWORD` no
+`.env.production` ou no shell antes de chamar o alvo.
 
 Exemplo para depuração:
 
 ```bash
-HEADLESS=false make selenium-local
+make selenium-local HEADLESS=false
 ```
 
 `make selenium-local-ui` inicia sem pausa artificial, pausa 1,5 segundo
@@ -134,8 +139,8 @@ make selenium-local-ui \
   usa `SELENIUM_ADMIN_*` quando `SELENIUM_ENV=production`.
 - A tela de gestão de usuários não faz parte da cobertura remota por ainda ser
   um módulo parcialmente em desenvolvimento.
-- `make selenium` continua exigindo `SELENIUM_BASE_URL`; `make selenium-prod-ui`
-  usa `https://marketplace-frontend-jh71.onrender.com/` como fallback quando a
-  variável não foi definida no ambiente.
+- `make selenium-prod` e `make selenium-prod-ui` usam
+  `https://marketplace-frontend-jh71.onrender.com/` quando `SELENIUM_BASE_URL`
+  não foi definida no shell nem no `.env.production`.
 - O Selenium Manager pode precisar de acesso à rede na primeira execução para
   resolver um driver compatível com o Chrome instalado.

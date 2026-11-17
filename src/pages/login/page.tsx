@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, User, Lock, Mail, Phone, AlertCircle, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, User, Lock, Phone, AlertCircle, CheckCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
   CPF_INVALID_MESSAGE,
@@ -20,7 +20,12 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(mode === "cadastro");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  // Volta da tela de redefinição (/redefinir-senha) com a senha já trocada.
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(
+    searchParams.get("senha") === "redefinida"
+      ? { type: "success", text: "Senha redefinida. Entre com a nova senha." }
+      : null,
+  );
   
   const { login, register, isAuthenticated, user } = useAuth();
 
@@ -83,15 +88,15 @@ export default function LoginPage() {
         }
         // The useEffect will handle redirection
       }
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Ocorreu um erro." });
+    } catch (err: unknown) {
+      setMessage({ type: "error", text: err instanceof Error && err.message ? err.message : "Ocorreu um erro." });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center py-12 px-4 font-sans">
+    <div className="min-h-screen bg-[var(--background-store)] flex items-center justify-center py-12 px-4 font-sans">
       <div className="w-full max-w-md">
         {/* Logo or Header */}
         <div className="text-center mb-8">
@@ -148,7 +153,7 @@ export default function LoginPage() {
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Seu nome"
                     required
-                    className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
+                    className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[var(--foreground)]"
                   />
                 </div>
               </div>
@@ -166,7 +171,7 @@ export default function LoginPage() {
                     onChange={handleCpfChange}
                     placeholder="000.000.000-00"
                     required
-                    className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
+                    className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[var(--foreground)]"
                   />
                 </div>
               </div>
@@ -182,7 +187,7 @@ export default function LoginPage() {
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="seu@email.com"
                   required
-                  className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
+                  className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[var(--foreground)]"
                 />
               </div>
             </div>
@@ -199,7 +204,7 @@ export default function LoginPage() {
                     value={form.phone}
                     onChange={handlePhoneChange}
                     placeholder="(11) 99999-9999"
-                    className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
+                    className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[var(--foreground)]"
                   />
                 </div>
               </div>
@@ -216,7 +221,7 @@ export default function LoginPage() {
                   placeholder="Sua senha"
                   required
                   minLength={isRegister ? 8 : undefined}
-                  className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#1a1a1a]"
+                  className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[var(--foreground)]"
                 />
                 <button
                   type="button"
@@ -230,7 +235,7 @@ export default function LoginPage() {
 
             {!isRegister && (
               <div className="text-right">
-                <Link to="#" className="text-xs text-[#C8427C] hover:underline">
+                <Link to="/esqueci-senha" className="text-xs text-[var(--color-brand)] hover:underline">
                   Esqueci minha senha
                 </Link>
               </div>

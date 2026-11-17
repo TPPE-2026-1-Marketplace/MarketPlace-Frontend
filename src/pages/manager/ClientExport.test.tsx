@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
@@ -9,72 +9,119 @@ vi.mock("@/lib/management", () => ({ fetchPeople: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: { get: vi.fn() } }));
 
 const people = [
-  { cpf: "111", nome: "Ana Cliente", email: "ana@dk.com", telefone: "61 9999", },
-  { cpf: "222", nome: 'Bia "Aspas"', email: "bia@dk.com", telefone: null },
-  { cpf: "333", nome: "Carlos Vendedor", email: "carlos@dk.com", telefone: null },
+  { cpf: "11122233344", nome: "Ana Cliente", email: "ana@dk.com", telefone: "61999990000" },
+  { cpf: "22233344455", nome: 'Bia "Aspas"', email: "bia@dk.com", telefone: null },
+  { cpf: "33344455566", nome: "Carlos Vendedor", email: "carlos@dk.com", telefone: null },
 ];
+
+async function renderLoaded() {
+  render(<ClientExport />);
+  await screen.findByText("Ana Cliente");
+}
+
+const search = () => screen.getByLabelText("Buscar nome, e-mail ou CPF");
 
 describe("ClientExport", () => {
   beforeEach(() => {
     vi.mocked(fetchPeople).mockResolvedValue({ data: people, meta: { page: 1, limit: 100, total: 3, totalPages: 1 } });
-    vi.mocked(api.get).mockResolvedValue({ data: [{ cpf: "333" }] });
+    vi.mocked(api.get).mockResolvedValue({ data: [{ cpf: "33344455566" }] });
   });
 
-  it("lista só clientes, sem os funcionários", async () => {
+  it("mostra o estado de carregamento e depois só os clientes, sem os funcionários", async () => {
     render(<ClientExport />);
-    expect(screen.getByText("Carregando clientes...")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Carregando dados");
 
     expect(await screen.findByText("Ana Cliente")).toBeInTheDocument();
     expect(screen.queryByText("Carlos Vendedor")).not.toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument();
-    expect(api.get).toHaveBeenCalledWith("/employees?limit=100");
   });
 
-  it("filtra por nome, e-mail ou CPF", async () => {
-    render(<ClientExport />);
-    await screen.findByText("Ana Cliente");
-    const search = screen.getByPlaceholderText("Buscar por nome, e-mail ou CPF...");
+  it("exibe indicadores, telefone formatado e CPF mascarado", async () => {
+    await renderLoaded();
 
-    await userEvent.type(search, "BIA@");
+    expect(screen.getByRole("heading", { name: "Clientes" })).toBeInTheDocument();
+    expect(screen.getAllByText("2")).toHaveLength(2);
+    expect(screen.getByText("(61) 99999-0000")).toBeInTheDocument();
+    expect(screen.getByText("***.***.***-44")).toBeInTheDocument();
+    expect(screen.queryByText("11122233344")).not.toBeInTheDocument();
+    expect(screen.getByText("Acesso conforme o perfil do usuário")).toBeInTheDocument();
+  });
+
+  it("filtra por nome, e-mail ou CPF ao aplicar os filtros e atualiza o resultado da busca", async () => {
+    await renderLoaded();
+
+    await userEvent.type(search(), "BIA@");
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     expect(screen.queryByText("Ana Cliente")).not.toBeInTheDocument();
-    await userEvent.clear(search);
-    await userEvent.type(search, "111");
+    expect(screen.getByText("Bia \"Aspas\"")).toBeInTheDocument();
+
+    await userEvent.clear(search());
+    await userEvent.type(search(), "111.222.333-44");
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     expect(screen.getByText("Ana Cliente")).toBeInTheDocument();
-    await userEvent.type(search, "x");
-    expect(screen.getByText("Nenhum cliente real encontrado.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Exportar CSV/ })).toBeDisabled();
+    expect(screen.queryByText("Bia \"Aspas\"")).not.toBeInTheDocument();
   });
 
-  it("exporta o CSV com aspas escapadas", async () => {
-    // O Blob do jsdom não implementa text(): guarda o conteúdo passado ao construtor.
-    const csvParts: string[] = [];
+  it("mostra o estado sem resultados e limpa os filtros", async () => {
+    await renderLoaded();
+
+    await userEvent.type(search(), "ninguém");
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    expect(screen.getByText("Nenhum resultado encontrado")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Exportar CSV" })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(screen.getByText("Ana Cliente")).toBeInTheDocument();
+    expect(search()).toHaveValue("");
+  });
+
+  it("exporta o CSV do resultado atual da busca", async () => {
+    const parts: string[] = [];
     vi.stubGlobal("Blob", class {
-      constructor(parts: string[]) {
-        csvParts.push(parts.join(""));
+      constructor(content: string[]) {
+        parts.push(content.join(""));
       }
     });
-    const createObjectURL = vi.fn(() => "blob:csv");
-    const revokeObjectURL = vi.fn();
-    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    Object.assign(URL, { createObjectURL: vi.fn(() => "blob:csv"), revokeObjectURL: vi.fn() });
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    render(<ClientExport />);
-    await screen.findByText("Ana Cliente");
+    await renderLoaded();
 
-    await userEvent.click(screen.getByRole("button", { name: /Exportar CSV/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    expect(screen.getByText("Exportar clientes")).toBeInTheDocument();
+    expect(click).not.toHaveBeenCalled();
 
-    expect(createObjectURL).toHaveBeenCalledTimes(1);
-    expect(csvParts[0]).toBe(
-      '"nome","email","telefone","cpf"\n"Ana Cliente","ana@dk.com","61 9999","111"\n"Bia ""Aspas""","bia@dk.com","","222"',
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Confirmar exportação" }));
+
+    expect(parts[0]).toContain('"Ana Cliente","ana@dk.com","61999990000","11122233344"');
+    expect(parts[0]).toContain('"Bia ""Aspas"""');
     expect(click).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:csv");
+    expect(screen.getByText("Exportação preparada")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 
-  it("mostra erro quando o backend falha", async () => {
+  it("não baixa nada ao cancelar a exportação", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    await renderLoaded();
+
+    await userEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it("mostra o erro e tenta de novo", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(fetchPeople).mockRejectedValueOnce(new Error("500"));
     render(<ClientExport />);
 
-    expect(await screen.findByText("Não foi possível carregar os clientes do backend.")).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Não foi possível carregar os clientes do backend.")).toBeInTheDocument();
+
+    await userEvent.click(within(alert).getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByText("Ana Cliente")).toBeInTheDocument();
   });
 });

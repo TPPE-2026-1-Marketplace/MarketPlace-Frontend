@@ -1,7 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { customer, employee, manager, renderWithProviders, superadmin } from "@/test/render";
+import { cashier, customer, employee, manager, renderWithProviders, superadmin } from "@/test/render";
 import Header from "./Header";
 
 const location = () => screen.getByTestId("location").textContent;
@@ -69,7 +69,8 @@ describe("Header", () => {
   it.each([
     [manager, "Gerente", true],
     [superadmin, "Super Admin", true],
-    [employee, "Funcionário", false],
+    [employee, "Funcionário", true],
+    [cashier, "Caixa", true],
   ])("mostra os módulos internos para %o", async (user, label, hasPanel) => {
     renderWithProviders(<Header />, { user });
 

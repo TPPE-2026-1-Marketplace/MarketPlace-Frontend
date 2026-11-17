@@ -3,22 +3,6 @@ import { api, ApiError } from "@/lib/api";
 
 export type UserRole = "customer" | "manager" | "superadmin" | "employee" | "cashier";
 
-export interface ManagedUser {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  role: UserRole;
-  phone?: string;
-  sellerCode?: string;
-  commissionRate?: number;
-  salesTarget?: number;
-  bonusEnabled?: boolean;
-  bonusAmount?: number;
-  active: boolean;
-  createdAt: string;
-}
-
 export interface User {
   id: string;
   name: string;
@@ -37,27 +21,63 @@ interface LoginApiResponse {
   access_token: string;
 }
 
+const VALID_ROLES = new Set<UserRole>(["customer", "manager", "superadmin", "employee", "cashier"]);
+
+const SENSITIVE_STORAGE_KEYS = [
+  "dk_last_order",
+  "dk_pending_order",
+  "dk_checkout_draft",
+  "dk_product_draft",
+  "dk_product_wizard_draft_v1",
+] as const;
+
 /**
- * Decodifica o payload de um JWT sem validar assinatura.
- * Usado apenas para extrair dados do token após login bem-sucedido.
+ * Decodifica o payload de um JWT (formato Base64URL) sem validar assinatura.
+ * Usado apenas para extrair claims do token emitido pela API.
  */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    const payload = token.split('.')[1];
-    return JSON.parse(atob(payload));
+    const parts = token.split(".");
+    if (parts.length < 2 || !parts[1]) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    return JSON.parse(window.atob(padded)) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
-const decodeJwt = (token: string) => {
+
+function isTokenExpired(token: string | null): boolean {
+  if (!token) return false;
+  const payload = decodeJwtPayload(token);
+  return typeof payload?.exp === "number" && payload.exp * 1000 <= Date.now();
+}
+
+function parseStoredUser(raw: string | null): User | null {
+  if (!raw) return null;
   try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(window.atob(base64));
+    const parsed = JSON.parse(raw) as Partial<User> | null;
+    if (!parsed || typeof parsed !== "object" || typeof parsed.id !== "string" || typeof parsed.email !== "string") {
+      return null;
+    }
+    const role: UserRole =
+      typeof parsed.role === "string" && VALID_ROLES.has(parsed.role as UserRole)
+        ? (parsed.role as UserRole)
+        : "customer";
+    return { ...parsed, role } as User;
   } catch {
-    return {};
+    return null;
   }
-};
+}
+
+function clearAuthStorage() {
+  localStorage.removeItem("dk_token");
+  localStorage.removeItem("dk_user");
+  for (const key of SENSITIVE_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  }
+}
 
 const mapRole = (backendRole: string): UserRole => {
   // Backend usa papéis em português
@@ -76,9 +96,9 @@ const mapRole = (backendRole: string): UserRole => {
 
 interface AuthContextType {
   user: User | null;
-  users: ManagedUser[];
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   register: (name: string, email: string, password: string, phone: string, cpf: string) => Promise<{ success: boolean; message: string }>;
+  updateUserProfile: (data: Partial<Pick<User, "name" | "email" | "phone">>) => void;
   logout: () => void;
   isManager: boolean;
   isSuperAdmin: boolean;
@@ -92,94 +112,26 @@ interface AuthContextType {
   canEditOrders: boolean;
   canEditCommissions: boolean;
   canEditBanners: boolean;
-  addUser: (userData: Omit<ManagedUser, "id" | "createdAt">) => { success: boolean; message: string };
-  updateUser: (id: string, userData: Partial<ManagedUser>) => { success: boolean; message: string };
-  deleteUser: (id: string) => { success: boolean; message: string };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const INITIAL_USERS: ManagedUser[] = [
-  {
-    id: "u-001",
-    name: "Super Admin DK",
-    email: "superadmin@dkfestas.com.br",
-    password: "super123",
-    role: "superadmin",
-    phone: "(11) 99999-0001",
-    active: true,
-    createdAt: "2024-01-01",
-  },
-  {
-    id: "u-002",
-    name: "Gerente DK",
-    email: "gerente@dkfestas.com.br",
-    password: "gerente123",
-    role: "manager",
-    phone: "(11) 99999-0000",
-    active: true,
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "u-003",
-    name: "Ana Vendas",
-    email: "ana.vendas@dkfestas.com.br",
-    password: "ana123",
-    role: "employee",
-    phone: "(11) 98888-1111",
-    sellerCode: "ANA01",
-    commissionRate: 5,
-    salesTarget: 20000,
-    bonusEnabled: true,
-    bonusAmount: 500,
-    active: true,
-    createdAt: "2024-02-01",
-  },
-  {
-    id: "u-004",
-    name: "Carlos Moda",
-    email: "carlos.moda@dkfestas.com.br",
-    password: "carlos123",
-    role: "employee",
-    phone: "(11) 98888-2222",
-    sellerCode: "CARLOS23",
-    commissionRate: 4.5,
-    salesTarget: 18000,
-    bonusEnabled: true,
-    bonusAmount: 400,
-    active: true,
-    createdAt: "2024-03-01",
-  },
-  {
-    id: "u-005",
-    name: "Beatriz Estilo",
-    email: "beatriz.estilo@dkfestas.com.br",
-    password: "beatriz123",
-    role: "employee",
-    phone: "(11) 98888-3333",
-    sellerCode: "BEA05",
-    commissionRate: 5.5,
-    salesTarget: 22000,
-    bonusEnabled: false,
-    bonusAmount: 600,
-    active: true,
-    createdAt: "2024-04-01",
-  },
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem("dk_user");
-    if (!stored) return null;
-    try {
-      return JSON.parse(stored) as User;
-    } catch {
-      // Corrupt stored session — clear it instead of white-screening the app
+    const token = localStorage.getItem("dk_token");
+    if (isTokenExpired(token)) {
+      localStorage.removeItem("dk_token");
       localStorage.removeItem("dk_user");
       return null;
     }
+    const parsed = parseStoredUser(stored);
+    if (stored && !parsed) {
+      // Corrupt stored session — clear it instead of white-screening the app
+      localStorage.removeItem("dk_user");
+    }
+    return parsed;
   });
-  const [users, setUsers] = useState<ManagedUser[]>(INITIAL_USERS);
 
   React.useEffect(() => {
     if (user) {
@@ -189,11 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  /**
-   * Attempts login via the backend API first.
-   * Falls back to the local users list for internal roles (manager, superadmin, employee)
-   * that may not exist in the database yet.
-   */
+  /** Authenticates user via the backend API (POST /auth/login) and fetches profile. */
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     try {
       const response = await api.post<LoginApiResponse>("/auth/login", { email, senha: password });
@@ -301,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (isApiError && err.status === 400) {
         let errorMsg = err.message || "Dados inválidos. Verifique os campos.";
-        const errors = (err.data as any)?.errors;
+        const errors = (err.data as { errors?: { message: string }[] } | undefined)?.errors;
         if (Array.isArray(errors)) {
           errorMsg = errors.map((e) => e.message).join(", ");
         }
@@ -319,40 +267,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const updateUserProfile = React.useCallback((data: Partial<Pick<User, "name" | "email" | "phone">>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const next = { ...prev, ...data };
+      try {
+        localStorage.setItem("dk_user", JSON.stringify(next));
+      } catch {
+        // Ignore storage write failure.
+      }
+      return next;
+    });
+  }, []);
+
+  const logout = React.useCallback(() => {
     setUser(null);
-    localStorage.removeItem("dk_token");
-    localStorage.removeItem("dk_user");
+    clearAuthStorage();
     window.dispatchEvent(new Event("clear-cart"));
-  };
+  }, []);
 
-  const addUser = (userData: Omit<ManagedUser, "id" | "createdAt">) => {
-    if (users.some((u) => u.email === userData.email)) {
-      return { success: false, message: "E-mail já cadastrado." };
-    }
-    const newUser: ManagedUser = {
-      ...userData,
-      id: `u-${Date.now()}`,
-      createdAt: new Date().toISOString().split("T")[0],
+  React.useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
     };
-    setUsers((prev) => [...prev, newUser]);
-    return { success: true, message: "Usuário cadastrado com sucesso!" };
-  };
-
-  const updateUser = (id: string, userData: Partial<ManagedUser>) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, ...userData } : u))
-    );
-    return { success: true, message: "Usuário atualizado com sucesso!" };
-  };
-
-  const deleteUser = (id: string) => {
-    if (id === user?.id) {
-      return { success: false, message: "Não é possível remover o próprio usuário." };
-    }
-    setUsers((prev) => prev.filter((u) => u.id !== id));
-    return { success: true, message: "Usuário removido com sucesso!" };
-  };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === null || (event.key === "dk_token" && !event.newValue)) {
+        setUser(null);
+        return;
+      }
+      if (event.key === "dk_user") {
+        setUser(parseStoredUser(event.newValue));
+      }
+    };
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("auth:unauthorized", handleUnauthorized);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [logout]);
 
   const isManager = user?.role === "manager" || user?.role === "superadmin";
   const isSuperAdmin = user?.role === "superadmin";
@@ -372,9 +325,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        users,
         login,
         register,
+        updateUserProfile,
         logout,
         isManager,
         isSuperAdmin,
@@ -388,9 +341,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canEditOrders,
         canEditCommissions,
         canEditBanners,
-        addUser,
-        updateUser,
-        deleteUser,
       }}
     >
       {children}

@@ -62,3 +62,9 @@ export const employee: User = {
   sellerCode: "ANA01",
   commissionRate: 5,
 };
+export const cashier: User = {
+  id: "444",
+  name: "Caixa DK",
+  email: "caixa@dk.com",
+  role: "cashier",
+};

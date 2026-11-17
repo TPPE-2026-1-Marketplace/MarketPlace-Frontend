@@ -39,7 +39,7 @@ export default function Header() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   // Auth state
-  const { user, logout, isManager, isSuperAdmin, isInternalUser } = useAuth();
+  const { user, logout, isInternalUser } = useAuth();
 
   const onProducts = location.pathname === "/produtos";
 
@@ -200,11 +200,13 @@ export default function Header() {
                       <p className="text-sm text-gray-900">{user.name}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{user.email}</p>
                       {user.role && (
-                        <span className="inline-block mt-1.5 bg-[#1a1a1a] text-white text-xs px-2 py-0.5">
+                        <span className="inline-block mt-1.5 bg-[var(--foreground)] text-white text-xs px-2 py-0.5">
                           {user.role === "superadmin"
                             ? "Super Admin"
                             : user.role === "manager"
                             ? "Gerente"
+                            : user.role === "cashier"
+                            ? "Caixa"
                             : user.role === "employee"
                             ? "Funcionário"
                             : "Cliente"}
@@ -226,16 +228,14 @@ export default function Header() {
                           <ShoppingBag className="w-4 h-4" />
                           Loja Online
                         </Link>
-                        {(isManager || isSuperAdmin) && (
-                          <Link
-                            to="/painel"
-                            onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                          >
-                            <LayoutDashboard className="w-4 h-4" />
-                            Painel Gerencial
-                          </Link>
-                        )}
+                        <Link
+                          to="/painel"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          Painel Gerencial
+                        </Link>
                         <Link
                           to="/pdv"
                           onClick={() => setUserMenuOpen(false)}

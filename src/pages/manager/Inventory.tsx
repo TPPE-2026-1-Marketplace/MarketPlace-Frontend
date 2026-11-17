@@ -7,14 +7,15 @@ import FilterBar from "@/components/manager/FilterBar";
 import InventoryAdjustDialog from "@/components/manager/InventoryAdjustDialog";
 import KpiCard, { KpiGrid } from "@/components/manager/KpiCard";
 import NoResults from "@/components/manager/NoResults";
+import ProductWizardDialog from "@/components/manager/ProductWizardDialog";
 import RecordsTable, { type RecordColumn } from "@/components/manager/RecordsTable";
 import { adminButtonClassName, adminControlClassName } from "@/components/manager/adminClasses";
 import { formatKpiCount } from "@/components/manager/format";
 import Button from "@/components/ui/Button";
-import { useCreateProduct } from "@/hooks/useCreateProduct";
 import { LOW_STOCK_LIMIT, useInventoryRows, type InventoryRow } from "@/hooks/useInventoryRows";
+import { useCategories, useProductPersistence } from "@/hooks/useProductPersistence";
+import type { Product } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/utils";
-import { AddProduct } from "./AddProduct";
 
 type Channel = "all" | "online" | "physical";
 type Availability = "all" | "available" | "low" | "out";
@@ -61,29 +62,16 @@ interface InventoryProps {
 /** Estoque do painel (Figma 755:410 / 755:640). */
 export function Inventory({ readOnly = false }: InventoryProps) {
   const { rows, totals, isLoading, error, refetch, adjustStock, removeRow } = useInventoryRows();
-  const createProduct = useCreateProduct(refetch);
+  const { createProduct, updateProduct } = useProductPersistence(refetch);
+  const categories = useCategories();
   const [draft, setDraft] = useState<InventoryFilters>(EMPTY_FILTERS);
   const [filters, setFilters] = useState<InventoryFilters>(EMPTY_FILTERS);
-  const [showAddProduct, setShowAddProduct] = useState(false);
+  // null = fechado; "create" = cadastro; produto = edição.
+  const [wizard, setWizard] = useState<"create" | Product | null>(null);
   // A linha fica guardada (e não só o SKU) para a confirmação continuar aberta após excluir.
   const [selectedRow, setSelectedRow] = useState<InventoryRow | null>(null);
 
   const filteredRows = useMemo(() => rows.filter((row) => matchesFilters(row, filters)), [rows, filters]);
-
-  if (showAddProduct) {
-    return (
-      <AddProduct
-        onBack={() => setShowAddProduct(false)}
-        onSave={(_product, payload) => {
-          if (!payload) {
-            setShowAddProduct(false);
-            return;
-          }
-          void createProduct(payload).then((created) => created && setShowAddProduct(false));
-        }}
-      />
-    );
-  }
 
   const columns: RecordColumn<InventoryRow>[] = [
     {
@@ -129,7 +117,7 @@ export function Inventory({ readOnly = false }: InventoryProps) {
         description="Controle as variantes e a disponibilidade em cada canal de venda."
         action={
           !readOnly && (
-            <Button variant="action" size="sm" className={adminButtonClassName} onClick={() => setShowAddProduct(true)}>
+            <Button variant="action" size="sm" className={adminButtonClassName} onClick={() => setWizard("create")}>
               Adicionar produto
             </Button>
           )
@@ -218,6 +206,22 @@ export function Inventory({ readOnly = false }: InventoryProps) {
         onClose={() => setSelectedRow(null)}
         onSave={adjustStock}
         onRemove={removeRow}
+        onEditProduct={
+          readOnly
+            ? undefined
+            : (row) => {
+                setSelectedRow(null);
+                setWizard(row.product);
+              }
+        }
+      />
+
+      <ProductWizardDialog
+        mode={wizard === null ? null : wizard === "create" ? { kind: "create" } : { kind: "edit", product: wizard }}
+        categories={categories}
+        onClose={() => setWizard(null)}
+        onCreate={createProduct}
+        onUpdate={updateProduct}
       />
     </>
   );

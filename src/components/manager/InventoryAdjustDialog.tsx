@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import { useDiscardGuard } from "@/hooks/useDiscardGuard";
 import type { InventoryRow } from "@/hooks/useInventoryRows";
 import AdminDialog from "./AdminDialog";
 import AdminField from "./AdminField";
@@ -7,28 +8,50 @@ import SavedConfirmation from "./SavedConfirmation";
 import { adminButtonClassName, adminControlClassName } from "./adminClasses";
 
 interface InventoryAdjustDialogProps {
-  row: InventoryRow | null;
-  onClose: () => void;
-  onSave: (codigoSku: string, stock: { online: number; physical: number }) => Promise<void>;
-  onRemove: (row: InventoryRow) => Promise<void>;
+  readonly row: InventoryRow | null;
+  readonly onClose: () => void;
+  readonly onSave: (codigoSku: string, stock: { online: number; physical: number }) => Promise<void>;
+  readonly onRemove: (row: InventoryRow) => Promise<void>;
+  /** Abre a edição do produto da linha (Figma 850:5697). */
+  readonly onEditProduct?: (row: InventoryRow) => void;
 }
 
 type Step = "form" | "confirm-remove" | "saved" | "removed";
 
 /** Frames "Estoque / Detalhe ou edição" (755:583), "Confirmação" (755:618) e "confirmDelete" (755:6020). */
-export default function InventoryAdjustDialog(props: InventoryAdjustDialogProps) {
+export default function InventoryAdjustDialog(props: Readonly<InventoryAdjustDialogProps>) {
   // A key reinicia as quantidades a cada variante aberta.
   return <InventoryAdjustContent key={props.row?.codigoSku ?? "fechado"} {...props} />;
 }
 
 const toQuantity = (value: string) => Math.max(0, Math.floor(Number(value) || 0));
 
-function InventoryAdjustContent({ row, onClose, onSave, onRemove }: InventoryAdjustDialogProps) {
+function InventoryAdjustContent({
+  row,
+  onClose,
+  onSave,
+  onRemove,
+  onEditProduct,
+}: Readonly<InventoryAdjustDialogProps>) {
   const [online, setOnline] = useState(row?.stockOnline ?? 0);
   const [physical, setPhysical] = useState(row?.stockPhysical ?? 0);
   const [step, setStep] = useState<Step>("form");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isDirty =
+    Boolean(row) &&
+    step === "form" &&
+    !row?.isOrphan &&
+    (online !== row?.stockOnline || physical !== row?.stockPhysical);
+  const baseGuard = useDiscardGuard(isDirty, onClose);
+  const discardGuard = {
+    ...baseGuard,
+    requestClose: () => {
+      setError(null);
+      baseGuard.requestClose();
+    },
+  };
 
   if (!row) return <AdminDialog open={false} onClose={onClose} title="" />;
 
@@ -112,11 +135,17 @@ function InventoryAdjustContent({ row, onClose, onSave, onRemove }: InventoryAdj
     <AdminDialog
       open
       onClose={onClose}
+      discardGuard={discardGuard}
       title={`Ajustar estoque · ${row.title}`}
       description="Revise os dados antes de continuar."
       actions={
         <>
           {errorMessage}
+          {onEditProduct && (
+            <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={() => onEditProduct(row)}>
+              Editar produto
+            </Button>
+          )}
           <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={() => setStep("confirm-remove")}>
             {removesProduct ? "Excluir produto" : "Excluir variante"}
           </Button>
@@ -133,7 +162,12 @@ function InventoryAdjustContent({ row, onClose, onSave, onRemove }: InventoryAdj
               Salvar estoque
             </Button>
           )}
-          <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onClose}>
+          <Button
+            variant="outline-neutral"
+            size="sm"
+            className={adminButtonClassName}
+            onClick={discardGuard.requestClose}
+          >
             Cancelar
           </Button>
         </>

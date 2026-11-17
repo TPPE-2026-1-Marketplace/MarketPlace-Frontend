@@ -60,7 +60,7 @@ describe("PedidoConfirmacaoPage (Finalizado)", () => {
 
   it("/pedido sem id usa o último pedido enviado ao pagamento", () => {
     saveOrderSnapshot({ ...snapshot, metodoPagamento: "pix", parcelas: 1 });
-    expect(localStorage.getItem(PENDING_ORDER_KEY)).toBe("1042");
+    expect(sessionStorage.getItem(PENDING_ORDER_KEY)).toBe("1042");
     renderPedido("/pedido");
 
     expect(screen.getByText(/Mariana, seu pedido #1042 foi registrado\./)).toBeInTheDocument();

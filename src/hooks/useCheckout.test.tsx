@@ -9,6 +9,7 @@ import { CartProvider, useCart } from "./useCart";
 import {
   buildInstallmentOptions,
   buildOrderPayload,
+  CHECKOUT_DRAFT_STORAGE_KEY,
   getCurrentStep,
   getFirstInvalidField,
   useCheckout,
@@ -175,13 +176,13 @@ describe("useCheckout — envio", () => {
     return renderHook(() => ({ checkout: useCheckout(), cart: useCart().cart }), { wrapper });
   }
 
-  function mockApi({ paymentStatus = "pending", failPayment = false } = {}) {
+  function mockApi({ paymentStatus = "pending", failPayment = false, redirectUrl = "https://pay.example/1042" } = {}) {
     vi.mocked(api.post).mockImplementation(async (path: string) => {
       if (path === "/shipping/calculate") return { valor: 24.9, prazo_dias: 3 };
       if (path.startsWith("/orders")) return { idPedido: 1042 };
       if (path.startsWith("/payments")) {
         if (failPayment) throw new Error("Gateway indisponível");
-        return { status: paymentStatus, redirectUrl: "https://pay.example/1042" };
+        return { status: paymentStatus, redirectUrl };
       }
       throw new Error(`rota inesperada ${path}`);
     });
@@ -249,7 +250,7 @@ describe("useCheckout — envio", () => {
       metodoPagamento: "credit_card",
       parcelas: 3,
     });
-    expect(localStorage.getItem("dk_pending_order")).toBe("1042");
+    expect(sessionStorage.getItem("dk_pending_order")).toBe("1042");
   });
 
   it("logado com PIX na loja: usa as rotas autenticadas e parcela única", async () => {
@@ -298,5 +299,51 @@ describe("useCheckout — envio", () => {
     const orderCalls = vi.mocked(api.post).mock.calls.filter(([path]) => path.startsWith("/orders"));
     expect(orderCalls).toHaveLength(1);
     expect(assignMock).toHaveBeenCalledWith("https://pay.example/1042");
+  });
+
+  it("salva rascunho no sessionStorage, restaura ao reabrir e limpa ao concluir", async () => {
+    mockApi({ paymentStatus: "paid" });
+    const first = renderCheckout();
+    act(() => {
+      first.result.current.checkout.setField("nome", "Mariana Rascunho");
+      first.result.current.checkout.setField("email", "rascunho@email.com");
+    });
+
+    expect(JSON.parse(sessionStorage.getItem(CHECKOUT_DRAFT_STORAGE_KEY) ?? "{}")).toMatchObject({
+      nome: "Mariana Rascunho",
+      email: "rascunho@email.com",
+    });
+    first.unmount();
+
+    const second = renderCheckout();
+    expect(second.result.current.checkout.form.nome).toBe("Mariana Rascunho");
+    expect(second.result.current.checkout.form.email).toBe("rascunho@email.com");
+
+    await fillValidForm(second.result);
+    await act(() => second.result.current.checkout.submit());
+    expect(sessionStorage.getItem(CHECKOUT_DRAFT_STORAGE_KEY)).toBeNull();
+  });
+
+  it("bloqueia redirecionamento para esquemas inseguros (javascript:) e segue para confirmação", async () => {
+    mockApi({ redirectUrl: "javascript:alert(1)" });
+    const { result } = renderCheckout();
+    await fillValidForm(result);
+
+    await act(() => result.current.checkout.submit());
+
+    expect(assignMock).not.toHaveBeenCalled();
+    expect(navigateMock).toHaveBeenCalledWith("/pedido/1042");
+  });
+
+  it("informa erro claro ao tentar enviar boleto indisponível", async () => {
+    mockApi();
+    const { result } = renderCheckout();
+    await fillValidForm(result);
+    act(() => result.current.checkout.setPaymentMethod("boleto"));
+
+    await act(() => result.current.checkout.submit());
+
+    expect(result.current.checkout.submitError).toContain("boleto indisponível");
+    expect(api.post).not.toHaveBeenCalledWith("/payments/guest", expect.anything());
   });
 });
