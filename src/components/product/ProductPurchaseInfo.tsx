@@ -1,5 +1,5 @@
 import React from "react";
-import { ShoppingCart, Check, Star, Minus, Plus, Ruler, AlertCircle } from "lucide-react";
+import { ShoppingCart, Check, Star, Ruler, AlertCircle } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ColorSelector from "@/components/ui/ColorSelector";

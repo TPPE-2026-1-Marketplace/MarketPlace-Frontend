@@ -41,7 +41,6 @@ describe("AuthContext", () => {
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.isInternalUser).toBe(false);
     expect(localStorage.getItem("dk_user")).toBeNull();
-    expect(result.current.users).toHaveLength(5);
   });
 
   it("restaura a sessão salva e calcula as permissões de gerente", () => {
@@ -198,6 +197,10 @@ describe("AuthContext", () => {
   it("logout limpa a sessão e dispara o evento clear-cart", () => {
     localStorage.setItem("dk_user", JSON.stringify({ id: "1", name: "A", email: "a", role: "customer" }));
     localStorage.setItem("dk_token", "t");
+    sessionStorage.setItem("dk_last_order", "{}");
+    sessionStorage.setItem("dk_pending_order", "10");
+    sessionStorage.setItem("dk_checkout_draft", "{}");
+    localStorage.setItem("dk_product_draft", "{}");
     const listener = vi.fn();
     window.addEventListener("clear-cart", listener);
     const { result } = setup();
@@ -207,48 +210,74 @@ describe("AuthContext", () => {
     expect(result.current.user).toBeNull();
     expect(localStorage.getItem("dk_token")).toBeNull();
     expect(localStorage.getItem("dk_user")).toBeNull();
+    expect(sessionStorage.getItem("dk_last_order")).toBeNull();
+    expect(sessionStorage.getItem("dk_pending_order")).toBeNull();
+    expect(sessionStorage.getItem("dk_checkout_draft")).toBeNull();
+    expect(localStorage.getItem("dk_product_draft")).toBeNull();
     expect(listener).toHaveBeenCalledTimes(1);
     window.removeEventListener("clear-cart", listener);
   });
 
-  it("gerencia usuários internos", () => {
-    localStorage.setItem(
-      "dk_user",
-      JSON.stringify({ id: "u-001", name: "Super", email: "superadmin@dkfestas.com.br", role: "superadmin" }),
-    );
+  it("decodifica JWT em Base64URL com - e _ sem padding", async () => {
+    const base64Url = btoa(JSON.stringify({ sub: "123", role: "administrador", email: "admin@dk.com", x: "???>??>" }))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    expect(base64Url).toContain("_");
+    postMock.mockResolvedValueOnce({ access_token: `hdr.${base64Url}.sig` });
+    getMock.mockRejectedValueOnce(new Error("skip"));
     const { result } = setup();
 
-    expect(
-      result.current.addUser({
-        name: "Dup",
-        email: "gerente@dkfestas.com.br",
-        password: "x",
-        role: "employee",
-        active: true,
-      }),
-    ).toEqual({ success: false, message: "E-mail já cadastrado." });
+    await act(async () => {
+      await result.current.login("admin@dk.com", "senha");
+    });
+
+    expect(result.current.user).toMatchObject({ id: "123", role: "superadmin", email: "admin@dk.com" });
+  });
+
+  it("descarta sessão na inicialização quando dk_token está expirado", () => {
+    const expired = jwt({ sub: "1", exp: Math.floor(Date.now() / 1000) - 60 });
+    localStorage.setItem("dk_user", JSON.stringify({ id: "1", name: "Admin", email: "a@dk.com", role: "superadmin" }));
+    localStorage.setItem("dk_token", expired);
+
+    const { result } = setup();
+
+    expect(result.current.user).toBeNull();
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(localStorage.getItem("dk_token")).toBeNull();
+    expect(localStorage.getItem("dk_user")).toBeNull();
+  });
+
+  it("atualiza o perfil em memória via updateUserProfile e sincroniza eventos globais", () => {
+    localStorage.setItem("dk_user", JSON.stringify({ id: "1", name: "Antigo", email: "a@dk.com", role: "customer" }));
+    localStorage.setItem("dk_token", jwt({ sub: "1", exp: Math.floor(Date.now() / 1000) + 3600 }));
+    const { result } = setup();
 
     act(() => {
-      expect(
-        result.current.addUser({ name: "Nova", email: "nova@dk.com", password: "x", role: "cashier", active: true }),
-      ).toEqual({ success: true, message: "Usuário cadastrado com sucesso!" });
+      result.current.updateUserProfile({ name: "Atualizado", email: "novo@dk.com" });
     });
-    const nova = result.current.users.find((u) => u.email === "nova@dk.com");
-    expect(nova).toMatchObject({ role: "cashier", createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+    expect(result.current.user).toMatchObject({ name: "Atualizado", email: "novo@dk.com" });
+    expect(JSON.parse(localStorage.getItem("dk_user")!).name).toBe("Atualizado");
 
     act(() => {
-      result.current.updateUser(nova!.id, { name: "Nova Caixa" });
+      window.dispatchEvent(new Event("auth:unauthorized"));
     });
-    expect(result.current.users.find((u) => u.id === nova!.id)?.name).toBe("Nova Caixa");
+    expect(result.current.user).toBeNull();
 
-    expect(result.current.deleteUser("u-001")).toEqual({
-      success: false,
-      message: "Não é possível remover o próprio usuário.",
-    });
     act(() => {
-      result.current.deleteUser(nova!.id);
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "dk_user",
+          newValue: JSON.stringify({ id: "2", name: "Outra Aba", email: "aba@dk.com", role: "manager" }),
+        }),
+      );
     });
-    expect(result.current.users.some((u) => u.id === nova!.id)).toBe(false);
+    expect(result.current.user).toMatchObject({ name: "Outra Aba", role: "manager" });
+
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key: "dk_token", newValue: null }));
+    });
+    expect(result.current.user).toBeNull();
   });
 
   it.each([

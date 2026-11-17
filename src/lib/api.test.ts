@@ -88,6 +88,20 @@ describe("api", () => {
     expect(error.data).toEqual({ message: "Não autorizado" });
   });
 
+  it("dispara auth:unauthorized ao receber 401 com token ativo (exceto /auth/login)", async () => {
+    const listener = vi.fn();
+    window.addEventListener("auth:unauthorized", listener);
+    localStorage.setItem("dk_token", "tok");
+    fetchMock.mockResolvedValue(jsonResponse({ message: "Expirado" }, 401));
+
+    await expect(api.get("/orders")).rejects.toMatchObject({ status: 401 });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await expect(api.post("/auth/login", {})).rejects.toMatchObject({ status: 401 });
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("auth:unauthorized", listener);
+  });
+
   it("usa mensagem padrão quando o erro não tem corpo JSON", async () => {
     fetchMock.mockResolvedValue(new Response("falha", { status: 500 }));
 

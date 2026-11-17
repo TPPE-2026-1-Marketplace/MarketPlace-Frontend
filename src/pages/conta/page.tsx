@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { User } from "lucide-react";
 import { buttonClassName } from "@/components/ui/button-variants";
@@ -32,7 +32,7 @@ interface AccountForm {
 }
 
 export default function ContaPage() {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, updateUserProfile } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<AccountTabKey>("dados");
   const [isEditing, setIsEditing] = useState(false);
@@ -52,13 +52,21 @@ export default function ContaPage() {
     cpf: "",
   });
 
-  // Fetch full profile from backend on mount
+  const userId = user?.id;
+  const userRef = useRef(user);
   useEffect(() => {
-    if (!user?.id) return;
+    userRef.current = user;
+  }, [user]);
+
+  // Fetch full profile from backend on mount or user identity change
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
 
     api
-      .get<UserProfile>(`/people/${user.id}`)
+      .get<UserProfile>(`/people/${userId}`)
       .then((data) => {
+        if (cancelled) return;
         setProfile(data);
         setForm({
           name: data.nome || "",
@@ -69,16 +77,23 @@ export default function ContaPage() {
         });
       })
       .catch(() => {
+        if (cancelled) return;
+        const currentUser = userRef.current;
+        if (!currentUser) return;
         // Fallback: use auth context data
         setForm({
-          name: user.name || "",
-          email: user.email || "",
-          telefone: maskPhone(user.phone ?? ""),
+          name: currentUser.name || "",
+          email: currentUser.email || "",
+          telefone: maskPhone(currentUser.phone ?? ""),
           dataNascimento: "",
-          cpf: user.id || "",
+          cpf: currentUser.id || "",
         });
       });
-  }, [user]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   if (!isAuthenticated) {
     return (
@@ -233,14 +248,21 @@ export default function ContaPage() {
         cpf: maskCpf(updated.cpf ?? ""),
       });
 
-      // Update localStorage user data
-      const storedUser = localStorage.getItem("dk_user");
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        parsed.name = updated.nome;
-        parsed.email = updated.email;
-        parsed.phone = updated.telefone || undefined;
-        localStorage.setItem("dk_user", JSON.stringify(parsed));
+      if (updateUserProfile) {
+        updateUserProfile({
+          name: updated.nome ?? user.name,
+          email: updated.email,
+          phone: updated.telefone || undefined,
+        });
+      } else {
+        const storedUser = localStorage.getItem("dk_user");
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          parsed.name = updated.nome;
+          parsed.email = updated.email;
+          parsed.phone = updated.telefone || undefined;
+          localStorage.setItem("dk_user", JSON.stringify(parsed));
+        }
       }
 
       setIsEditing(false);

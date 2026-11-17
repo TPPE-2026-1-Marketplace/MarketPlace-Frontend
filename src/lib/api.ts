@@ -63,6 +63,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   });
 
   if (!response.ok) {
+    if (response.status === 401 && token && path !== "/auth/login" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("auth:unauthorized"));
+    }
     const errorData = await response.json().catch(() => ({}));
     throw new ApiError(
       response.status,

@@ -4,6 +4,7 @@ import AdminPanel from "@/components/manager/AdminPanel";
 import AdminShell from "@/components/manager/AdminShell";
 import type { AdminNavItem } from "@/components/manager/AdminNav";
 import { adminButtonClassName } from "@/components/manager/adminClasses";
+import Button from "@/components/ui/Button";
 import { buttonClassName } from "@/components/ui/button-variants";
 import { useAuth, type UserRole } from "../../context/AuthContext";
 import { Inventory } from "./Inventory";
@@ -40,7 +41,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 /** "Acesso restrito" no formato do frame "Fluxo / access" (755:6068). */
-function RestrictedAccess() {
+function RestrictedAccess({ isLoggedIn, onSwitchAccount }: Readonly<{ isLoggedIn: boolean; onSwitchAccount: () => void }>) {
   return (
     <div className="flex min-h-screen flex-col gap-6 bg-[var(--background-store)] p-4 md:p-8">
       <p className="text-sm leading-5 font-medium text-[var(--foreground-secondary)]">DK Fashion / Gestão</p>
@@ -51,6 +52,11 @@ function RestrictedAccess() {
             <Link to="/login" className={buttonClassName({ variant: "action", size: "sm", className: adminButtonClassName })}>
               Fazer login
             </Link>
+            {isLoggedIn && (
+              <Button variant="outline-neutral" size="sm" className={adminButtonClassName} onClick={onSwitchAccount}>
+                Trocar de conta
+              </Button>
+            )}
             <Link to="/" className={buttonClassName({ variant: "outline-neutral", size: "sm", className: adminButtonClassName })}>
               Voltar à loja
             </Link>
@@ -74,14 +80,14 @@ export function ManagerDashboard() {
     navigate(newTab === "dashboard" ? "/painel" : `/painel/${newTab}`);
   };
 
-  if (!isInternalUser || !user) {
-    return <RestrictedAccess />;
-  }
-
-  const handleLogout = () => {
+  const handleSwitchAccount = () => {
     logout();
-    navigate("/");
+    navigate("/login");
   };
+
+  if (!isInternalUser || !user) {
+    return <RestrictedAccess isLoggedIn={Boolean(user)} onSwitchAccount={handleSwitchAccount} />;
+  }
 
   // Ordem e rótulos do "Menu administrativo" do Figma, só com as abas que existem.
   const navItems: (AdminNavItem<Tab> & { requiresPermission?: () => boolean })[] = [
@@ -110,7 +116,6 @@ export function ManagerDashboard() {
       userName={user.name}
       roleLabel={ROLE_LABELS[user.role]}
       periodLabel={periodLabel}
-      onLogout={handleLogout}
     >
       {tab === "dashboard" && <Overview />}
       {tab === "estoque" && <Inventory readOnly={!canEditStock} />}

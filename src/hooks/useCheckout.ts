@@ -20,6 +20,19 @@ import type {
 export const MAX_INSTALLMENTS = 6;
 export const CHECKOUT_DRAFT_STORAGE_KEY = "dk_checkout_draft";
 
+function isSafeRedirectUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol === "https:") return true;
+    if (parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function loadCheckoutDraft(): Partial<CheckoutForm> | null {
   try {
     const raw = sessionStorage.getItem(CHECKOUT_DRAFT_STORAGE_KEY);
@@ -297,7 +310,10 @@ export function useCheckout() {
     if (delivery === "entrega" && shipping.error && validation.cep) validation.cep = shipping.error;
     setErrors(validation);
     if (Object.keys(validation).length > 0) return validation;
-    if (paymentMethod === "boleto") return {};
+    if (paymentMethod === "boleto") {
+      setSubmitError("Pagamento por boleto indisponível no momento. Escolha cartão ou PIX.");
+      return {};
+    }
 
     setSubmitting(true);
     setSubmitError(null);
@@ -345,7 +361,7 @@ export function useCheckout() {
       }
       clear();
 
-      if (payment.status !== "paid" && payment.redirectUrl) {
+      if (payment.status !== "paid" && payment.redirectUrl && isSafeRedirectUrl(payment.redirectUrl)) {
         window.location.assign(payment.redirectUrl);
       } else {
         navigate(`/pedido/${orderId}`);

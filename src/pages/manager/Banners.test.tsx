@@ -65,6 +65,10 @@ describe("Banners", () => {
     expect(screen.queryByPlaceholderText("https://...")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Adição manual de URL" }));
+    await userEvent.type(screen.getByPlaceholderText("https://..."), "javascript:alert(1)");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(screen.getByText("Informe uma URL válida iniciando com https://")).toBeInTheDocument();
+    await userEvent.clear(screen.getByPlaceholderText("https://..."));
     await userEvent.type(screen.getByPlaceholderText("https://..."), "https://img/novo.jpg");
     await userEvent.type(screen.getByPlaceholderText("ex: Nova Coleção 2026"), "Lançamento");
     await userEvent.type(screen.getByPlaceholderText("Título principal do banner"), "Banner Novo");

@@ -1,7 +1,15 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LayoutDashboard, ShoppingBag, LogOut } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, type UserRole } from "../context/AuthContext";
+
+const ROLE_DISPLAY_LABELS: Record<UserRole, string> = {
+  superadmin: "Super Admin",
+  manager: "Gerente",
+  employee: "Vendedor",
+  cashier: "Caixa",
+  customer: "Cliente",
+};
 
 export function ModuleSelection() {
   const navigate = useNavigate();
@@ -21,15 +29,15 @@ export function ModuleSelection() {
     }
   }, [user, isInternalUser, navigate]);
 
-  const canAccessManagement = user?.role === "superadmin" || user?.role === "manager";
-
   // Não exibe entradas para os módulos antes da autorização.
   if (!user || !isInternalUser) {
     return null;
   }
 
+  const roleLabel = ROLE_DISPLAY_LABELS[user.role] ?? "Equipe interna";
+
   return (
-    <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--background-store)] flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         <div className="text-center mb-8">
           {/* Mesmo logo do Header da loja (public/dk-logo.svg). */}
@@ -41,30 +49,28 @@ export function ModuleSelection() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {canAccessManagement && (
-            <button
-              onClick={() => navigate("/painel")}
-              className="group bg-white border border-gray-100 p-8 hover:shadow-lg transition-all text-left"
-            >
-              <div className="w-14 h-14 bg-[#1a1a1a] flex items-center justify-center mb-4 group-hover:bg-[#333333] transition-colors">
-                <LayoutDashboard className="w-7 h-7 text-white" />
-              </div>
-              <h2 className="text-gray-900 text-xl mb-2">Módulo de Gestão</h2>
-              <p className="text-gray-500 text-sm leading-relaxed">
-                Acesse o painel administrativo para gerenciar produtos, estoque,
-                pedidos, vendas online, funcionários e relatórios.
-              </p>
-              <div className="mt-4 text-xs text-gray-400 uppercase tracking-widest">
-                Acesso: {user.role === "superadmin" ? "Super Admin" : "Gerente"}
-              </div>
-            </button>
-          )}
+          <button
+            onClick={() => navigate("/painel")}
+            className="group bg-white border border-gray-100 p-8 hover:shadow-lg transition-all text-left"
+          >
+            <div className="w-14 h-14 bg-[var(--foreground)] flex items-center justify-center mb-4 group-hover:opacity-90 transition-opacity">
+              <LayoutDashboard className="w-7 h-7 text-white" />
+            </div>
+            <h2 className="text-gray-900 text-xl mb-2">Módulo de Gestão</h2>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Acesse o painel administrativo para consultar estoque, pedidos,
+              vendas presenciais, comissões e retirada em loja.
+            </p>
+            <div className="mt-4 text-xs text-gray-400 uppercase tracking-widest">
+              Acesso: {roleLabel}
+            </div>
+          </button>
 
           <button
             onClick={() => navigate("/pdv")}
             className="group bg-white border border-gray-100 p-8 hover:shadow-lg transition-all text-left"
           >
-            <div className="w-14 h-14 bg-[#1a1a1a] flex items-center justify-center mb-4 group-hover:bg-[#333333] transition-colors">
+            <div className="w-14 h-14 bg-[var(--foreground)] flex items-center justify-center mb-4 group-hover:opacity-90 transition-opacity">
               <ShoppingBag className="w-7 h-7 text-white" />
             </div>
             <h2 className="text-gray-900 text-xl mb-2">PDV - Vendas Presenciais</h2>
@@ -101,13 +107,7 @@ export function ModuleSelection() {
             </div>
             <div>
               <span className="text-gray-400">Perfil:</span>
-              <span className="text-gray-700 ml-2 capitalize">
-                {user.role === "superadmin"
-                  ? "Super Admin"
-                  : user.role === "manager"
-                  ? "Gerente"
-                  : "Funcionário"}
-              </span>
+              <span className="text-gray-700 ml-2">{roleLabel}</span>
             </div>
             {user.commissionRate && (
               <div>

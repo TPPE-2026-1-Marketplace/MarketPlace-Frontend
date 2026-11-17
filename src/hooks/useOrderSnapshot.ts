@@ -7,8 +7,8 @@ export const PENDING_ORDER_KEY = "dk_pending_order";
 
 export function saveOrderSnapshot(snapshot: OrderSnapshot): void {
   try {
-    localStorage.setItem(ORDER_SNAPSHOT_KEY, JSON.stringify(snapshot));
-    localStorage.setItem(PENDING_ORDER_KEY, String(snapshot.idPedido));
+    sessionStorage.setItem(ORDER_SNAPSHOT_KEY, JSON.stringify(snapshot));
+    sessionStorage.setItem(PENDING_ORDER_KEY, String(snapshot.idPedido));
   } catch {
     // Armazenamento indisponível (modo privado): a confirmação usa o fallback.
   }
@@ -17,7 +17,7 @@ export function saveOrderSnapshot(snapshot: OrderSnapshot): void {
 /** Lê o snapshot salvo; com `idPedido`, só retorna se for do mesmo pedido. */
 export function readOrderSnapshot(idPedido?: string | number | null): OrderSnapshot | null {
   try {
-    const raw = localStorage.getItem(ORDER_SNAPSHOT_KEY);
+    const raw = sessionStorage.getItem(ORDER_SNAPSHOT_KEY) ?? localStorage.getItem(ORDER_SNAPSHOT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<OrderSnapshot>;
     if (typeof parsed?.idPedido !== "number") return null;
@@ -30,7 +30,7 @@ export function readOrderSnapshot(idPedido?: string | number | null): OrderSnaps
 
 export function readPendingOrderId(): string | null {
   try {
-    return localStorage.getItem(PENDING_ORDER_KEY);
+    return sessionStorage.getItem(PENDING_ORDER_KEY) ?? localStorage.getItem(PENDING_ORDER_KEY);
   } catch {
     return null;
   }
