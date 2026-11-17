@@ -214,6 +214,17 @@ describe("useCheckout — envio", () => {
     navigateMock.mockReset();
   });
 
+  it("avisa antes de sair da página com o formulário preenchido e sem finalizar", async () => {
+    mockApi();
+    const { result } = renderCheckout();
+    await fillValidForm(result);
+
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it("não mostra o aviso de saída do navegador ao redirecionar para o pagamento", async () => {
     mockApi();
     const { result } = renderCheckout();
