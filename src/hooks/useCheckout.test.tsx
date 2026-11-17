@@ -214,6 +214,37 @@ describe("useCheckout — envio", () => {
     navigateMock.mockReset();
   });
 
+  it("avisa antes de sair da página com o formulário preenchido e sem finalizar", async () => {
+    mockApi();
+    const { result } = renderCheckout();
+    await fillValidForm(result);
+
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("não mostra o aviso de saída do navegador ao redirecionar para o pagamento", async () => {
+    mockApi();
+    const { result } = renderCheckout();
+    await fillValidForm(result);
+
+    // O redirecionamento acontece antes do re-render que remove o listener,
+    // então o beforeunload é disparado exatamente neste momento.
+    let warningPrevented: boolean | null = null;
+    assignMock.mockImplementation(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      warningPrevented = event.defaultPrevented;
+    });
+
+    await act(() => result.current.checkout.submit());
+
+    expect(assignMock).toHaveBeenCalled();
+    expect(warningPrevented).toBe(false);
+  });
+
   it("não envia com erros e devolve os campos inválidos", async () => {
     mockApi();
     const { result } = renderCheckout();

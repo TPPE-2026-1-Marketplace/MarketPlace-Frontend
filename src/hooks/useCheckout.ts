@@ -223,6 +223,12 @@ export function useCheckout() {
   /** Verdadeiro depois do envio: o carrinho esvazia, mas a página não deve voltar ao carrinho. */
   const [completed, setCompleted] = useState(false);
   const orderIdRef = useRef<number | null>(null);
+  /**
+   * Desliga o aviso "Deseja sair do site?" de forma síncrona. `completed` só
+   * desliga o listener após o re-render, e o redirecionamento ao checkout da
+   * InfinitePay acontece antes disso, então o navegador ainda mostrava o aviso.
+   */
+  const skipUnloadWarningRef = useRef(false);
 
   const isFormDirty =
     !completed &&
@@ -248,6 +254,7 @@ export function useCheckout() {
   useEffect(() => {
     if (!isFormDirty) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (skipUnloadWarningRef.current) return;
       event.preventDefault();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -353,6 +360,7 @@ export function useCheckout() {
         parcelas,
         criadoEm: new Date().toISOString(),
       });
+      skipUnloadWarningRef.current = true;
       setCompleted(true);
       try {
         sessionStorage.removeItem(CHECKOUT_DRAFT_STORAGE_KEY);
