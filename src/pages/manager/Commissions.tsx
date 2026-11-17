@@ -9,6 +9,7 @@ import KpiCard, { KpiGrid } from "@/components/manager/KpiCard";
 import NoResults from "@/components/manager/NoResults";
 import RecordsTable, { type RecordColumn } from "@/components/manager/RecordsTable";
 import TeamGoalDialog from "@/components/manager/TeamGoalDialog";
+import { SellerRanking } from "@/components/SellerRanking";
 import { adminButtonClassName, adminControlClassName } from "@/components/manager/adminClasses";
 import { formatCompetence } from "@/components/manager/format";
 import Button from "@/components/ui/Button";
@@ -39,7 +40,7 @@ interface CommissionsProps {
 }
 
 /** Comissões do painel (Figma 755:2745 / 755:2996). */
-export function Commissions({ now }: CommissionsProps) {
+export function Commissions({ now }: Readonly<CommissionsProps>) {
   const { isSuperAdmin } = useAuth();
   const [openedAt] = useState(() => now ?? new Date());
   const competences = useMemo(() => recentCompetences(openedAt), [openedAt]);
@@ -197,6 +198,8 @@ export function Commissions({ now }: CommissionsProps) {
               getRowKey={(seller) => seller.employee.cpf}
             />
           )}
+
+          <SellerRanking mes={competence.mes} ano={competence.ano} />
         </>
       )}
 
